@@ -131,8 +131,6 @@ function logout() {
     S.demoMode    = false;
     S.leads = []; S.calls = []; S.commissions = []; S.team = [];
     S.scripts = []; S.smsTemplates = []; S.scheduledJobs = []; S.auditLog = [];
-    const db = document.getElementById('demo-banner');
-    if (db) db.style.display = 'none';
     // Restore real data from localStorage so next login sees correct state
     loadLocal();
   }
@@ -198,7 +196,6 @@ function startDemo() {
   sessionStorage.setItem('aiv-session', JSON.stringify(user));
   failedAttempts = 0;
   document.getElementById('login-overlay').classList.add('hidden');
-  document.getElementById('demo-banner').style.display = 'flex';
   resetSessionTimer();
   applySidebarForRole('admin');
   updateSidebarUser(user);
