@@ -1,0 +1,25 @@
+/* ── BASE: Reset, Design Tokens, Typography ──────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#0B0D12;--surface:#12151D;--surface-hi:#1A1E2A;--border:#1F2535;--border-hi:#2A3147;
+  --accent:#4B72FF;--acc-m:rgba(75,114,255,.10);--acc-g:rgba(75,114,255,.20);
+  --hl:#EDF0F7;--sub:#8B93A8;--body:#5A6278;--pos:#2DD4BF;--red:#FF4545;--amber:#F59E0B;
+  --sw:248px;
+  --s-new:#4B72FF;--s-contact:#F59E0B;--s-interest:#2DD4BF;--s-closed:#22C55E;
+  --s-failed:#FF6B35;--s-dead:#8B93A8;--s-dnc:#FF4545;
+}
+
+html{font-size:14px;scroll-behavior:smooth}
+body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--hl);-webkit-font-smoothing:antialiased;display:flex;min-height:100vh;overflow:hidden}
+body::after{content:'';position:fixed;top:-200px;right:-200px;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(75,114,255,.05) 0%,transparent 70%);pointer-events:none;z-index:0}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:3px}
+
+/* Animations */
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+@keyframes slideIn{from{transform:translateY(-20px);opacity:0}to{transform:translateY(0);opacity:1}}
