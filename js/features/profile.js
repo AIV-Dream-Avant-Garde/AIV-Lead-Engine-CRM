@@ -27,7 +27,8 @@ function renderPerfil() {
   const myLeads  = S.leads.filter(l => l.providerId === uid_ || l.closerId === uid_);
   const myClosed = myLeads.filter(l => l.status === 'Cerrado');
   const myComm   = S.commissions.filter(c => c.providerId === uid_ || c.closerId === uid_);
-  const totalPaid = myComm.filter(c => c.status === 'paid').reduce((s,c) => {
+  // Include clawbacks (negative amounts) to accurately reduce totalPaid on refunds
+  const totalPaid = myComm.filter(c => c.status === 'paid' || c.status === 'clawback').reduce((s,c) => {
     let a = 0;
     if (c.closerId   === uid_) a += parseFloat(c.closerAmount   || 0);
     if (c.providerId === uid_) a += parseFloat(c.providerAmount || 0);
@@ -119,8 +120,8 @@ function renderPerfil() {
           let amt = 0;
           if (c.closerId   === uid_) amt += parseFloat(c.closerAmount   || 0);
           if (c.providerId === uid_) amt += parseFloat(c.providerAmount || 0);
-          const statusCls = {pending:'comm-pending', paid:'comm-paid', cancelled:'comm-cancelled'}[c.status] || 'comm-pending';
-          const statusLbl = {pending:'Pendiente', paid:'Pagado', cancelled:'Cancelado'}[c.status] || c.status;
+          const statusCls = {pending:'comm-pending', paid:'comm-paid', cancelled:'comm-cancelled', clawback:'comm-cancelled'}[c.status] || 'comm-pending';
+          const statusLbl = {pending:'Pendiente', paid:'Pagado', cancelled:'Cancelado', clawback:'Reembolso'}[c.status] || c.status;
           return `<div class="comm-item">
             <div class="comm-info">
               <div class="comm-lead">${esc(c.leadName||'--')}</div>

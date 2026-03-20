@@ -15,10 +15,10 @@ const SHEETS = { leads:'Leads', calls:'Llamadas', team:'Team', commissions:'Comm
 // CSRF protection — paste the value from your browser's Setup page
 const CRM_SECRET = 'PASTE_YOUR_CRM_SECRET_HERE'; // Setup → shows after first load
 
-const LEAD_HDR = ['id','name','phone','address','website','rating','reviews','city','barrio','keyword','source','sourceDetail','status','providerId','providerRate','closerId','closerRate','dealValue','providerCommission','closerCommission','commissionStatus','lockedBy','lockedUntil','assignedAt','workHistory','dncReason','followUpDate','notes','importedAt','updatedAt','calendarEventId'];
+const LEAD_HDR = ['id','name','phone','address','website','rating','reviews','city','barrio','keyword','source','sourceDetail','status','providerId','providerRate','closerId','closerRate','dealValue','collectedAmount','providerCommission','closerCommission','commissionStatus','lockedBy','lockedUntil','assignedAt','workHistory','dncReason','followUpDate','notes','importedAt','updatedAt','calendarEventId','refundAmount','refundReason','refundedAt'];
 const CALL_HDR = ['id','leadId','leadName','phone','callSid','outcome','duration','notes','recordingUrl','driveUrl','consentConfirmed','calledAt'];
 const TEAM_HDR = ['id','name','role','pinHash','providerRate','closerRate','contact','active','createdAt'];
-const COMM_HDR   = ['id','leadId','leadName','dealValue','providerId','providerRate','providerAmount','closerId','closerRate','closerAmount','status','createdAt','paidAt','paidBy','paymentRef'];
+const COMM_HDR   = ['id','leadId','leadName','dealValue','collectedAmount','providerId','providerRate','providerAmount','closerId','closerRate','closerAmount','status','createdAt','paidAt','paidBy','paymentRef','refundReason','adjustedBy','adjustedAt'];
 const SCRIPT_HDR = ['id','name','stage','body','createdAt','updatedAt'];
 
 function getSheet(name, hdr) {
@@ -152,9 +152,50 @@ function doPost(e) {
     if (a === 'saveCommission') {
       const s=getSheet(SHEETS.commissions,COMM_HDR),rows=s.getDataRange().getValues();
       const h=rows[0]||COMM_HDR,lc=h.indexOf('leadId');
-      const exists=rows.slice(1).some(r=>String(r[lc])===String(b.leadId));
-      if(!exists)s.appendRow(COMM_HDR.map(h=>b[h]??''));
-      return ok({saved:!exists,duplicate:exists});
+      // Allow clawback records even when a commission for the same lead already exists
+      if(!b.isClawback){
+        const exists=rows.slice(1).some(r=>String(r[lc])===String(b.leadId));
+        if(exists)return ok({saved:false,duplicate:true});
+      }
+      s.appendRow(COMM_HDR.map(col=>b[col]??''));
+      return ok({saved:true,duplicate:false});
+    }
+    if (a === 'cancelCommission') {
+      const s=getSheet(SHEETS.commissions,COMM_HDR),rows=s.getDataRange().getValues(),h=rows[0];
+      const ic=h.indexOf('id'),sc=h.indexOf('status'),rc=h.indexOf('refundReason'),ac=h.indexOf('adjustedBy'),atc=h.indexOf('adjustedAt');
+      for(let i=1;i<rows.length;i++){
+        if(String(rows[i][ic])===String(b.id)){
+          s.getRange(i+1,sc+1).setValue('cancelled');
+          if(rc>=0)s.getRange(i+1,rc+1).setValue(b.reason||'');
+          if(ac>=0)s.getRange(i+1,ac+1).setValue(b.adjustedBy||'');
+          if(atc>=0)s.getRange(i+1,atc+1).setValue(new Date().toISOString());
+          break;
+        }
+      }
+      return ok({updated:true});
+    }
+    if (a === 'adjustCollected') {
+      const ls=getSheet(SHEETS.leads,LEAD_HDR),lrows=ls.getDataRange().getValues(),lh=lrows[0];
+      const lidx=lh.indexOf('id'),cidx=lh.indexOf('collectedAmount');
+      if(cidx>=0){
+        for(let i=1;i<lrows.length;i++){
+          if(String(lrows[i][lidx])===String(b.leadId)){
+            ls.getRange(i+1,cidx+1).setValue(b.collected??'');
+            break;
+          }
+        }
+      }
+      // Also update matching pending commission rows
+      const cs=getSheet(SHEETS.commissions,COMM_HDR),crows=cs.getDataRange().getValues(),ch=crows[0];
+      const clid=ch.indexOf('leadId'),cst=ch.indexOf('status'),cca=ch.indexOf('collectedAmount');
+      if(cca>=0){
+        for(let i=1;i<crows.length;i++){
+          if(String(crows[i][clid])===String(b.leadId)&&String(crows[i][cst])==='pending'){
+            cs.getRange(i+1,cca+1).setValue(b.collected??'');
+          }
+        }
+      }
+      return ok({updated:true});
     }
     if (a === 'markCommissionPaid') {
       const s=getSheet(SHEETS.commissions,COMM_HDR),rows=s.getDataRange().getValues(),h=rows[0];

@@ -135,7 +135,7 @@ function renderTable() {
         <td>${srcBadgeHTML(l.source)}</td>
         <td>${fuBadgeHTML(l)}</td>
         <td style="font-family:'DM Mono',monospace;font-size:11px">${esc(rat)}</td>
-        <td><span class="sbadge ${sc}">${esc(l.status || 'Nuevo')}</span></td>
+        <td><span class="sbadge ${sc}">${esc(l.status || 'Nuevo')}</span>${l.refundedAt ? '<span style="font-size:9px;background:#c0392b;color:#fff;border-radius:3px;padding:1px 4px;margin-left:3px">Reemb.</span>' : ''}</td>
         <td style="font-size:11px">${fmtD(l.updatedAt || l.importedAt)}</td>
         <td style="font-size:11px">${lc_}</td>
         <td>${lockCell}</td>
@@ -297,7 +297,7 @@ function openLead(id) {
   if (l.dncReason) { const dr = document.getElementById('m-dnc-reason'); if (dr) dr.value = l.dncReason; }
 
   // Detail grid with editable phone + address
-  document.getElementById('m-details').innerHTML = [
+  const detailRows = [
     {lb:'Telefono', v:`<input value="${esc(l.phone||'')}" id="edit-phone" placeholder="Sin telefono">`},
     {lb:'Rating',   v: l.rating && l.rating !== 'N/A' ? `★ ${l.rating} (${l.reviews} reseñas)` : '--'},
     {lb:'Direccion',v:`<input value="${esc(l.address||'')}" id="edit-address" placeholder="Sin direccion">`},
@@ -309,7 +309,17 @@ function openLead(id) {
       : 'Sin definir'},
     {lb:'Importado',  v: fmtD(l.importedAt)},
     {lb:'Actualizado',v: fmtD(l.updatedAt)},
-  ].map(({lb,v}) => `<div class="detail-item${['Telefono','Direccion'].includes(lb)?' editable':''}"><div class="detail-label">${lb}</div><div class="detail-val">${v}</div></div>`).join('');
+  ];
+  // Partial collection indicator
+  if (l.collectedAmount && parseFloat(l.collectedAmount) !== parseFloat(l.dealValue || 0)) {
+    detailRows.push({lb:'Cobrado', v:`<span style="color:var(--amber);font-weight:600">${fmtCOP(l.collectedAmount)}</span> de ${fmtCOP(l.dealValue)}`});
+  }
+  // Refund indicator
+  if (l.refundedAt) {
+    detailRows.push({lb:'Reembolso', v:`<span style="color:#c0392b;font-weight:600">${fmtCOP(l.refundAmount)}</span>${l.refundReason ? ' — ' + esc(l.refundReason) : ''}`});
+  }
+  document.getElementById('m-details').innerHTML = detailRows
+    .map(({lb,v}) => `<div class="detail-item${['Telefono','Direccion'].includes(lb)?' editable':''}"><div class="detail-label">${lb}</div><div class="detail-val">${v}</div></div>`).join('');
 
   // Lock/claim UI
   const lockWrap = document.getElementById('m-lock-wrap');

@@ -225,6 +225,30 @@ async function bulkMarkPaid() {
   alert(pending.length + ' comisiones marcadas como pagadas.');
 }
 
+function promptAdjustCollected(leadId) {
+  const lead = S.leads.find(l => l.id === leadId);
+  if (!lead) return;
+  const raw = prompt(`¿Cuánto se cobró efectivamente? (COP)\nValor contratado: ${fmtCOP(lead.dealValue)}`, lead.collectedAmount || lead.dealValue || '');
+  if (raw === null) return;
+  const reason = prompt('Motivo del ajuste (opcional):') || '';
+  adjustCollectedAmount(leadId, raw, reason);
+}
+
+function promptCancelCommission(commId) {
+  const reason = prompt('Razón de cancelación (requerida):');
+  if (!reason) return;
+  cancelCommission(commId, reason);
+}
+
+function promptIssueRefund(leadId) {
+  const lead = S.leads.find(l => l.id === leadId);
+  if (!lead) return;
+  if (!confirm(`¿Emitir reembolso para "${lead.name}"?\nEsto cancelará comisiones pendientes y creará registros de reembolso para las ya pagadas.`)) return;
+  const reason = prompt('Razón del reembolso (requerida):');
+  if (!reason) return;
+  issueRefund(leadId, reason);
+}
+
 // ── SMS / WhatsApp templates ────────────────────────────────
 function renderSmsTemplates() {
   const wrap = document.getElementById('admin-sms-list');
@@ -503,18 +527,31 @@ function renderAdmin() {
   if (commWrap) {
     commWrap.innerHTML = filtered.length
       ? filtered.map(c => {
+          const isClawback = c.status === 'clawback';
           const totalAmt = parseFloat(c.providerAmount||0) + parseFloat(c.closerAmount||0);
-          const statusCls = {pending:'comm-pending', paid:'comm-paid', cancelled:'comm-cancelled'}[c.status] || 'comm-pending';
-          const statusLbl = {pending:'Pendiente', paid:'Pagado', cancelled:'Cancelado'}[c.status] || c.status;
+          const statusCls = {pending:'comm-pending', paid:'comm-paid', cancelled:'comm-cancelled', clawback:'comm-cancelled'}[c.status] || 'comm-pending';
+          const statusLbl = {pending:'Pendiente', paid:'Pagado', cancelled:'Cancelado', clawback:'Reembolso'}[c.status] || c.status;
           const paidInfo  = c.status === 'paid' ? ` · ${esc(c.paidBy||'')} · ${esc(c.paymentRef||'')}` : '';
+          const refundInfo = (c.refundReason && c.status !== 'paid') ? ` · Motivo: ${esc(c.refundReason)}` : '';
+          const collInfo  = c.collectedAmount && parseFloat(c.collectedAmount) !== parseFloat(c.dealValue)
+            ? ` · Cobrado: ${fmtCOP(c.collectedAmount)}`
+            : '';
+          const amtStyle  = isClawback ? 'color:#c0392b;' : '';
+          const actions   = c.status === 'pending'
+            ? `<button class="btn btn-success" style="font-size:11px;padding:4px 9px;flex-shrink:0" onclick="markCommissionPaid('${c.id}')">Marcar pagado</button>
+               <button class="btn btn-ghost" style="font-size:11px;padding:4px 9px;flex-shrink:0" onclick="promptAdjustCollected('${c.leadId}')">Ajustar cobrado</button>
+               <button class="btn btn-danger" style="font-size:11px;padding:4px 9px;flex-shrink:0" onclick="promptCancelCommission('${c.id}')">Cancelar</button>`
+            : c.status === 'paid'
+            ? `<button class="btn btn-danger" style="font-size:11px;padding:4px 9px;flex-shrink:0" onclick="promptIssueRefund('${c.leadId}')">Reembolso</button>`
+            : '';
           return `<div class="admin-comm-row">
             <div class="admin-comm-info">
               <div class="admin-comm-lead">${esc(c.leadName||'--')}</div>
-              <div class="admin-comm-detail">Negocio: ${fmtCOP(c.dealValue)} · ${esc(c.providerName||'--')} ${fmtCOP(c.providerAmount)} + ${esc(c.closerName||'--')} ${fmtCOP(c.closerAmount)} · ${fmtD(c.createdAt)}${paidInfo}</div>
+              <div class="admin-comm-detail">Contratado: ${fmtCOP(c.dealValue)}${collInfo} · ${esc(c.providerName||'--')} ${fmtCOP(c.providerAmount)} + ${esc(c.closerName||'--')} ${fmtCOP(c.closerAmount)} · ${fmtD(c.createdAt)}${paidInfo}${refundInfo}</div>
             </div>
-            <span class="admin-comm-amount">${fmtCOP(totalAmt)}</span>
+            <span class="admin-comm-amount" style="${amtStyle}">${fmtCOP(totalAmt)}</span>
             <span class="comm-status-badge ${statusCls}">${statusLbl}</span>
-            ${c.status === 'pending' ? `<button class="btn btn-success" style="font-size:11px;padding:4px 9px;flex-shrink:0" onclick="markCommissionPaid('${c.id}')">Marcar pagado</button>` : ''}
+            ${actions}
           </div>`;
         }).join('')
       : `<div class="notes-empty">Sin comisiones${commFilter ? ' con ese filtro' : ''}.</div>`;

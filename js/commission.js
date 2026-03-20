@@ -110,3 +110,96 @@ function confirmCerradoWithValue(leadId, dealValue) {
   closeModal();
   renderAll();
 }
+
+// ── Partial payments, refunds & clawbacks ──────────────────
+
+function adjustCollectedAmount(leadId, collectedRaw, reason) {
+  const lead = S.leads.find(l => l.id === leadId);
+  if (!lead) return;
+  const collected = parseFloat(collectedRaw);
+  if (isNaN(collected) || collected < 0 || collected > parseFloat(lead.dealValue || 0)) {
+    alert('Monto inválido. Debe ser entre 0 y ' + fmtCOP(lead.dealValue) + '.'); return;
+  }
+  lead.collectedAmount = collected;
+  lead.updatedAt = new Date().toISOString();
+  const {providerAmount, closerAmount} = calcCommissions(lead, collected);
+  S.commissions
+    .filter(c => c.leadId === leadId && c.status === 'pending')
+    .forEach(c => {
+      c.providerAmount  = providerAmount;
+      c.closerAmount    = closerAmount;
+      c.collectedAmount = collected;
+      c.adjustedBy      = S.session?.userName || 'Admin';
+      c.adjustedAt      = new Date().toISOString();
+      if (reason) c.refundReason = reason;
+    });
+  pushLead(lead);
+  if (S.config.scriptUrl) sheetsCall({action:'adjustCollected', leadId, collected, reason: reason || '', adjustedBy: S.session?.userName || 'Admin'});
+  saveLocal();
+  auditLog('adjustCollected', leadId, `${lead.name} → ${fmtCOP(collected)}`);
+  renderAll();
+}
+
+function cancelCommission(commId, reason) {
+  const c = S.commissions.find(x => x.id === commId);
+  if (!c || c.status !== 'pending') return;
+  const now = new Date().toISOString();
+  c.status       = 'cancelled';
+  c.refundReason = reason || '';
+  c.adjustedBy   = S.session?.userName || 'Admin';
+  c.adjustedAt   = now;
+  const lead = S.leads.find(l => l.id === c.leadId);
+  if (lead) { lead.commissionStatus = 'cancelled'; lead.updatedAt = now; pushLead(lead); }
+  if (S.config.scriptUrl) sheetsCall({action:'cancelCommission', id: commId, reason: reason || '', adjustedBy: c.adjustedBy});
+  saveLocal();
+  auditLog('cancelCommission', commId, reason || '');
+  renderAll();
+}
+
+function issueRefund(leadId, reason) {
+  if (!reason) return;
+  const lead = S.leads.find(l => l.id === leadId);
+  if (!lead) return;
+  const now = new Date().toISOString();
+  lead.refundAmount = parseFloat(lead.collectedAmount || lead.dealValue || 0);
+  lead.refundReason = reason;
+  lead.refundedAt   = now;
+  lead.updatedAt    = now;
+
+  S.commissions
+    .filter(c => c.leadId === leadId && c.status !== 'clawback')
+    .forEach(c => {
+      if (c.status === 'pending') {
+        c.status       = 'cancelled';
+        c.refundReason = reason;
+        c.adjustedBy   = S.session?.userName || 'Admin';
+        c.adjustedAt   = now;
+        if (S.config.scriptUrl) sheetsCall({action:'cancelCommission', id: c.id, reason, adjustedBy: c.adjustedBy});
+      } else if (c.status === 'paid') {
+        const clawback = {
+          id:             uid(),
+          leadId:         c.leadId,
+          leadName:       c.leadName,
+          dealValue:      -(parseFloat(c.dealValue)      || 0),
+          providerId:     c.providerId,
+          providerName:   c.providerName,
+          providerAmount: -(parseFloat(c.providerAmount) || 0),
+          closerId:       c.closerId,
+          closerName:     c.closerName,
+          closerAmount:   -(parseFloat(c.closerAmount)   || 0),
+          status:         'clawback',
+          refundReason:   reason,
+          adjustedBy:     S.session?.userName || 'Admin',
+          paidAt:'', paidBy:'', paymentRef:'',
+          createdAt:      now,
+        };
+        S.commissions.push(clawback);
+        if (S.config.scriptUrl) sheetsCall({action:'saveCommission', ...clawback, isClawback: true});
+      }
+    });
+
+  pushLead(lead);
+  saveLocal();
+  auditLog('issueRefund', leadId, reason);
+  renderAll();
+}

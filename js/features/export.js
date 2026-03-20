@@ -36,8 +36,9 @@ function doExport() {
   const leads = getExportLeads();
   const hdrs  = ['name','phone','address','website','rating','reviews','city','barrio','keyword',
                   'source','sourceDetail','status','dncReason','followUpDate','importedAt','updatedAt',
-                  'dealValue','providerCommission','closerCommission','commissionStatus',
-                  'providerName','closerName','callCount'];
+                  'dealValue','collectedAmount','providerCommission','closerCommission','commissionStatus',
+                  'providerName','closerName','callCount',
+                  'refundAmount','refundReason','refundedAt'];
   const csv   = [
     hdrs.join(','),
     ...leads.map(l => {
