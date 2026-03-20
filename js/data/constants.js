@@ -58,7 +58,6 @@ const SCORE_WEIGHTS = {
 
 const ROLE_VISIBLE = {
   admin:    ['setup','scraper','import','leads','pipeline','llamadas','perfil','export','admin','analytics'],
-  provider: ['leads','pipeline','perfil'],
   closer:   ['leads','pipeline','llamadas','perfil'],
   solo:     ['leads','pipeline','llamadas','perfil','analytics'],
 };

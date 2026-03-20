@@ -275,17 +275,6 @@ function applyBulkAction() {
         pushLead(l);
       }
     });
-  } else if (act === 'provider') {
-    if (!sess) { toast('Debes iniciar sesión.', 'error'); return; }
-    S.leads.forEach(l => {
-      if (S.selected.has(l.id)) {
-        l.providerId   = sess.userId;
-        l.providerRate = sess.providerRate || 0;
-        l.assignedAt   = l.assignedAt || now;
-        l.updatedAt    = now;
-        pushLead(l);
-      }
-    });
   } else if (act === 'dnc') {
     const reason = document.getElementById('bulk-action-text')?.value?.trim();
     if (!reason) { toast('Ingresa la razón DNC — requerido como registro legal.', 'error'); return; }
@@ -612,10 +601,9 @@ function renderDealPreview(lead) {
   if (!wrap) return;
   const val = parseFloat(document.getElementById('m-deal-value')?.value || lead.dealValue || 0);
   if (!val) { wrap.textContent = ''; return; }
-  const {providerAmount, closerAmount} = calcCommissions(lead, val);
-  const pName = S.team.find(m => m.id === lead.providerId)?.name || '—';
+  const {closerAmount} = calcCommissions(lead, val);
   const cName = S.team.find(m => m.id === lead.closerId)?.name || S.session?.userName || '—';
-  wrap.innerHTML = `Prov. (${esc(pName)}): <strong>${fmtCOP(providerAmount)}</strong> · Closer (${esc(cName)}): <strong>${fmtCOP(closerAmount)}</strong>`;
+  wrap.innerHTML = `Closer (${esc(cName)}): <strong>${fmtCOP(closerAmount)}</strong>`;
 }
 
 function startCallFromModal(leadId) { closeModal(); makeCall(leadId); }

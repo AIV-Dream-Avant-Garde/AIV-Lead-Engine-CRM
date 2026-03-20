@@ -348,7 +348,6 @@ Content-Type: application/json
       <option value="followup">Fijar seguimiento</option>
       <option value="source">Cambiar fuente</option>
       <option value="closer">Asignar cerrador (yo)</option>
-      <option value="provider">Asignar proveedor (yo)</option>
       <option value="dnc">Marcar No llamar</option>
     </select>
     <input type="date" id="bulk-action-date" style="display:none;font-size:12px;padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--hl)">
@@ -790,7 +789,6 @@ Content-Type: application/json
       <input type="number" id="deal-value-inp" placeholder="Ej: 5000000" min="0" step="1000" oninput="updateDealPreview()">
     </div>
     <div id="deal-preview" class="deal-preview">
-      <div class="deal-preview-row"><span id="dp-provider-label">Proveedor (--%):</span><span id="dp-provider-amt">$0</span></div>
       <div class="deal-preview-row"><span id="dp-closer-label">Closer (--%):</span><span id="dp-closer-amt">$0</span></div>
       <div class="deal-preview-row deal-preview-total"><span>Total comisiones:</span><span id="dp-total">$0</span></div>
     </div>
@@ -811,21 +809,11 @@ Content-Type: application/json
       <div class="field"><label>Rol</label>
         <select id="tm-role">
           <option value="closer">Closer</option>
-          <option value="provider">Proveedor</option>
           <option value="solo">Solo Operator</option>
         </select>
       </div>
       <div class="field"><label>PIN (4 digitos)</label><input type="password" id="tm-pin" placeholder="••••" maxlength="4" pattern="[0-9]{4}"></div>
       <div class="field"><label>Confirmar PIN</label><input type="password" id="tm-pin2" placeholder="••••" maxlength="4"></div>
-      <div class="field"><label>Tasa proveedor (%)</label>
-        <select id="tm-prate">
-          <option value="0">0%</option><option value="0.5">0.5%</option><option value="1">1%</option>
-          <option value="1.5">1.5%</option><option value="2">2%</option><option value="2.5">2.5%</option>
-          <option value="3" selected>3%</option><option value="3.5">3.5%</option><option value="4">4%</option>
-          <option value="4.5">4.5%</option><option value="5">5%</option><option value="6">6%</option>
-          <option value="7">7%</option><option value="8">8%</option><option value="10">10%</option>
-        </select>
-      </div>
       <div class="field"><label>Tasa closer (%)</label>
         <select id="tm-crate">
           <option value="5">5%</option><option value="7">7%</option><option value="8">8%</option>
@@ -838,7 +826,7 @@ Content-Type: application/json
       </div>
     </div>
     <div class="form-grid col1" style="margin-top:4px;margin-bottom:4px"><div class="field"><label>WhatsApp / Email (opcional)</label><input type="text" id="tm-contact" placeholder="+57 300 000 0000 o correo@empresa.com"></div></div>
-    <div class="info-row" style="margin-top:4px;margin-bottom:14px">El PIN se guarda como hash SHA-256 — ni tu puedes verlo despues. Si lo olvidan, asignales uno nuevo.</div>
+    <div class="info-row" style="margin-top:4px;margin-bottom:14px">El PIN se guarda de forma segura. El admin puede revelar el PIN desde el panel de equipo.</div>
     <div class="btn-row">
       <button class="btn btn-primary" onclick="saveTeamMember()">Guardar miembro</button>
       <button class="btn btn-ghost" onclick="closeTeamModal()">Cancelar</button>

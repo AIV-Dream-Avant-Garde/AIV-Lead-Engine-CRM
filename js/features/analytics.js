@@ -21,7 +21,7 @@ function renderAnalyticsKPIs() {
 
   const paidComm = S.commissions
     .filter(c => c.status === 'paid' && c.paidAt && c.paidAt.startsWith(month))
-    .reduce((s, c) => s + parseFloat(c.closerAmount || 0) + parseFloat(c.providerAmount || 0), 0);
+    .reduce((s, c) => s + parseFloat(c.closerAmount || 0), 0);
 
   const worked = S.leads.filter(l => l.status !== 'Nuevo').length;
   const closeRate = worked > 0
@@ -93,11 +93,11 @@ function renderSourceROI() {
 function renderLeaderboard() {
   const tbody = document.querySelector('#analytics-leaderboard tbody');
   if (!tbody) return;
-  const ROLE_LABELS = {admin:'Admin', provider:'Proveedor', closer:'Closer', solo:'Solo'};
+  const ROLE_LABELS = {admin:'Admin', closer:'Closer', solo:'Solo'};
   const members = S.team.filter(m => String(m.active) !== 'false').map(m => {
-    const closed  = S.leads.filter(l => l.status === 'Cerrado' && (l.closerId === m.id || l.providerId === m.id));
+    const closed  = S.leads.filter(l => l.status === 'Cerrado' && l.closerId === m.id);
     const revenue = closed.reduce((s, l) => s + parseFloat(l.dealValue || 0), 0);
-    const calls   = S.calls.filter(c => c.leadId && S.leads.find(l => l.id === c.leadId && (l.closerId === m.id || l.providerId === m.id))).length;
+    const calls   = S.calls.filter(c => c.leadId && S.leads.find(l => l.id === c.leadId && l.closerId === m.id)).length;
     return {name:m.name, role:m.role, deals:closed.length, revenue, calls};
   }).sort((a, b) => b.revenue - a.revenue || b.deals - a.deals);
 

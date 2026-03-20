@@ -17,30 +17,21 @@ function renderPerfil() {
         <div class="profile-name">${esc(user.userName)}</div>
         <div class="profile-role-label">${role}</div>
         <div class="profile-rates">
-          ${user.providerRate > 0 ? `<span class="rate-badge rate-provider">Proveedor: ${user.providerRate}%</span>` : ''}
-          ${user.closerRate   > 0 ? `<span class="rate-badge rate-closer">Closer: ${user.closerRate}%</span>`   : ''}
+          ${user.closerRate > 0 ? `<span class="rate-badge rate-closer">Closer: ${user.closerRate}%</span>` : ''}
         </div>
       </div>
     </div>`;
 
   // Lead stats
   const isAdmin  = role === 'admin';
-  const myLeads  = isAdmin ? S.leads : S.leads.filter(l => l.providerId === uid_ || l.closerId === uid_);
+  const myLeads  = isAdmin ? S.leads : S.leads.filter(l => l.closerId === uid_ || l.lockedBy === uid_);
   const myClosed = myLeads.filter(l => l.status === 'Cerrado');
-  const myComm   = isAdmin ? S.commissions : S.commissions.filter(c => c.providerId === uid_ || c.closerId === uid_);
+  const myComm   = isAdmin ? S.commissions : S.commissions.filter(c => c.closerId === uid_);
   // Include clawbacks (negative amounts) to accurately reduce totalPaid on refunds
-  const totalPaid = myComm.filter(c => c.status === 'paid' || c.status === 'clawback').reduce((s,c) => {
-    let a = 0;
-    if (c.closerId   === uid_) a += parseFloat(c.closerAmount   || 0);
-    if (c.providerId === uid_) a += parseFloat(c.providerAmount || 0);
-    return s + a;
-  }, 0);
-  const totalPending = myComm.filter(c => c.status === 'pending').reduce((s,c) => {
-    let a = 0;
-    if (c.closerId   === uid_) a += parseFloat(c.closerAmount   || 0);
-    if (c.providerId === uid_) a += parseFloat(c.providerAmount || 0);
-    return s + a;
-  }, 0);
+  const totalPaid = myComm.filter(c => c.status === 'paid' || c.status === 'clawback').reduce((s,c) =>
+    s + parseFloat(c.closerAmount || 0), 0);
+  const totalPending = myComm.filter(c => c.status === 'pending').reduce((s,c) =>
+    s + parseFloat(c.closerAmount || 0), 0);
   const setEl = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
   setEl('pst-leads',   myLeads.length);
   setEl('pst-closed',  myClosed.length);
@@ -51,7 +42,7 @@ function renderPerfil() {
   const myCalls  = isAdmin ? S.calls : S.calls.filter(c => {
     if (c.calledBy) return c.calledBy === uid_;
     const lead = S.leads.find(l => l.id === c.leadId);
-    return lead && (lead.closerId === uid_ || lead.providerId === uid_);
+    return lead && lead.closerId === uid_;
   });
   const answered = myCalls.filter(c => c.outcome === 'answered');
   const avgDur   = myCalls.length
@@ -103,25 +94,9 @@ function renderPerfil() {
   // Commission ledger
   const commList = document.getElementById('perfil-comm-list');
   if (commList) {
-    // Solo operator: show provider/closer split summary first
-    if (role === 'solo') {
-      let asProvider = 0, asCloser = 0;
-      myComm.forEach(c => {
-        if (c.providerId === uid_) asProvider += parseFloat(c.providerAmount || 0);
-        if (c.closerId   === uid_) asCloser   += parseFloat(c.closerAmount   || 0);
-      });
-      commList.insertAdjacentHTML('beforebegin',
-        `<div style="display:flex;gap:10px;margin-bottom:10px">
-          <div class="perf-stat" style="flex:1"><div class="perf-val">${fmtCOP(asProvider)}</div><div class="perf-lbl">Como proveedor</div></div>
-          <div class="perf-stat" style="flex:1"><div class="perf-val">${fmtCOP(asCloser)}</div><div class="perf-lbl">Como closer</div></div>
-        </div>`
-      );
-    }
     commList.innerHTML = myComm.length
       ? myComm.slice(0,20).map(c => {
-          let amt = 0;
-          if (c.closerId   === uid_) amt += parseFloat(c.closerAmount   || 0);
-          if (c.providerId === uid_) amt += parseFloat(c.providerAmount || 0);
+          const amt = parseFloat(c.closerAmount || 0);
           const statusCls = {pending:'comm-pending', paid:'comm-paid', cancelled:'comm-cancelled', clawback:'comm-cancelled'}[c.status] || 'comm-pending';
           const statusLbl = {pending:'Pendiente', paid:'Pagado', cancelled:'Cancelado', clawback:'Reembolso'}[c.status] || c.status;
           return `<div class="comm-item">

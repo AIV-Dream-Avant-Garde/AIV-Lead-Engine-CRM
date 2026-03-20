@@ -8,13 +8,10 @@ function fmtCOP(n) {
 }
 
 function calcCommissions(lead, dealValue) {
-  const isSelfSourced = lead.providerId && lead.providerId === lead.closerId;
-  const provRate = isSelfSourced ? 0 : parseFloat(lead.providerRate || 0);
-  const closRate = parseFloat(lead.closerRate || 0);
+  const closer  = S.team.find(m => m.id === lead.closerId);
+  const closRate = parseFloat(closer?.closerRate || lead.closerRate || 0);
   return {
-    providerAmount: dealValue * provRate / 100,
-    closerAmount:   dealValue * closRate / 100,
-    provRate,
+    closerAmount: dealValue * closRate / 100,
     closRate,
   };
 }
@@ -26,16 +23,12 @@ function updateDealPreview() {
   if (!val || val <= 0) { preview.style.display = 'none'; return; }
   const lead = S.leads.find(l => l.id === S.pendingCerrado);
   if (!lead) return;
-  const {providerAmount, closerAmount, provRate, closRate} = calcCommissions(lead, val);
-  const providerMember = S.team.find(m => m.id === lead.providerId);
-  const closerMember   = S.team.find(m => m.id === (lead.closerId || S.session?.userId));
-  document.getElementById('dp-provider-label').textContent =
-    (providerMember ? providerMember.name.split(' ')[0] : 'Proveedor') + ' (' + provRate + '%):';
+  const {closerAmount, closRate} = calcCommissions(lead, val);
+  const closerMember = S.team.find(m => m.id === (lead.closerId || S.session?.userId));
   document.getElementById('dp-closer-label').textContent =
-    (closerMember   ? closerMember.name.split(' ')[0]   : 'Closer')   + ' (' + closRate + '%):';
-  document.getElementById('dp-provider-amt').textContent = fmtCOP(providerAmount);
-  document.getElementById('dp-closer-amt').textContent   = fmtCOP(closerAmount);
-  document.getElementById('dp-total').textContent        = fmtCOP(providerAmount + closerAmount);
+    (closerMember ? closerMember.name.split(' ')[0] : 'Closer') + ' (' + closRate + '%):';
+  document.getElementById('dp-closer-amt').textContent = fmtCOP(closerAmount);
+  document.getElementById('dp-total').textContent      = fmtCOP(closerAmount);
   preview.style.display = 'block';
 }
 
@@ -51,8 +44,6 @@ function interceptCerrado(leadId) {
     lead.closerId   = S.session.userId;
     lead.closerRate = S.session.closerRate || 0;
   }
-  const pMember = S.team.find(m => m.id === lead.providerId);
-  if (pMember && !lead.providerRate) lead.providerRate = parseFloat(pMember.providerRate || 0);
   document.getElementById('deal-value-inp').value    = '';
   document.getElementById('deal-preview').style.display = 'none';
   document.getElementById('deal-overlay').classList.add('open');
@@ -73,10 +64,9 @@ function confirmCerradoWithValue(leadId, dealValue) {
     lead.closerId   = S.session.userId;
     lead.closerRate = S.session.closerRate || 0;
   }
-  const {providerAmount, closerAmount} = calcCommissions(lead, dealValue);
-  lead.dealValue          = dealValue;
-  lead.providerCommission = providerAmount.toFixed(0);
-  lead.closerCommission   = closerAmount.toFixed(0);
+  const {closerAmount} = calcCommissions(lead, dealValue);
+  lead.dealValue        = dealValue;
+  lead.closerCommission = closerAmount.toFixed(0);
   lead.commissionStatus   = 'pending';
   lead.status             = 'Cerrado';
   lead.updatedAt          = new Date().toISOString();
@@ -90,19 +80,16 @@ function confirmCerradoWithValue(leadId, dealValue) {
   });
   pushLead(lead);
   const commRec = {
-    id:             uid(),
-    leadId:         lead.id,
-    leadName:       lead.name,
+    id:           uid(),
+    leadId:       lead.id,
+    leadName:     lead.name,
     dealValue,
-    providerId:     lead.providerId || '',
-    providerName:   S.team.find(m => m.id === lead.providerId)?.name || '',
-    providerAmount: lead.providerCommission,
-    closerId:       lead.closerId,
-    closerName:     S.team.find(m => m.id === lead.closerId)?.name || S.session?.userName || '',
-    closerAmount:   lead.closerCommission,
-    status:         'pending',
+    closerId:     lead.closerId,
+    closerName:   S.team.find(m => m.id === lead.closerId)?.name || S.session?.userName || '',
+    closerAmount: lead.closerCommission,
+    status:       'pending',
     paidAt:'', paidBy:'', paymentRef:'',
-    createdAt:      lead.updatedAt,
+    createdAt:    lead.updatedAt,
   };
   S.commissions.push(commRec);
   saveLocal();
@@ -123,11 +110,10 @@ function adjustCollectedAmount(leadId, collectedRaw, reason) {
   }
   lead.collectedAmount = collected;
   lead.updatedAt = new Date().toISOString();
-  const {providerAmount, closerAmount} = calcCommissions(lead, collected);
+  const {closerAmount} = calcCommissions(lead, collected);
   S.commissions
     .filter(c => c.leadId === leadId && c.status === 'pending')
     .forEach(c => {
-      c.providerAmount  = providerAmount;
       c.closerAmount    = closerAmount;
       c.collectedAmount = collected;
       c.adjustedBy      = S.session?.userName || 'Admin';
@@ -180,21 +166,18 @@ function issueRefund(leadId, reason) {
         if (S.config.scriptUrl) sheetsCall({action:'cancelCommission', id: c.id, reason, adjustedBy: c.adjustedBy});
       } else if (c.status === 'paid') {
         const clawback = {
-          id:             uid(),
-          leadId:         c.leadId,
-          leadName:       c.leadName,
-          dealValue:      -(parseFloat(c.dealValue)      || 0),
-          providerId:     c.providerId,
-          providerName:   c.providerName,
-          providerAmount: -(parseFloat(c.providerAmount) || 0),
-          closerId:       c.closerId,
-          closerName:     c.closerName,
-          closerAmount:   -(parseFloat(c.closerAmount)   || 0),
-          status:         'clawback',
-          refundReason:   reason,
-          adjustedBy:     S.session?.userName || 'Admin',
+          id:           uid(),
+          leadId:       c.leadId,
+          leadName:     c.leadName,
+          dealValue:    -(parseFloat(c.dealValue)    || 0),
+          closerId:     c.closerId,
+          closerName:   c.closerName,
+          closerAmount: -(parseFloat(c.closerAmount) || 0),
+          status:       'clawback',
+          refundReason: reason,
+          adjustedBy:   S.session?.userName || 'Admin',
           paidAt:'', paidBy:'', paymentRef:'',
-          createdAt:      now,
+          createdAt:    now,
         };
         S.commissions.push(clawback);
         if (S.config.scriptUrl) sheetsCall({action:'saveCommission', ...clawback, isClawback: true});

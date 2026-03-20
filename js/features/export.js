@@ -36,20 +36,18 @@ function doExport() {
   const leads = getExportLeads();
   const hdrs  = ['name','phone','address','website','rating','reviews','city','barrio','keyword',
                   'source','sourceDetail','status','dncReason','followUpDate','importedAt','updatedAt',
-                  'dealValue','collectedAmount','providerCommission','closerCommission','commissionStatus',
-                  'providerName','closerName','callCount',
+                  'dealValue','collectedAmount','closerCommission','commissionStatus',
+                  'closerName','callCount',
                   'refundAmount','refundReason','refundedAt'];
   const csv   = [
     hdrs.join(','),
     ...leads.map(l => {
-      const {providerAmount, closerAmount} = l.dealValue ? calcCommissions(l, parseFloat(l.dealValue)) : {providerAmount:0, closerAmount:0};
+      const {closerAmount} = l.dealValue ? calcCommissions(l, parseFloat(l.dealValue)) : {closerAmount:0};
       const enriched = {
         ...l,
-        providerCommission: providerAmount || '',
-        closerCommission:   closerAmount   || '',
-        providerName: S.team.find(m => m.id === l.providerId)?.name || '',
-        closerName:   S.team.find(m => m.id === l.closerId)?.name   || '',
-        callCount:    S.calls.filter(c => c.leadId === l.id).length,
+        closerCommission: closerAmount || '',
+        closerName:  S.team.find(m => m.id === l.closerId)?.name || '',
+        callCount:   S.calls.filter(c => c.leadId === l.id).length,
       };
       return hdrs.map(h => `"${(enriched[h]||'').toString().replace(/"/g,'""')}"`).join(',');
     }),
@@ -62,16 +60,15 @@ function doExport() {
 
 function exportCommissions() {
   if (!S.commissions.length) { toast('Sin comisiones registradas.', 'error'); return; }
-  const hdrs = ['leadName','dealValue','collectedAmount','providerName','providerAmount',
+  const hdrs = ['leadName','dealValue','collectedAmount',
                  'closerName','closerAmount','status','createdAt','paidAt','paidBy','paymentRef',
                  'refundReason','adjustedBy','adjustedAt'];
   const csv = [
     hdrs.join(','),
     ...S.commissions.map(c => {
-      const prov = S.team.find(m => m.id === c.providerId)?.name || c.providerName || '';
-      const clsr = S.team.find(m => m.id === c.closerId)?.name   || c.closerName   || '';
+      const clsr = S.team.find(m => m.id === c.closerId)?.name || c.closerName || '';
       return hdrs.map(h => {
-        const v = h === 'providerName' ? prov : h === 'closerName' ? clsr : (c[h] || '');
+        const v = h === 'closerName' ? clsr : (c[h] || '');
         return `"${String(v).replace(/"/g,'""')}"`;
       }).join(',');
     }),

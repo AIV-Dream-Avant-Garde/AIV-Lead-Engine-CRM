@@ -36,7 +36,7 @@ function showSignalBanner() {
       items.push(`${assigned.length} lead${assigned.length !== 1 ? 's' : ''} asignado${assigned.length !== 1 ? 's' : ''} a ti`);
   }
 
-  if (role === 'provider' || role === 'solo' || role === 'admin') {
+  if (role === 'solo' || role === 'admin') {
     const myNew = S.leads.filter(l => l.providerId === uid_ && l.status === 'Nuevo');
     if (myNew.length) items.push(`${myNew.length} de tus leads sin trabajar aun`);
   }
@@ -86,7 +86,6 @@ function openTeamModal(memberId) {
   document.getElementById('tm-name').value    = '';
   document.getElementById('tm-pin').value     = '';
   document.getElementById('tm-pin2').value    = '';
-  document.getElementById('tm-prate').value   = '3';
   document.getElementById('tm-crate').value   = '10';
   document.getElementById('tm-contact').value = '';
   document.getElementById('tm-role').value    = 'closer';
@@ -98,7 +97,6 @@ function openTeamModal(memberId) {
       document.getElementById('tm-id').value      = m.id;
       document.getElementById('tm-name').value    = m.name    || '';
       document.getElementById('tm-role').value    = m.role    || 'closer';
-      document.getElementById('tm-prate').value   = m.providerRate || 3;
       document.getElementById('tm-crate').value   = m.closerRate   || 10;
       document.getElementById('tm-contact').value = m.contact || '';
     }
@@ -112,6 +110,12 @@ function closeTeamModal() {
   document.getElementById('tm-modal')?.classList.remove('open');
 }
 
+function togglePin(id, plain) {
+  const el = document.getElementById('pin-' + id);
+  if (!el) return;
+  el.textContent = el.textContent === '••••' ? plain : '••••';
+}
+
 async function saveTeamMember() {
   const existingId = document.getElementById('tm-id').value.trim();
   const name       = document.getElementById('tm-name').value.trim();
@@ -119,7 +123,6 @@ async function saveTeamMember() {
   const pin        = document.getElementById('tm-pin').value.trim();
   const pin2       = document.getElementById('tm-pin2').value.trim();
   const contact    = document.getElementById('tm-contact')?.value?.trim() || '';
-  const prate      = parseFloat(document.getElementById('tm-prate').value || 0);
   const crate      = parseFloat(document.getElementById('tm-crate').value || 0);
 
   if (!name)                          { toast('El nombre es requerido.', 'error');             return; }
@@ -138,12 +141,13 @@ async function saveTeamMember() {
   }
 
   const id     = existingId || uid();
-  const member = {id, name, role, contact, providerRate:prate, closerRate:crate, active:true, createdAt:new Date().toISOString()};
+  const member = {id, name, role, contact, closerRate:crate, active:true, createdAt:new Date().toISOString()};
   if (pin) {
-    member.pinHash = await sha256(pin);
+    member.pinHash  = await sha256(pin);
+    member.pinPlain = pin;
   } else {
     const existing = S.team.find(m => m.id === id);
-    if (existing) member.pinHash = existing.pinHash;
+    if (existing) { member.pinHash = existing.pinHash; member.pinPlain = existing.pinPlain || ''; }
   }
 
   const idx = S.team.findIndex(m => m.id === id);
@@ -488,7 +492,7 @@ function renderScripts() {
 // ── renderAdmin — consolidated (team + commissions + audit + locked + DNC + perf) ─
 function renderAdmin() {
   if (S.session?.role !== 'admin') return;
-  const roleLabels = {admin:'Admin', provider:'Proveedor', closer:'Closer', solo:'Solo'};
+  const roleLabels = {admin:'Admin', closer:'Closer', solo:'Solo'};
 
   // Team list
   const teamWrap = document.getElementById('admin-team-list');
@@ -502,8 +506,11 @@ function renderAdmin() {
             <div class="team-info">
               <div class="team-name">${esc(m.name)}</div>
               <div class="team-meta">${roleLabels[m.role]||m.role} · ${inactive?'Inactivo':'Activo'}${m.contact?' · '+esc(m.contact):''}</div>
+              <div class="team-pin" style="font-size:11px;color:var(--sub);font-family:'DM Mono',monospace">
+                PIN: <span id="pin-${m.id}">••••</span>
+                ${m.pinPlain ? `<span onclick="togglePin('${m.id}','${m.pinPlain}')" style="cursor:pointer;margin-left:4px;opacity:.6" title="Revelar PIN">👁</span>` : '<span style="opacity:.4;font-size:10px"> (reasignar)</span>'}
+              </div>
             </div>
-            <div class="team-rates">${m.providerRate||0}% prv / ${m.closerRate||0}% clsr</div>
             <div class="team-actions">
               <button class="btn btn-ghost" style="font-size:11px;padding:4px 9px" onclick="openTeamModal('${m.id}')">Editar</button>
               <button class="btn ${inactive?'btn-success':'btn-danger'}" style="font-size:11px;padding:4px 9px" onclick="toggleTeamActive('${m.id}')">${inactive?'Activar':'Desactivar'}</button>
@@ -522,7 +529,7 @@ function renderAdmin() {
   if (pendingLbl) pendingLbl.textContent = pendingN > 0 ? `· ${pendingN} pendiente${pendingN!==1?'s':''}` : '';
 
   const filtered = S.commissions
-    .filter(c => (!commFilter || c.status === commFilter) && (!commPerson || c.providerId===commPerson || c.closerId===commPerson))
+    .filter(c => (!commFilter || c.status === commFilter) && (!commPerson || c.closerId===commPerson))
     .sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt))
     .slice(0, 60);
 
@@ -530,7 +537,7 @@ function renderAdmin() {
     commWrap.innerHTML = filtered.length
       ? filtered.map(c => {
           const isClawback = c.status === 'clawback';
-          const totalAmt = parseFloat(c.providerAmount||0) + parseFloat(c.closerAmount||0);
+          const totalAmt = parseFloat(c.closerAmount||0);
           const statusCls = {pending:'comm-pending', paid:'comm-paid', cancelled:'comm-cancelled', clawback:'comm-cancelled'}[c.status] || 'comm-pending';
           const statusLbl = {pending:'Pendiente', paid:'Pagado', cancelled:'Cancelado', clawback:'Reembolso'}[c.status] || c.status;
           const paidInfo  = c.status === 'paid' ? ` · ${esc(c.paidBy||'')} · ${esc(c.paymentRef||'')}` : '';
@@ -549,7 +556,7 @@ function renderAdmin() {
           return `<div class="admin-comm-row">
             <div class="admin-comm-info">
               <div class="admin-comm-lead">${esc(c.leadName||'--')}</div>
-              <div class="admin-comm-detail">Contratado: ${fmtCOP(c.dealValue)}${collInfo} · ${esc(c.providerName||'--')} ${fmtCOP(c.providerAmount)} + ${esc(c.closerName||'--')} ${fmtCOP(c.closerAmount)} · ${fmtD(c.createdAt)}${paidInfo}${refundInfo}</div>
+              <div class="admin-comm-detail">Contratado: ${fmtCOP(c.dealValue)}${collInfo} · Closer: ${esc(c.closerName||'--')} ${fmtCOP(c.closerAmount)} · ${fmtD(c.createdAt)}${paidInfo}${refundInfo}</div>
             </div>
             <span class="admin-comm-amount" style="${amtStyle}">${fmtCOP(totalAmt)}</span>
             <span class="comm-status-badge ${statusCls}">${statusLbl}</span>

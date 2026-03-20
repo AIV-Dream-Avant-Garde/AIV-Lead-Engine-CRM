@@ -47,7 +47,7 @@ async function tryLogin() {
 
   // Admin PIN check
   if (hash === ADMIN_HASH) {
-    startSession({userId:'admin', userName:'Admin', role:'admin', providerRate:0, closerRate:0});
+    startSession({userId:'admin', userName:'Admin', role:'admin', closerRate:0});
     return;
   }
 
@@ -55,11 +55,10 @@ async function tryLogin() {
   const member = S.team.find(m => m.pinHash === hash && String(m.active) !== 'false');
   if (member) {
     startSession({
-      userId:       member.id,
-      userName:     member.name,
-      role:         member.role || 'closer',
-      providerRate: parseFloat(member.providerRate || 0),
-      closerRate:   parseFloat(member.closerRate   || 0),
+      userId:     member.id,
+      userName:   member.name,
+      role:       member.role || 'closer',
+      closerRate: parseFloat(member.closerRate || 0),
     });
     return;
   }
@@ -191,7 +190,7 @@ function startDemo() {
   S.calls       = DEMO_DATA.calls.map(c => ({...c}));
   S.team        = DEMO_DATA.team.map(m => ({...m}));
   S.commissions = DEMO_DATA.commissions.map(c => ({...c}));
-  const user    = {userId:'demo-admin', userName:'Demo Usuario', role:'admin', providerRate:3, closerRate:12};
+  const user    = {userId:'demo-admin', userName:'Demo Usuario', role:'admin', closerRate:12};
   S.session     = user;
   sessionStorage.setItem('aiv-session', JSON.stringify(user));
   failedAttempts = 0;
@@ -221,6 +220,6 @@ function updateSidebarUser(user) {
   const nm = document.getElementById('sb-user-name');
   if (nm) nm.textContent = user.userName;
   const rl = document.getElementById('sb-user-role');
-  const labels = {admin:'Administrador', provider:'Proveedor', closer:'Closer', solo:'Solo Operator'};
+  const labels = {admin:'Administrador', closer:'Closer', solo:'Solo Operator'};
   if (rl) rl.textContent = labels[user.role] || user.role;
 }
