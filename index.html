@@ -40,16 +40,11 @@
   </div>
 </div>
 
-<!-- DEMO BANNER -->
-<div id="demo-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--amber);color:#000;font-size:12px;font-weight:700;text-align:center;padding:5px 16px;letter-spacing:.4px;align-items:center;justify-content:center;gap:16px">
-  <span>⚡ MODO DEMO — Los cambios no se sincronizan. Explora libremente.</span>
-  <button class="btn" style="background:#000;color:var(--amber);font-size:11px;padding:3px 10px;border-radius:4px;flex-shrink:0" onclick="logout()">Salir del demo</button>
-</div>
 
 <!-- SESSION WARNING BANNER -->
-<div id="session-warning-banner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:9998;background:#d97706;color:#fff;font-size:12px;font-weight:600;padding:7px 16px;align-items:center;justify-content:center;gap:12px">
+<div id="session-warning-banner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:9998;background:var(--amber);color:#000;font-size:12px;font-weight:600;padding:7px 16px;align-items:center;justify-content:center;gap:12px">
   <span>Tu sesión expira en <span id="session-countdown">2:00</span> min por inactividad.</span>
-  <button class="btn" style="background:#fff;color:#d97706;font-size:12px;padding:4px 12px;border-radius:4px" onclick="extendSession()">Continuar sesión</button>
+  <button class="btn btn-xs" style="background:#000;color:var(--amber);flex-shrink:0" onclick="extendSession()">Continuar sesión</button>
 </div>
 
 <!-- SIDEBAR -->
@@ -70,7 +65,7 @@
     <div class="sb-sec-label">Herramientas</div>
     <div class="nav-item role-hidden active" data-sec="setup">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.1 3.1l1.4 1.4M11.5 11.5l1.4 1.4M3.1 12.9l1.4-1.4M11.5 4.5l1.4-1.4"/></svg>
-      Setup
+      Configuración
     </div>
     <div class="nav-item role-hidden" data-sec="scraper">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="5" r="3"/><path d="M11 2V1M11 9v-1M8 5H7M15 5h-1M8.9 2.9L8.2 2.2M13.8 7.8l-.7-.7M8.9 7.1l-.7.7M13.8 2.2l-.7.7M2 15l4-4"/></svg>
@@ -133,7 +128,7 @@
     </div>
     <div class="tb-actions">
       <span class="pill accent" id="tb-leads-pill">0 leads</span>
-      <button class="btn btn-ghost" style="font-size:12px;padding:5px 12px" onclick="syncNow()" id="sync-btn">&#x21BB; Sincronizar</button>
+      <button class="btn btn-ghost btn-sm" onclick="syncNow()" id="sync-btn">&#x21BB; Sincronizar</button>
     </div>
   </div>
   <div class="content-area">
@@ -212,7 +207,7 @@
     <div class="card-sub" style="margin-bottom:14px">Recibe leads automaticamente desde Facebook/Google Ads, tu sitio web, Zapier, Make o n8n. Sin configuracion adicional — tu GAS URL ya es el endpoint.</div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
       <input type="text" id="webhook-url-display" readonly style="flex:1;font-family:'DM Mono',monospace;font-size:11px;color:var(--sub);background:var(--surface-hi);border:1px solid var(--border);border-radius:6px;padding:7px 10px" placeholder="Guarda la URL del Apps Script primero">
-      <button class="btn btn-ghost" style="padding:6px 14px;font-size:12px;flex-shrink:0" onclick="copyWebhookUrl()">Copiar URL</button>
+      <button class="btn btn-ghost btn-sm" style="flex-shrink:0" onclick="copyWebhookUrl()">Copiar URL</button>
     </div>
     <div style="font-size:12px;font-weight:600;color:var(--body);margin-bottom:8px">Formato JSON esperado:</div>
     <pre style="background:var(--surface-hi);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font-size:11px;font-family:'DM Mono',monospace;color:var(--hl);overflow-x:auto;margin:0 0 14px 0;line-height:1.7">POST {GAS_URL}?action=inbound
@@ -279,7 +274,7 @@ Content-Type: application/json
   <div class="card" style="margin-top:14px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <span class="label-sm" style="margin-bottom:0">Historial de scrapes</span>
-      <button class="btn btn-ghost" style="font-size:11px;padding:3px 9px" onclick="clearScrapeHistory()">Limpiar</button>
+      <button class="btn btn-ghost btn-xs" onclick="clearScrapeHistory()">Limpiar</button>
     </div>
     <div id="scrape-history-list"><div class="notes-empty">Sin scrapes aun.</div></div>
   </div>
@@ -346,7 +341,7 @@ Content-Type: application/json
       <option>Nuevo</option><option>Contactado</option><option>Interesado</option>
       <option>Cerrado</option><option>Negociacion fallida</option><option>No interesado</option>
     </select>
-    <button class="btn btn-amber" style="font-size:12px;padding:5px 12px" onclick="applyBulkStatus()">Aplicar</button>
+    <button class="btn btn-amber btn-sm" onclick="applyBulkStatus()">Aplicar</button>
     <div class="bulk-divider"></div>
     <select id="bulk-action" class="filter-sel" onchange="onBulkActionChange()">
       <option value="">Otra accion...</option>
@@ -358,9 +353,9 @@ Content-Type: application/json
     </select>
     <input type="date" id="bulk-action-date" style="display:none;font-size:12px;padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--hl)">
     <input type="text" id="bulk-action-text" style="display:none;font-size:12px;padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--hl);width:140px" placeholder="">
-    <button class="btn btn-primary" style="font-size:12px;padding:5px 12px" onclick="applyBulkAction()">Aplicar</button>
-    <button class="btn btn-danger" style="font-size:12px;padding:5px 12px" onclick="deleteSelected()">Eliminar</button>
-    <button class="btn btn-ghost" style="font-size:12px;padding:5px 12px;margin-left:auto" onclick="clearSelection()">Deseleccionar</button>
+    <button class="btn btn-primary btn-sm" onclick="applyBulkAction()">Aplicar</button>
+    <button class="btn btn-danger btn-sm" onclick="deleteSelected()">Eliminar</button>
+    <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="clearSelection()">Deseleccionar</button>
   </div>
   <div class="table-toolbar">
     <div class="search-box"><span class="search-icon">⌕</span><input id="tbl-q" type="search" placeholder="Buscar nombre, telefono, fuente, barrio..." aria-label="Buscar leads" oninput="debouncedSearch()"></div>
@@ -379,8 +374,8 @@ Content-Type: application/json
       <option value="today">Hoy</option>
       <option value="has">Con fecha</option>
     </select>
-    <button class="btn btn-ghost" style="font-size:12px;padding:6px 11px" onclick="clearFilters()">&#x2715;</button>
-    <button class="btn btn-primary" id="dialer-toggle-btn" style="font-size:12px;padding:6px 13px;flex-shrink:0" onclick="toggleDialer()">&#9654; Marcador automatico</button>
+    <button class="btn btn-ghost btn-sm" onclick="clearFilters()">&#x2715;</button>
+    <button class="btn btn-primary btn-sm" id="dialer-toggle-btn" style="flex-shrink:0" onclick="toggleDialer()">&#9654; Marcador automatico</button>
     <span id="dialer-queue-count" style="display:none;font-size:11px;color:var(--pos);font-family:'DM Mono',monospace;white-space:nowrap"></span>
   </div>
   <div class="table-wrap">
@@ -496,7 +491,7 @@ Content-Type: application/json
   <div class="admin-section">
     <div class="admin-section-title">
       <span>Equipo</span>
-      <button class="btn btn-primary" style="font-size:12px;padding:5px 14px" onclick="openTeamModal(null)">+ Agregar miembro</button>
+      <button class="btn btn-primary btn-sm" onclick="openTeamModal(null)">+ Agregar miembro</button>
     </div>
     <div id="admin-team-list"><div class="notes-empty">Sin miembros del equipo aun.</div></div>
   </div>
@@ -540,7 +535,7 @@ Content-Type: application/json
       <span>Registro de auditoria</span>
       <div style="display:flex;align-items:center;gap:10px">
         <span style="font-size:11px;color:var(--body);font-weight:400">Ultimas 100 acciones</span>
-        <button class="btn btn-ghost" style="font-size:11px;padding:3px 10px" onclick="exportAuditLog()">Exportar CSV</button>
+        <button class="btn btn-ghost btn-xs" onclick="exportAuditLog()">Exportar CSV</button>
       </div>
     </div>
     <div id="admin-audit-list"><div class="notes-empty">Sin entradas de auditoria.</div></div>
@@ -587,7 +582,7 @@ Content-Type: application/json
       </div>
       <div class="field"><label>Max resultados</label><input type="number" id="sj-max" value="50" min="10" max="200"></div>
     </div>
-    <button class="btn btn-primary" style="font-size:12px;padding:5px 14px;margin-bottom:12px" onclick="addScheduledJob()">+ Agregar trabajo</button>
+    <button class="btn btn-primary btn-sm" style="margin-bottom:12px" onclick="addScheduledJob()">+ Agregar trabajo</button>
     <div id="admin-jobs-list"><div class="notes-empty">Sin trabajos programados.</div></div>
   </div>
 
@@ -601,7 +596,7 @@ Content-Type: application/json
       <div class="field"><label>Nombre de la plantilla</label><input type="text" id="sms-tpl-name" placeholder="Follow-up post llamada"></div>
       <div class="field"><label>Mensaje</label><textarea class="script-editor" id="sms-tpl-body" rows="3" placeholder="Hola {nombre}, le escribo de {empresa}..."></textarea></div>
     </div>
-    <button class="btn btn-primary" style="font-size:12px;padding:5px 14px;margin-bottom:12px" onclick="addSmsTemplate()">+ Agregar plantilla</button>
+    <button class="btn btn-primary btn-sm" style="margin-bottom:12px" onclick="addSmsTemplate()">+ Agregar plantilla</button>
     <div id="admin-sms-list"><div class="notes-empty">Sin plantillas SMS.</div></div>
   </div>
 
@@ -618,7 +613,7 @@ Content-Type: application/json
   <div class="admin-section">
     <div class="admin-section-title">
       <span>Guiones de llamada</span>
-      <button class="btn btn-primary" style="font-size:12px;padding:5px 14px" onclick="openScriptModal(null)">+ Agregar guion</button>
+      <button class="btn btn-primary btn-sm" onclick="openScriptModal(null)">+ Agregar guion</button>
     </div>
     <div style="font-size:11px;color:var(--body);margin-bottom:12px">Los guiones aparecen en el widget de llamada. Organiza por etapa: Apertura, Pitch, Objeciones, Cierre, Rebuttals.</div>
     <div id="admin-scripts-list"><div class="notes-empty">Sin guiones configurados.</div></div>
@@ -721,7 +716,7 @@ Content-Type: application/json
       <div class="divider"></div>
       <div class="form-grid" style="margin-bottom:14px">
         <div class="field"><label>Estado</label>
-          <select id="m-status" onchange="onModalStatusChange()" style="background:var(--surface-hi);border:1px solid var(--border);border-radius:6px;padding:8px 11px;font-size:13px;color:var(--hl);outline:none;width:100%;font-family:'DM Sans',sans-serif">
+          <select id="m-status" onchange="onModalStatusChange()">
             <option>Nuevo</option><option>Contactado</option><option>Interesado</option>
             <option>Cerrado</option><option>Negociacion fallida</option><option>No interesado</option><option>No llamar</option>
           </select>
@@ -771,8 +766,8 @@ Content-Type: application/json
         <div class="inline-confirm" id="delete-confirm">
           <span>¿Confirmar eliminacion?</span>
           <div class="inline-confirm-btns">
-            <button class="btn btn-danger" style="font-size:11px;padding:3px 10px" onclick="deleteLeadModal()">Si, eliminar</button>
-            <button class="btn btn-ghost" style="font-size:11px;padding:3px 10px" onclick="toggleDeleteConfirm()">Cancelar</button>
+            <button class="btn btn-danger btn-xs" onclick="deleteLeadModal()">Si, eliminar</button>
+            <button class="btn btn-ghost btn-xs" onclick="toggleDeleteConfirm()">Cancelar</button>
           </div>
         </div>
       </div>
@@ -822,7 +817,7 @@ Content-Type: application/json
       <div class="field"><label>PIN (4 digitos)</label><input type="password" id="tm-pin" placeholder="••••" maxlength="4" pattern="[0-9]{4}"></div>
       <div class="field"><label>Confirmar PIN</label><input type="password" id="tm-pin2" placeholder="••••" maxlength="4"></div>
       <div class="field"><label>Tasa proveedor (%)</label>
-        <select id="tm-prate" style="background:var(--surface-hi);border:1px solid var(--border);border-radius:6px;padding:8px 11px;font-size:13px;color:var(--hl);outline:none;width:100%;font-family:'DM Sans',sans-serif">
+        <select id="tm-prate">
           <option value="0">0%</option><option value="0.5">0.5%</option><option value="1">1%</option>
           <option value="1.5">1.5%</option><option value="2">2%</option><option value="2.5">2.5%</option>
           <option value="3" selected>3%</option><option value="3.5">3.5%</option><option value="4">4%</option>
@@ -831,7 +826,7 @@ Content-Type: application/json
         </select>
       </div>
       <div class="field"><label>Tasa closer (%)</label>
-        <select id="tm-crate" style="background:var(--surface-hi);border:1px solid var(--border);border-radius:6px;padding:8px 11px;font-size:13px;color:var(--hl);outline:none;width:100%;font-family:'DM Sans',sans-serif">
+        <select id="tm-crate">
           <option value="5">5%</option><option value="7">7%</option><option value="8">8%</option>
           <option value="10" selected>10%</option><option value="12">12%</option><option value="13">13%</option>
           <option value="15">15%</option><option value="17">17%</option><option value="18">18%</option>
@@ -932,12 +927,12 @@ Content-Type: application/json
     <textarea class="cw-notes-inp" id="cw-notes" rows="2" placeholder="Notas de la llamada..."></textarea>
     <button class="btn btn-primary btn-full" onclick="saveCallLog(false)" style="font-size:12px;padding:8px">Guardar y cerrar</button>
     <button class="cw-next-btn" onclick="saveCallLog(true)">Guardar e ir al siguiente lead →</button>
-    <button class="btn btn-ghost" id="cw-skip-btn" style="display:none;font-size:11px;padding:5px 12px;margin-top:4px;width:100%" onclick="skipDialerLead()">Saltar este lead (marcador)</button>
+    <button class="btn btn-ghost btn-sm" id="cw-skip-btn" style="display:none;margin-top:4px;width:100%" onclick="skipDialerLead()">Saltar este lead (marcador)</button>
     <div id="cw-sms-wrap" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
       <div style="font-size:11px;color:var(--body);margin-bottom:6px">Enviar SMS/WhatsApp</div>
       <div style="display:flex;gap:6px">
         <select id="cw-sms-tpl" class="filter-sel" style="flex:1;font-size:11px"></select>
-        <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px;flex-shrink:0" onclick="sendPostCallSms()">Enviar</button>
+        <button class="btn btn-ghost btn-xs" style="flex-shrink:0" onclick="sendPostCallSms()">Enviar</button>
       </div>
     </div>
   </div>

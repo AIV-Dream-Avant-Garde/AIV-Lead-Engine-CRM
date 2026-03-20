@@ -67,7 +67,7 @@ function navigate(id) {
   document.querySelector(`.nav-item[data-sec="${id}"]`)?.classList.add('active');
 
   const labels = {
-    setup:'Setup', scraper:'Scraper', import:'Importar', leads:'Leads',
+    setup:'Configuración', scraper:'Scraper', import:'Importar', leads:'Leads',
     pipeline:'Pipeline', llamadas:'Llamadas', export:'Exportar',
     perfil:'Mi Perfil', admin:'Admin', analytics:'Analytics',
   };
