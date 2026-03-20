@@ -508,7 +508,7 @@ function renderAdmin() {
               <div class="team-meta">${roleLabels[m.role]||m.role} · ${inactive?'Inactivo':'Activo'}${m.contact?' · '+esc(m.contact):''}</div>
               <div class="team-pin" style="font-size:11px;color:var(--sub);font-family:'DM Mono',monospace">
                 PIN: <span id="pin-${m.id}">••••</span>
-                ${m.pinPlain ? `<span onclick="togglePin('${m.id}','${m.pinPlain}')" style="cursor:pointer;margin-left:4px;opacity:.6" title="Revelar PIN">👁</span>` : '<span style="opacity:.4;font-size:10px"> (reasignar)</span>'}
+                ${m.pinPlain ? `<span onclick="togglePin('${m.id}','${m.pinPlain}')" style="cursor:pointer;margin-left:4px;opacity:.55;color:var(--accent)" title="Revelar PIN"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;vertical-align:middle"><path d="M1 8c1.5-3.5 3.8-5.5 7-5.5S13.5 4.5 15 8c-1.5 3.5-3.8 5.5-7 5.5S2.5 11.5 1 8z"/><circle cx="8" cy="8" r="2.5"/></svg></span>` : '<span style="opacity:.4;font-size:10px"> (reasignar)</span>'}
               </div>
             </div>
             <div class="team-actions">
