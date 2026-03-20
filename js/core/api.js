@@ -6,7 +6,7 @@ async function sheetsCall(params) {
   if (!url) return null;
   try {
     if (GET_ACTIONS.has(params.action)) {
-      const r = await fetch(url + '?' + new URLSearchParams(params).toString(), {redirect:'follow'});
+      const r = await fetch(url + '?' + new URLSearchParams({...params, _s: S.config.crmSecret}).toString(), {redirect:'follow'});
       return await r.json();
     }
     const r = await fetch(url + '?action=' + params.action, {
@@ -39,8 +39,11 @@ function setLastSynced() {
 
 async function syncNow() {
   if (!S.config.scriptUrl) { setSyncUI('','Conecta Apps Script en Setup'); return; }
+  if (S.isSyncing) return; // prevent concurrent syncs
+  S.isSyncing = true;
+  const syncBtn = document.getElementById('sync-btn');
+  if (syncBtn) { syncBtn.disabled = true; syncBtn.setAttribute('aria-busy','true'); }
   setSyncUI('syncing','Sincronizando...');
-  document.getElementById('sync-btn').disabled = true;
   setProgress(5);
 
   // Push dirty/unsynced leads in batches of 20
@@ -88,27 +91,28 @@ async function syncNow() {
 
   setProgress(100);
   setTimeout(() => setProgress(0), 600);
-  document.getElementById('sync-btn').disabled = false;
+  S.isSyncing = false;
+  if (syncBtn) { syncBtn.disabled = false; syncBtn.removeAttribute('aria-busy'); }
   renderAll();
 }
 
 async function testConn() {
   const url = document.getElementById('cfg-url')?.value?.trim();
-  if (!url) { alert('Ingresa la URL primero.'); return; }
+  if (!url) { toast('Ingresa la URL primero.', 'error'); return; }
   setSyncUI('syncing','Probando...');
   try {
     const r = await fetch(url + '?action=ping', {redirect:'follow'});
     const d = await r.json();
     if (d.ping || d.success) {
       setSyncUI('ok','Conexion OK');
-      alert('Apps Script conectado. Servidor: ' + d.serverTime);
+      toast('Apps Script conectado — ' + d.serverTime, 'success', 5000);
     } else {
       setSyncUI('error','Error');
-      alert('Respuesta: ' + JSON.stringify(d));
+      toast('Error: ' + JSON.stringify(d), 'error');
     }
   } catch(e) {
     setSyncUI('error','Error');
-    alert('Error: ' + e.message + '\n\nVerifica que el Apps Script esté deployado como "Cualquier persona".');
+    toast('Error: ' + e.message + ' — Verifica el deploy del Apps Script.', 'error', 6000);
   }
 }
 
@@ -120,14 +124,14 @@ function saveConfig() {
     const webhookEl = document.getElementById('webhook-url-display');
     if (webhookEl) webhookEl.value = S.config.scriptUrl;
   }
-  alert('Configuracion guardada.');
+  toast('Configuración guardada', 'success');
 }
 
 function saveReportEmail() {
   const email = document.getElementById('cfg-report-email')?.value?.trim();
-  if (!email) { alert('Ingresa un correo válido.'); return; }
-  if (!S.config.scriptUrl) { alert('Configura el Apps Script URL primero.'); return; }
-  sheetsCall({action:'saveReportEmail', email}).then(() => alert('Correo de reporte guardado.'));
+  if (!email) { toast('Ingresa un correo válido.', 'error'); return; }
+  if (!S.config.scriptUrl) { toast('Configura el Apps Script URL primero.', 'error'); return; }
+  sheetsCall({action:'saveReportEmail', email}).then(() => toast('Correo de reporte guardado', 'success'));
 }
 
 async function pushLead(lead) {

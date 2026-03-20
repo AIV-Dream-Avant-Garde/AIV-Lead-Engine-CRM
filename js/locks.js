@@ -27,7 +27,7 @@ function claimLead(leadId) {
   const lead = S.leads.find(l => l.id === leadId);
   if (!lead) return;
   if (isLockedByOther(lead)) {
-    alert('Este lead ya esta reclamado por ' + getLockerName(lead) + '. Expira en ' + lockCountdown(lead) + '.');
+    toast('Lead reclamado por ' + getLockerName(lead) + ' — expira en ' + lockCountdown(lead) + '.', 'error');
     return;
   }
   lead.lockedBy    = S.session?.userId || '';

@@ -72,8 +72,9 @@ function updateAdminBadge() {
 
 function applyAdminNavVisibility() {
   const adminNav = document.getElementById('nav-admin-item');
-  if (!adminNav) return;
-  adminNav.classList.toggle('role-hidden', S.session?.role !== 'admin');
+  if (adminNav) adminNav.classList.toggle('role-hidden', S.session?.role !== 'admin');
+  const analyticsNav = document.getElementById('nav-analytics-item');
+  if (analyticsNav) analyticsNav.classList.toggle('role-hidden', !['admin','solo'].includes(S.session?.role));
 }
 
 // ── Team management ────────────────────────────────────────
@@ -121,19 +122,19 @@ async function saveTeamMember() {
   const prate      = parseFloat(document.getElementById('tm-prate').value || 0);
   const crate      = parseFloat(document.getElementById('tm-crate').value || 0);
 
-  if (!name)                          { alert('El nombre es requerido.');             return; }
+  if (!name)                          { toast('El nombre es requerido.', 'error');             return; }
   const isNew = !existingId;
-  if (isNew && !pin)                  { alert('El PIN es requerido para nuevos miembros.'); return; }
-  if (pin && pin.length !== 4)        { alert('El PIN debe tener exactamente 4 dígitos.'); return; }
-  if (pin && !/^\d{4}$/.test(pin))    { alert('El PIN solo puede contener dígitos.'); return; }
-  if (pin && pin !== pin2)            { alert('Los PINs no coinciden.'); return; }
-  if (pin === '2819')                 { alert('El PIN 2819 está reservado para Admin.'); return; }
-  if (pin === '0000')                 { alert('El PIN 0000 está reservado para Demo.'); return; }
+  if (isNew && !pin)                  { toast('El PIN es requerido para nuevos miembros.', 'error'); return; }
+  if (pin && pin.length !== 4)        { toast('El PIN debe tener exactamente 4 dígitos.', 'error'); return; }
+  if (pin && !/^\d{4}$/.test(pin))    { toast('El PIN solo puede contener dígitos.', 'error'); return; }
+  if (pin && pin !== pin2)            { toast('Los PINs no coinciden.', 'error'); return; }
+  if (pin === '2819')                 { toast('El PIN 2819 está reservado para Admin.', 'error'); return; }
+  if (pin === '0000')                 { toast('El PIN 0000 está reservado para Demo.', 'error'); return; }
 
   if (pin) {
     const newHash   = await sha256(pin);
     const collision = S.team.find(m => m.pinHash === newHash && m.id !== (existingId || '__new__'));
-    if (collision)  { alert('Este PIN ya está en uso por ' + collision.name + '.'); return; }
+    if (collision)  { toast('Este PIN ya está en uso por ' + collision.name + '.', 'error'); return; }
   }
 
   const id     = existingId || uid();
@@ -154,7 +155,7 @@ async function saveTeamMember() {
   auditLog(isNew ? 'createTeamMember' : 'updateTeamMember', id, name + ' role=' + role);
   closeTeamModal();
   renderAdmin();
-  alert('Miembro guardado correctamente.');
+  toast('Miembro guardado correctamente.', 'success');
 }
 
 function toggleTeamActive(memberId) {
@@ -188,7 +189,7 @@ function forceReleaseLead(leadId) {
   auditLog('forceReleaseLead', leadId, lead.name + ' (was locked by ' + lockerName + ')');
   renderAdmin();
   renderTable();
-  alert('Lead liberado. Vuelve al pool universal.');
+  toast('Lead liberado — vuelve al pool universal.', 'success');
 }
 
 async function markCommissionPaid(commId) {
@@ -200,29 +201,30 @@ async function markCommissionPaid(commId) {
   comm.paidAt     = new Date().toISOString();
   comm.paidBy     = S.session?.userName || '';
   comm.paymentRef = ref;
-  localStorage.setItem('aiv-comm', JSON.stringify(S.commissions));
+  saveLocal();
   if (S.config.scriptUrl) sheetsCall({action:'markCommissionPaid', id:commId, paidBy:comm.paidBy, paymentRef:ref});
   auditLog('markCommissionPaid', commId, ref);
+  toast('Comisión marcada como pagada', 'success');
   renderAdmin();
   renderPerfil();
 }
 
 async function bulkMarkPaid() {
   const person = document.getElementById('admin-comm-person')?.value;
-  if (!person) { alert('Selecciona un miembro primero.'); return; }
+  if (!person) { toast('Selecciona un miembro primero.', 'error'); return; }
   const ref = prompt('Referencia de pago (ej: transferencia #123):');
   if (ref === null) return;
   const pending = S.commissions.filter(c => c.status === 'pending' && (c.providerId === person || c.closerId === person));
-  if (!pending.length) { alert('Sin comisiones pendientes para este miembro.'); return; }
+  if (!pending.length) { toast('Sin comisiones pendientes para este miembro.', 'error'); return; }
   pending.forEach(comm => {
     comm.status = 'paid'; comm.paidAt = new Date().toISOString();
     comm.paidBy = S.session?.userName || ''; comm.paymentRef = ref;
     if (S.config.scriptUrl) sheetsCall({action:'markCommissionPaid', id:comm.id, paidBy:comm.paidBy, paymentRef:ref});
   });
-  localStorage.setItem('aiv-comm', JSON.stringify(S.commissions));
+  saveLocal();
   auditLog('bulkMarkPaid', '', 'count=' + pending.length + ' ref=' + ref);
   renderAdmin(); renderPerfil();
-  alert(pending.length + ' comisiones marcadas como pagadas.');
+  toast(pending.length + ' comisiones marcadas como pagadas.', 'success');
 }
 
 function promptAdjustCollected(leadId) {
@@ -273,8 +275,8 @@ function renderSmsTemplates() {
 function addSmsTemplate() {
   const name = document.getElementById('sms-tpl-name')?.value?.trim();
   const body = document.getElementById('sms-tpl-body')?.value?.trim();
-  if (!name) { alert('Nombre requerido.'); return; }
-  if (!body) { alert('Cuerpo del mensaje requerido.'); return; }
+  if (!name) { toast('Nombre requerido.', 'error'); return; }
+  if (!body) { toast('Cuerpo del mensaje requerido.', 'error'); return; }
   if (!Array.isArray(S.smsTemplates)) S.smsTemplates = [];
   S.smsTemplates.push({id:uid(), name, body});
   try { localStorage.setItem('aiv-sms-tpl', JSON.stringify(S.smsTemplates)); } catch(e) {}
@@ -302,7 +304,7 @@ async function checkTriggerStatus() {
 }
 
 async function setTrigger(fn, enabled) {
-  if (!S.config.scriptUrl) { alert('Configura el Apps Script URL primero.'); return; }
+  if (!S.config.scriptUrl) { toast('Configura el Apps Script URL primero.', 'error'); return; }
   const res = await sheetsCall({action:'setTrigger', fn, enabled});
   if (res?.success) {
     if (fn === 'runScheduledScrapes') S.triggerStatus.scrape = enabled;
@@ -310,7 +312,7 @@ async function setTrigger(fn, enabled) {
     renderScheduledJobs();
     renderReportTrigger();
   } else {
-    alert('Error al actualizar el trigger. Verifica que el script esté desplegado con los permisos correctos.');
+    toast('Error al actualizar el trigger. Verifica que el script esté desplegado con los permisos correctos.', 'error', 5000);
   }
 }
 
@@ -379,9 +381,9 @@ function addScheduledJob() {
   const keyword     = document.getElementById('sj-keyword')?.value || '';
   const radius      = document.getElementById('sj-radius')?.value  || '1000';
   const max         = parseInt(document.getElementById('sj-max')?.value || '50');
-  if (!city)    { alert('La ciudad es requerida.');    return; }
-  if (!keyword) { alert('El keyword es requerido.');   return; }
-  if (!lat || !lng) { alert('No se pudo determinar la ubicación. Selecciona un barrio.'); return; }
+  if (!city)    { toast('La ciudad es requerida.', 'error');    return; }
+  if (!keyword) { toast('El keyword es requerido.', 'error');   return; }
+  if (!lat || !lng) { toast('No se pudo determinar la ubicación. Selecciona un barrio.', 'error'); return; }
   if (!Array.isArray(S.scheduledJobs)) S.scheduledJobs = [];
   S.scheduledJobs.push({keyword, city, barrio, lat, lng, radius, maxResults:max, source:'Scraper (auto)', active:true});
   try { localStorage.setItem('aiv-sched-jobs', JSON.stringify(S.scheduledJobs)); } catch(e) {}
@@ -431,8 +433,8 @@ function saveScript() {
   const name  = document.getElementById('sc-modal-name').value.trim();
   const stage = document.getElementById('sc-modal-stage').value;
   const body  = document.getElementById('sc-modal-body').value.trim();
-  if (!name) { alert('El nombre del guion es requerido.'); return; }
-  if (!body) { alert('El cuerpo del guion es requerido.'); return; }
+  if (!name) { toast('El nombre del guion es requerido.', 'error'); return; }
+  if (!body) { toast('El cuerpo del guion es requerido.', 'error'); return; }
   const now = new Date().toISOString();
   const sc  = {id, name, stage, body, createdAt:now, updatedAt:now};
   const idx = (S.scripts||[]).findIndex(x => x.id === id);
@@ -669,6 +671,19 @@ function renderAdmin() {
   renderSmsTemplates();
   initAdminJobsForm();
   checkTriggerStatus(); // async — re-renders trigger rows when response arrives
+}
+
+function exportAuditLog() {
+  if (!S.auditLog.length) { toast('Sin entradas de auditoría.', 'error'); return; }
+  const hdrs = ['timestamp','userName','action','targetId','detail'];
+  const csv = [
+    hdrs.join(','),
+    ...S.auditLog.map(a => hdrs.map(h => `"${String(a[h]||'').replace(/"/g,'""')}"`).join(',')),
+  ].join('\n');
+  const el = document.createElement('a');
+  el.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'}));
+  el.download = 'aiv_auditlog_' + new Date().toISOString().slice(0,10) + '.csv';
+  el.click();
 }
 
 function initAdminJobsForm() {

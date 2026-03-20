@@ -60,7 +60,7 @@ function interceptCerrado(leadId) {
 
 function confirmDealValue() {
   const val = parseFloat(document.getElementById('deal-value-inp')?.value || '0');
-  if (!val || val <= 0) { alert('Ingresa un valor valido mayor a 0.'); return; }
+  if (!val || val <= 0) { toast('Ingresa un valor válido mayor a 0.', 'error'); return; }
   document.getElementById('deal-overlay').classList.remove('open');
   confirmCerradoWithValue(S.pendingCerrado, val);
   S.pendingCerrado = null;
@@ -105,8 +105,9 @@ function confirmCerradoWithValue(leadId, dealValue) {
     createdAt:      lead.updatedAt,
   };
   S.commissions.push(commRec);
-  localStorage.setItem('aiv-comm', JSON.stringify(S.commissions));
+  saveLocal();
   if (S.config.scriptUrl) sheetsCall({action:'saveCommission', ...commRec});
+  toast('Negocio cerrado — comisión registrada', 'success');
   closeModal();
   renderAll();
 }
@@ -118,7 +119,7 @@ function adjustCollectedAmount(leadId, collectedRaw, reason) {
   if (!lead) return;
   const collected = parseFloat(collectedRaw);
   if (isNaN(collected) || collected < 0 || collected > parseFloat(lead.dealValue || 0)) {
-    alert('Monto inválido. Debe ser entre 0 y ' + fmtCOP(lead.dealValue) + '.'); return;
+    toast('Monto inválido. Debe ser entre 0 y ' + fmtCOP(lead.dealValue) + '.', 'error'); return;
   }
   lead.collectedAmount = collected;
   lead.updatedAt = new Date().toISOString();
@@ -137,6 +138,7 @@ function adjustCollectedAmount(leadId, collectedRaw, reason) {
   if (S.config.scriptUrl) sheetsCall({action:'adjustCollected', leadId, collected, reason: reason || '', adjustedBy: S.session?.userName || 'Admin'});
   saveLocal();
   auditLog('adjustCollected', leadId, `${lead.name} → ${fmtCOP(collected)}`);
+  toast('Monto cobrado actualizado', 'success');
   renderAll();
 }
 
@@ -153,6 +155,7 @@ function cancelCommission(commId, reason) {
   if (S.config.scriptUrl) sheetsCall({action:'cancelCommission', id: commId, reason: reason || '', adjustedBy: c.adjustedBy});
   saveLocal();
   auditLog('cancelCommission', commId, reason || '');
+  toast('Comisión cancelada', 'warning');
   renderAll();
 }
 
@@ -201,5 +204,6 @@ function issueRefund(leadId, reason) {
   pushLead(lead);
   saveLocal();
   auditLog('issueRefund', leadId, reason);
+  toast('Reembolso registrado', 'warning');
   renderAll();
 }

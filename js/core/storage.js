@@ -2,31 +2,50 @@
 
 function saveLocal() {
   try {
-    localStorage.setItem('aiv-cfg',   JSON.stringify(S.config));
-    localStorage.setItem('aiv-leads', JSON.stringify(S.leads));
-    localStorage.setItem('aiv-calls', JSON.stringify(S.calls));
+    localStorage.setItem('aiv-cfg',        JSON.stringify(S.config));
+    localStorage.setItem('aiv-leads',      JSON.stringify(S.leads.map(l => ({...l, _synced: l._synced === true}))));
+    localStorage.setItem('aiv-calls',      JSON.stringify(S.calls));
+    localStorage.setItem('aiv-team',       JSON.stringify(S.team));
+    localStorage.setItem('aiv-comm',       JSON.stringify(S.commissions));
+    localStorage.setItem('aiv-scripts',    JSON.stringify(S.scripts     || []));
+    localStorage.setItem('aiv-sms-tpl',   JSON.stringify(S.smsTemplates || []));
+    localStorage.setItem('aiv-sched-jobs', JSON.stringify(S.scheduledJobs || []));
     S.dirty.clear();
     checkStorage();
   } catch(e) {
     checkStorage();
-    alert(
-      'Error al guardar: almacenamiento lleno.\n\n' +
-      '1. Sincroniza con Google Sheets\n' +
-      '2. Exporta backup CSV\n\n' +
-      'Datos en memoria seguros hasta cerrar la pestaña.'
-    );
+    toast('Almacenamiento lleno — sincroniza con Sheets o exporta CSV. Datos seguros en memoria.', 'error', 7000);
   }
 }
 
 function loadLocal() {
   try { S.config = {...S.config, ...JSON.parse(localStorage.getItem('aiv-cfg')  || '{}')}; } catch(e) {}
-  try { S.leads  = JSON.parse(localStorage.getItem('aiv-leads') || '[]'); } catch(e) {}
+  try { S.leads  = JSON.parse(localStorage.getItem('aiv-leads') || '[]').map(l => ({...l, _synced: l._synced === true})); } catch(e) {}
   try { S.calls  = JSON.parse(localStorage.getItem('aiv-calls') || '[]'); } catch(e) {}
   try { S.team   = JSON.parse(localStorage.getItem('aiv-team')  || '[]'); } catch(e) {}
   try { S.commissions = JSON.parse(localStorage.getItem('aiv-comm')    || '[]'); } catch(e) {}
   try { S.scripts      = JSON.parse(localStorage.getItem('aiv-scripts') || '[]'); } catch(e) {}
   try { S.smsTemplates = JSON.parse(localStorage.getItem('aiv-sms-tpl') || '[]'); } catch(e) {}
   try { S.scheduledJobs = JSON.parse(localStorage.getItem('aiv-sched-jobs') || '[]'); } catch(e) {}
+  purgeDemoData();
+}
+
+function purgeDemoData() {
+  const isDemo = id => !id || id.startsWith('demo-') || id.startsWith('dl-') || id.startsWith('dc-') || id.startsWith('dcomm-');
+  const before = S.leads.length + S.team.length + S.commissions.length + S.calls.length;
+  S.leads       = S.leads.filter(l => !isDemo(l.id));
+  S.team        = S.team.filter(m => !isDemo(m.id));
+  S.commissions = S.commissions.filter(c => !isDemo(c.id));
+  S.calls       = S.calls.filter(c => !isDemo(c.id));
+  const after = S.leads.length + S.team.length + S.commissions.length + S.calls.length;
+  if (before !== after) {
+    try {
+      localStorage.setItem('aiv-leads', JSON.stringify(S.leads.map(l => ({...l, _synced: l._synced === true}))));
+      localStorage.setItem('aiv-team',  JSON.stringify(S.team));
+      localStorage.setItem('aiv-comm',  JSON.stringify(S.commissions));
+      localStorage.setItem('aiv-calls', JSON.stringify(S.calls));
+    } catch(e) {}
+  }
 }
 
 function checkStorage() {

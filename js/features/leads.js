@@ -50,9 +50,21 @@ function scoreLead(l) {
 }
 
 function scoreDotHTML(l) {
-  const s = scoreLead(l);
+  const s    = scoreLead(l);
   const tier = s >= 60 ? 'high' : s >= 30 ? 'mid' : 'low';
-  return `<span class="score-dot score-${tier}" title="Prioridad: ${s} pts"></span>`;
+  const tips = [
+    l.phone && l.phone !== 'N/A' ? '+' + SCORE_WEIGHTS.hasPhone + ' teléfono' : '',
+    parseFloat(l.rating) >= 4 ? '+' + SCORE_WEIGHTS.ratingHigh + ' rating alto' : '',
+    isOverdue(l) ? '+' + SCORE_WEIGHTS.fuOverdue + ' FU vencido' : isTodayFU(l) ? '+' + SCORE_WEIGHTS.fuToday + ' FU hoy' : '',
+  ].filter(Boolean).join(', ') || 'sin datos';
+  return `<span class="score-chip score-${tier}" title="${s} pts: ${tips}">${s}</span>`;
+}
+
+function highlight(text, q) {
+  if (!q) return esc(text);
+  const idx = text.toLowerCase().indexOf(q.toLowerCase());
+  if (idx < 0) return esc(text);
+  return esc(text.slice(0, idx)) + '<mark>' + esc(text.slice(idx, idx + q.length)) + '</mark>' + esc(text.slice(idx + q.length));
 }
 
 // ── Filter / sort ──────────────────────────────────────────
@@ -98,19 +110,49 @@ function sortBy(col) {
   renderTable();
 }
 
+// ── Search debounce ────────────────────────────────────────
+let _searchTimer = null;
+function debouncedSearch() {
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(() => { S.page = 1; renderTable(); }, 200);
+}
+
 // ── Table render ───────────────────────────────────────────
 function renderTable() {
   const filtered = getSorted(getFiltered());
   const total    = filtered.length;
-  const pages    = Math.max(1, Math.ceil(total / S.pageSize));
-  S.page         = Math.min(S.page, pages);
-  const slice    = filtered.slice((S.page - 1) * S.pageSize, S.page * S.pageSize);
+  const q        = (document.getElementById('tbl-q')?.value || '').trim();
   const tbody    = document.getElementById('tbl-body');
   if (!tbody) return;
 
+  // When searching, bypass pagination and show all results (up to 200)
+  let slice;
+  if (q) {
+    slice = filtered.slice(0, 200);
+    const pag = document.getElementById('tbl-pages');
+    if (pag) pag.innerHTML = total > 200
+      ? `<span style="font-size:11px;color:var(--sub)">Primeros 200 de ${total} — afina la búsqueda</span>`
+      : '';
+  } else {
+    const pages = Math.max(1, Math.ceil(total / S.pageSize));
+    S.page      = Math.min(S.page, pages);
+    slice       = filtered.slice((S.page - 1) * S.pageSize, S.page * S.pageSize);
+    renderPagination(total, pages);
+  }
+
+  const hasFilters = ['f-city','f-barrio','f-source','f-status','f-followup','f-mine'].some(id => {
+    const el = document.getElementById(id); return el && el.value;
+  });
+
   if (!slice.length) {
-    // colspan=12: ☐ name phone city barrio source fu rating status updated lastCall + lock
-    tbody.innerHTML = '<tr><td colspan="13" class="table-empty">Sin leads con los filtros actuales.</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="13" class="table-empty">
+      <div style="padding:40px;text-align:center">
+        <div style="font-size:32px;margin-bottom:8px">🔍</div>
+        <div style="font-weight:600;color:var(--hl);margin-bottom:4px">Sin resultados</div>
+        <div style="font-size:12px;color:var(--sub);margin-bottom:12px">${q ? 'No se encontraron leads con "' + esc(q) + '"' : 'No hay leads con los filtros actuales'}</div>
+        ${q || hasFilters ? '<button class="btn btn-ghost" style="font-size:12px" onclick="clearFilters()">Limpiar filtros</button>' : ''}
+      </div>
+    </td></tr>`;
   } else {
     tbody.innerHTML = slice.map(l => {
       const sc   = STATUS_CLS[l.status] || 'new';
@@ -127,9 +169,9 @@ function renderTable() {
       else                    lockCell = `<button class="claim-btn" onclick="event.stopPropagation();claimLead('${l.id}')">Reclamar</button>`;
       return `<tr class="${sel} ${dnc}" onclick="rowClick(event,'${l.id}')">
         <td onclick="event.stopPropagation()"><input type="checkbox" ${S.selected.has(l.id)?'checked':''} onchange="toggleSel('${l.id}',this.checked)"></td>
-        <td style="text-align:center;width:28px">${scoreDotHTML(l)}</td>
-        <td class="name-cell">${esc(l.name)}</td>
-        <td style="font-family:'DM Mono',monospace;font-size:11px">${esc(l.phone)}</td>
+        <td style="text-align:center;width:36px">${scoreDotHTML(l)}</td>
+        <td class="name-cell">${highlight(l.name, q)}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:11px">${highlight(l.phone || '', q)}</td>
         <td style="font-size:11px">${esc(l.city   || '--')}</td>
         <td style="font-size:11px">${esc(l.barrio || '--')}</td>
         <td>${srcBadgeHTML(l.source)}</td>
@@ -144,7 +186,6 @@ function renderTable() {
   }
 
   document.getElementById('tbl-count').textContent = total + ' lead' + (total !== 1 ? 's' : '');
-  renderPagination(total, pages);
   updateBulkBar();
 
   document.querySelectorAll('thead th.sortable').forEach(th => {
@@ -190,7 +231,9 @@ function updateBulkBar()      {
 }
 function applyBulkStatus() {
   const st = document.getElementById('bulk-status')?.value;
-  if (!st) { alert('Selecciona un estado.'); return; }
+  if (!st) { toast('Selecciona un estado.', 'error'); return; }
+  const n = S.selected.size;
+  if (!confirm(`¿Cambiar estado de ${n} lead${n !== 1 ? 's' : ''} a "${st}"? Esta acción no se puede deshacer.`)) return;
   S.leads.forEach(l => { if (S.selected.has(l.id)) { l.status = st; l.updatedAt = new Date().toISOString(); pushLead(l); } });
   clearSelection(); renderAll();
 }
@@ -208,21 +251,21 @@ function onBulkActionChange() {
 
 function applyBulkAction() {
   const act  = document.getElementById('bulk-action')?.value || '';
-  if (!act) { alert('Selecciona una accion.'); return; }
-  if (S.selected.size === 0) { alert('Selecciona al menos un lead.'); return; }
+  if (!act) { toast('Selecciona una acción.', 'error'); return; }
+  if (S.selected.size === 0) { toast('Selecciona al menos un lead.', 'error'); return; }
   const now  = new Date().toISOString();
   const sess = S.session;
 
   if (act === 'followup') {
     const d = document.getElementById('bulk-action-date')?.value;
-    if (!d) { alert('Selecciona una fecha de seguimiento.'); return; }
+    if (!d) { toast('Selecciona una fecha de seguimiento.', 'error'); return; }
     S.leads.forEach(l => { if (S.selected.has(l.id)) { l.followUpDate = d; l.updatedAt = now; pushLead(l); } });
   } else if (act === 'source') {
     const src = document.getElementById('bulk-action-text')?.value?.trim();
-    if (!src) { alert('Ingresa la nueva fuente.'); return; }
+    if (!src) { toast('Ingresa la nueva fuente.', 'error'); return; }
     S.leads.forEach(l => { if (S.selected.has(l.id)) { l.source = src; l.updatedAt = now; pushLead(l); } });
   } else if (act === 'closer') {
-    if (!sess) { alert('Debes iniciar sesion.'); return; }
+    if (!sess) { toast('Debes iniciar sesión.', 'error'); return; }
     S.leads.forEach(l => {
       if (S.selected.has(l.id)) {
         l.closerId   = sess.userId;
@@ -233,7 +276,7 @@ function applyBulkAction() {
       }
     });
   } else if (act === 'provider') {
-    if (!sess) { alert('Debes iniciar sesion.'); return; }
+    if (!sess) { toast('Debes iniciar sesión.', 'error'); return; }
     S.leads.forEach(l => {
       if (S.selected.has(l.id)) {
         l.providerId   = sess.userId;
@@ -245,7 +288,7 @@ function applyBulkAction() {
     });
   } else if (act === 'dnc') {
     const reason = document.getElementById('bulk-action-text')?.value?.trim();
-    if (!reason) { alert('Ingresa la razon para No llamar — requerido como registro legal.'); return; }
+    if (!reason) { toast('Ingresa la razón DNC — requerido como registro legal.', 'error'); return; }
     if (!confirm(`¿Marcar ${S.selected.size} lead(s) como "No llamar"?`)) return;
     S.leads.forEach(l => {
       if (S.selected.has(l.id)) {
@@ -353,6 +396,8 @@ function openLead(id) {
 
   renderLeadCallHistory(id);
   renderModalNotes(l);
+  renderLeadTimeline(l);
+  switchModalTab('notes');
   const ni = document.getElementById('m-note-inp');
   if (ni) ni.value = '';
 
@@ -372,6 +417,50 @@ function renderModalNotes(l) {
           <button class="note-del" onclick="delNote(${i})" title="Eliminar">&times;</button>
         </div>`).join('')
     : '<div class="notes-empty">Sin notas aun.</div>';
+}
+
+function switchModalTab(tab) {
+  document.getElementById('tab-notes')?.style && (document.getElementById('tab-notes').style.display = tab === 'notes' ? '' : 'none');
+  document.getElementById('tab-timeline')?.style && (document.getElementById('tab-timeline').style.display = tab === 'timeline' ? '' : 'none');
+  document.querySelectorAll('.modal-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-btn-' + tab)?.classList.add('active');
+}
+
+function renderLeadTimeline(l) {
+  const el = document.getElementById('m-timeline');
+  if (!el) return;
+  const events = [];
+
+  S.calls.filter(c => c.leadId === l.id).forEach(c => {
+    events.push({
+      date: c.calledAt,
+      icon: '📞',
+      text: 'Llamada: ' + (OUTCOME_LABELS[c.outcome] || c.outcome) + ' · ' + fmtSec(parseInt(c.duration || 0)) + (c.notes ? ' — ' + c.notes : ''),
+    });
+  });
+
+  (Array.isArray(l.notes) ? l.notes : []).forEach(n => {
+    events.push({date: n.date, icon: '📝', text: n.text});
+  });
+
+  (Array.isArray(l.workHistory) ? l.workHistory : []).forEach(w => {
+    const ts = w.closedAt || w.releasedAt || w.claimedAt || '';
+    events.push({date: ts, icon: '🔄', text: (w.closerName || w.closerId || '—') + ': ' + (w.outcome || '')});
+  });
+
+  if (l.importedAt) events.push({date: l.importedAt, icon: '➕', text: 'Lead importado'});
+
+  events.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  el.innerHTML = events.length
+    ? events.map(e => `<div class="timeline-item">
+        <span class="tl-icon">${e.icon}</span>
+        <div class="tl-body">
+          <div class="tl-text">${esc(e.text)}</div>
+          <div class="tl-date">${fmtD(e.date)} ${fmtT(e.date)}</div>
+        </div>
+      </div>`).join('')
+    : '<div class="notes-empty">Sin actividad registrada.</div>';
 }
 
 function closeModal() {
@@ -457,7 +546,7 @@ function saveLead() {
   // DNC guard — require reason
   if (newStatus === 'No llamar' && l.status !== 'No llamar') {
     const reason = document.getElementById('m-dnc-reason')?.value?.trim();
-    if (!reason) { alert('Por favor ingresa la razón para "No llamar" — requerido como registro legal.'); return; }
+    if (!reason) { toast('Por favor ingresa la razón DNC — requerido como registro legal.', 'error'); return; }
     l.dncReason = reason;
   }
 
@@ -475,6 +564,7 @@ function saveLead() {
   l.updatedAt    = new Date().toISOString();
   pushLead(l);
   closeModal();
+  toast('Lead guardado', 'success');
   renderAll();
 }
 
@@ -482,7 +572,7 @@ function deleteLeadModal() {
   const l = S.leads.find(x => x.id === S.curLeadId);
   if (!l) return;
   if (l.status === 'No llamar' && S.session?.role !== 'admin') {
-    alert('Solo admin puede eliminar leads marcados como "No llamar".');
+    toast('Solo admin puede eliminar leads marcados como "No llamar".', 'error');
     return;
   }
   if (S.config.scriptUrl) sheetsCall({action:'delete', id:S.curLeadId});

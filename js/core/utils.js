@@ -37,3 +37,17 @@ function lsUsed() {
   for (const k of Object.keys(localStorage)) t += (localStorage.getItem(k) || '').length * 2;
   return t;
 }
+
+function toast(msg, type, duration) {
+  type     = type     || 'info';
+  duration = duration || 3500;
+  const el = document.createElement('div');
+  el.className   = 'toast toast-' + type;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('visible'));
+  setTimeout(() => {
+    el.classList.remove('visible');
+    setTimeout(() => el.remove(), 280);
+  }, duration);
+}

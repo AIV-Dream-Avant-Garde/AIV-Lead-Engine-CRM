@@ -26,12 +26,12 @@ function processCSV(file) {
   reader.onload = ev => {
     const text = ev.target.result;
     const lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim().split('\n');
-    if (lines.length < 2) { alert('CSV vacío o inválido.'); return; }
+    if (lines.length < 2) { toast('CSV vacío o inválido.', 'error'); return; }
     const headers = splitCSV(lines[0]).map(h => h.toLowerCase().trim());
     const rows    = lines.slice(1)
       .map(line => { const vals = splitCSV(line); const obj = {}; headers.forEach((h,i) => obj[h] = (vals[i]||'').trim()); return obj; })
       .filter(r => r.name && r.name !== 'name');
-    if (!rows.length) { alert('CSV vacío o inválido.'); return; }
+    if (!rows.length) { toast('CSV vacío o inválido.', 'error'); return; }
 
     // Build mapper UI
     const autoMap = {};
@@ -73,15 +73,6 @@ function processCSV(file) {
     if (dz) dz.style.display = 'none';
   };
   reader.readAsText(file, 'utf-8');
-}
-
-function parseCSV(text) {
-  const lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim().split('\n');
-  if (lines.length < 2) return [];
-  const hdr = splitCSV(lines[0]).map(h => h.toLowerCase().trim());
-  return lines.slice(1)
-    .map(line => { const vals = splitCSV(line); const obj = {}; hdr.forEach((h,i) => obj[h] = (vals[i]||'').trim()); return obj; })
-    .filter(r => r.name && r.name !== 'name');
 }
 
 function splitCSV(line) {
@@ -153,7 +144,7 @@ async function confirmImport() {
     setLastSynced();
   }
 
-  alert(toAdd.length + ' leads importados.');
+  toast(toAdd.length + ' leads importados.', 'success');
   cancelImport();
   renderAll();
   navigate('leads');

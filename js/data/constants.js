@@ -57,8 +57,8 @@ const SCORE_WEIGHTS = {
 };
 
 const ROLE_VISIBLE = {
-  admin:    ['setup','scraper','import','leads','pipeline','llamadas','perfil','export'],
+  admin:    ['setup','scraper','import','leads','pipeline','llamadas','perfil','export','admin','analytics'],
   provider: ['scraper','import','leads','pipeline','perfil','export'],
   closer:   ['leads','pipeline','llamadas','perfil','export'],
-  solo:     ['scraper','import','leads','pipeline','llamadas','perfil','export'],
+  solo:     ['scraper','import','leads','pipeline','llamadas','perfil','export','analytics'],
 };

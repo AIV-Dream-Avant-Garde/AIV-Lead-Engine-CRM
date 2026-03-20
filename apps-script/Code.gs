@@ -45,6 +45,10 @@ function tryParse(s,d){try{return JSON.parse(s)||d}catch(e){return d}}
 function doGet(e) {
   try {
     const a = e.parameter.action;
+    if (a !== 'ping' && a !== 'twiml') {
+      const s = e.parameter._s || '';
+      if (s !== CRM_SECRET) return err_('Unauthorized');
+    }
     if (a === 'ping') return ok({ping:true,serverTime:new Date().toISOString()});
     if (a === 'pull') {
       const since = e.parameter.since;
@@ -78,8 +82,8 @@ function doPost(e) {
   try {
     const a = e.parameter.action;
     const b = JSON.parse(e.postData.contents||'{}');
-    if (CRM_SECRET !== 'PASTE_YOUR_CRM_SECRET_HERE' && b._secret !== CRM_SECRET) {
-      return err_('Unauthorized');
+    if (b._secret !== CRM_SECRET) {
+      return err_('Unauthorized — configura CRM_SECRET en Code.gs con el valor de Setup.');
     }
     if (a === 'push') {
       const s=getSheet(SHEETS.leads,LEAD_HDR),rows=s.getDataRange().getValues();
@@ -107,12 +111,18 @@ function doPost(e) {
               const evDate=new Date(b.followUpDate);
               const title='Seguimiento: '+(b.name||'Lead');
               let calEventId=oldCalId;
-              if(oldCalId){
-                try{const ev=CalendarApp.getEventById(oldCalId);if(ev){ev.setTitle(title);ev.setAllDayDate(evDate);}}catch(ce){calEventId='';}
+              if(calEventId){
+                try{
+                  const ev=CalendarApp.getEventById(calEventId);
+                  if(ev){ev.setTitle(title);ev.setAllDayDate(evDate);}
+                  else calEventId=''; // event was deleted externally — recreate below
+                }catch(ce){calEventId='';}
               }
               if(!calEventId){
-                const ev=CalendarApp.getDefaultCalendar().createAllDayEvent(title,evDate,{description:'CRM Lead ID: '+b.id});
-                calEventId=ev.getId();
+                try{
+                  const ev=CalendarApp.getDefaultCalendar().createAllDayEvent(title,evDate,{description:'CRM Lead ID: '+b.id});
+                  calEventId=ev.getId();
+                }catch(ce){Logger.log('Calendar create error: '+ce.message);}
               }
               b.calendarEventId=calEventId;
             }catch(ce){Logger.log('Calendar error: '+ce.message);}
@@ -271,10 +281,12 @@ function doPost(e) {
       const url='https://places.googleapis.com/v1/places:searchText';
       const hdr={'Content-Type':'application/json','X-Goog-Api-Key':PLACES_API_KEY,'X-Goog-FieldMask':'places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount,nextPageToken'};
       let body={textQuery:keyword,locationBias:{circle:{center:{latitude:parseFloat(lat),longitude:parseFloat(lng)},radius:parseFloat(radius)}},maxResultCount:20};
-      let leads=[],token=null,tries=0;
-      while(leads.length<(maxResults||100)&&tries<10){
+      const MAX_API_CALLS = 15; // Guard against quota exhaustion
+      let leads=[],token=null,tries=0,apiCalls=0;
+      while(leads.length<(maxResults||100)&&tries<10&&apiCalls<MAX_API_CALLS){
         if(token)body={textQuery:keyword,pageToken:token};
         const r=UrlFetchApp.fetch(url,{method:'post',headers:hdr,payload:JSON.stringify(body),muteHttpExceptions:true});
+        apiCalls++;
         const d=JSON.parse(r.getContentText());
         if(d.error)return err_(d.error.message);
         (d.places||[]).forEach(p=>{ if(leads.length<maxResults)leads.push({name:p.displayName?.text||'N/A',phone:p.nationalPhoneNumber||'N/A',address:p.formattedAddress||'N/A',website:p.websiteUri||'N/A',rating:p.rating||'N/A',reviews:p.userRatingCount||'N/A'}); });
@@ -282,7 +294,7 @@ function doPost(e) {
         if(!token)break;
         Utilities.sleep(2000);
       }
-      return ok({leads});
+      return ok({leads,truncated:apiCalls>=MAX_API_CALLS});
     }
     if (a === 'setTrigger') {
       const fn = b.fn;
@@ -493,4 +505,4 @@ function runScheduledScrapes() {
 }
 
 function ok(d){return ContentService.createTextOutput(JSON.stringify({success:true,...d})).setMimeType(ContentService.MimeType.JSON)}
-function err_(m){return ContentService.createTextOutput(JSON.stringify({success:false,error:m})).setMimeType(ContentService.MimeType.JSON)}
+function err_(m,code){return ContentService.createTextOutput(JSON.stringify({success:false,error:m,code:code||500,timestamp:new Date().toISOString()})).setMimeType(ContentService.MimeType.JSON)}

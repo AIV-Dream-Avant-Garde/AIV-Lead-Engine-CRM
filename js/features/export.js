@@ -18,7 +18,7 @@ function getExportLeads() {
 
 function previewExport() {
   const leads = getExportLeads();
-  if (!leads.length) { alert('Sin leads con estos filtros.'); return; }
+  if (!leads.length) { toast('Sin leads con estos filtros.', 'error'); return; }
   const hdrs  = ['name','phone','address','website','rating','city','barrio','keyword','source','sourceDetail','status','followUpDate'];
   const lines = [
     hdrs.join(','),
@@ -60,9 +60,44 @@ function doExport() {
   a.click();
 }
 
+function exportCommissions() {
+  if (!S.commissions.length) { toast('Sin comisiones registradas.', 'error'); return; }
+  const hdrs = ['leadName','dealValue','collectedAmount','providerName','providerAmount',
+                 'closerName','closerAmount','status','createdAt','paidAt','paidBy','paymentRef',
+                 'refundReason','adjustedBy','adjustedAt'];
+  const csv = [
+    hdrs.join(','),
+    ...S.commissions.map(c => {
+      const prov = S.team.find(m => m.id === c.providerId)?.name || c.providerName || '';
+      const clsr = S.team.find(m => m.id === c.closerId)?.name   || c.closerName   || '';
+      return hdrs.map(h => {
+        const v = h === 'providerName' ? prov : h === 'closerName' ? clsr : (c[h] || '');
+        return `"${String(v).replace(/"/g,'""')}"`;
+      }).join(',');
+    }),
+  ].join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'}));
+  a.download = 'aiv_comisiones_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+}
+
+function exportCalls() {
+  if (!S.calls.length) { toast('Sin llamadas registradas.', 'error'); return; }
+  const hdrs = ['leadName','phone','outcome','duration','notes','calledAt','consentConfirmed','callSid'];
+  const csv = [
+    hdrs.join(','),
+    ...S.calls.map(c => hdrs.map(h => `"${String(c[h]||'').replace(/"/g,'""')}"`).join(',')),
+  ].join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'}));
+  a.download = 'aiv_llamadas_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+}
+
 function copyCrmSecret() {
   const s = S.config.crmSecret || '';
-  if (!s) { alert('Secreto no generado aún. Recarga la página.'); return; }
+  if (!s) { toast('Secreto no generado aún. Recarga la página.', 'error'); return; }
   navigator.clipboard.writeText(s).then(() => {
     const el = document.getElementById('crm-secret-display');
     if (el) { const orig = el.textContent; el.textContent = 'Copiado!'; setTimeout(() => el.textContent = orig, 2000); }
@@ -71,7 +106,7 @@ function copyCrmSecret() {
 
 function copyWebhookUrl() {
   const url = S.config.scriptUrl || '';
-  if (!url) { alert('Guarda la URL del Apps Script primero.'); return; }
+  if (!url) { toast('Guarda la URL del Apps Script primero.', 'error'); return; }
   navigator.clipboard.writeText(url).then(() => {
     const btn = document.querySelector('[onclick="copyWebhookUrl()"]');
     if (btn) { btn.textContent = 'Copiado!'; setTimeout(() => btn.textContent = 'Copiar URL', 2000); }

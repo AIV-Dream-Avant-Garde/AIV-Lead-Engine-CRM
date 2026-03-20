@@ -54,6 +54,8 @@ function renderAll() {
   updatePerfilBadge();
   updateAdminBadge();
   applyAdminNavVisibility();
+  if (document.getElementById('sec-pipeline')?.classList.contains('active')) renderPipeline();
+  if (document.getElementById('sec-analytics')?.classList.contains('active')) renderAnalytics();
 }
 
 // ── navigate — consolidated (all section logic merged) ─────
@@ -66,17 +68,18 @@ function navigate(id) {
   const labels = {
     setup:'Setup', scraper:'Scraper', import:'Importar', leads:'Leads',
     pipeline:'Pipeline', llamadas:'Llamadas', export:'Exportar',
-    perfil:'Mi Perfil', admin:'Admin',
+    perfil:'Mi Perfil', admin:'Admin', analytics:'Analytics',
   };
   const el = document.getElementById('tb-section');
   if (el) el.textContent = labels[id] || id;
 
   if (id === 'pipeline')  renderPipeline();
+  if (id === 'analytics') renderAnalytics();
   if (id === 'leads')     { S.page = 1; renderTable(); }
   if (id === 'llamadas')  renderCallsSection();
   if (id === 'perfil')    renderPerfil();
   if (id === 'admin') {
-    if (S.session?.role !== 'admin') { alert('Acceso restringido.'); navigate('leads'); return; }
+    if (S.session?.role !== 'admin') { toast('Acceso restringido.', 'error'); navigate('leads'); return; }
     renderAdmin();
   }
   if (id === 'scraper') {
@@ -109,21 +112,42 @@ document.addEventListener('keydown', e => {
       document.getElementById('deal-overlay').classList.remove('open');
     if (document.getElementById('delete-confirm')?.classList.contains('visible'))
       document.getElementById('delete-confirm').classList.remove('visible');
+    const sm = document.getElementById('shortcuts-modal');
+    if (sm) sm.remove();
   }
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && S.curLeadId) { e.preventDefault(); saveLead(); return; }
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
   if (S.curLeadId) return; // modal open — shortcuts disabled
   const section = document.querySelector('.section.active')?.id;
   if ((e.key === 'n' || e.key === 'N') && section === 'sec-leads') goNextLead();
   if (e.key === 's' || e.key === 'S') syncNow();
+  if (e.key === '?') { showShortcutsModal(); return; }
   if (e.key === 'Escape' && document.getElementById('call-widget')?.classList.contains('visible')) hangUp();
 });
+
+function showShortcutsModal() {
+  const existing = document.getElementById('shortcuts-modal');
+  if (existing) { existing.remove(); return; }
+  const el = document.createElement('div');
+  el.id = 'shortcuts-modal';
+  el.className = 'shortcuts-modal';
+  el.innerHTML = `<div class="shortcuts-inner">
+    <div class="shortcuts-title">Atajos de teclado <span class="shortcuts-close" onclick="this.closest('#shortcuts-modal').remove()">×</span></div>
+    <table class="shortcuts-table">
+      <tr><td><kbd>?</kbd></td><td>Mostrar / ocultar este panel</td></tr>
+      <tr><td><kbd>N</kbd></td><td>Siguiente lead disponible</td></tr>
+      <tr><td><kbd>S</kbd></td><td>Sincronizar con Google Sheets</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>Cerrar modal / overlay</td></tr>
+      <tr><td><kbd>Ctrl+Enter</kbd></td><td>Guardar lead (dentro del modal)</td></tr>
+    </table>
+  </div>`;
+  document.body.appendChild(el);
+}
 
 // ── Single clean init — replaces all stage1/stage2/stage3 inits ─
 (function init() {
   // 1. Load all data from localStorage
   loadLocal();
-  try { S.team        = JSON.parse(localStorage.getItem('aiv-team')           || '[]'); } catch(e) { S.team=[]; }
-  try { S.commissions = JSON.parse(localStorage.getItem('aiv-comm')           || '[]'); } catch(e) { S.commissions=[]; }
   try { S.auditLog    = JSON.parse(localStorage.getItem('aiv-audit')          || '[]'); } catch(e) { S.auditLog=[]; }
   try { S.scrapeHistory = JSON.parse(localStorage.getItem('aiv-scrape-history') || '[]'); } catch(e) { S.scrapeHistory=[]; }
 

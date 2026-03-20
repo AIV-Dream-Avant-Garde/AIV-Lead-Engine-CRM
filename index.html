@@ -37,17 +37,23 @@
     </div>
     <div class="login-hint" id="login-hint">Ingresa tu PIN para acceder</div>
     <div class="login-lockout" id="login-lockout"></div>
-    <button class="btn btn-ghost" style="width:100%;margin-top:10px;font-size:12px;opacity:.65;letter-spacing:.3px" onclick="startDemo()">Probar en modo demo</button>
   </div>
 </div>
 
 <!-- DEMO BANNER -->
-<div id="demo-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--amber);color:#000;font-size:11px;font-weight:700;text-align:center;padding:4px 8px;letter-spacing:.5px">
-  MODO DEMO — Los cambios no se guardan ni se sincronizan
+<div id="demo-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--amber);color:#000;font-size:12px;font-weight:700;text-align:center;padding:5px 16px;letter-spacing:.4px;align-items:center;justify-content:center;gap:16px">
+  <span>⚡ MODO DEMO — Los cambios no se sincronizan. Explora libremente.</span>
+  <button class="btn" style="background:#000;color:var(--amber);font-size:11px;padding:3px 10px;border-radius:4px;flex-shrink:0" onclick="logout()">Salir del demo</button>
+</div>
+
+<!-- SESSION WARNING BANNER -->
+<div id="session-warning-banner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:9998;background:#d97706;color:#fff;font-size:12px;font-weight:600;padding:7px 16px;align-items:center;justify-content:center;gap:12px">
+  <span>Tu sesión expira en <span id="session-countdown">2:00</span> min por inactividad.</span>
+  <button class="btn" style="background:#fff;color:#d97706;font-size:12px;padding:4px 12px;border-radius:4px" onclick="extendSession()">Continuar sesión</button>
 </div>
 
 <!-- SIDEBAR -->
-<aside class="sidebar">
+<aside class="sidebar" role="navigation" aria-label="Navegación principal">
   <div class="sb-logo">
     <div class="sb-logo-mark"><div class="sb-logo-dot"></div>AIV</div>
     <div class="sb-logo-sub">Lead Engine &amp; CRM</div>
@@ -98,6 +104,10 @@
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1l1.5 3h3l-2.5 2 1 3L8 7.5 5 9l1-3L3.5 4h3z"/></svg>
       Admin
       <span class="nav-badge red" id="nav-admin-badge" style="display:none">0</span>
+    </div>
+    <div class="nav-item role-hidden" data-sec="analytics" id="nav-analytics-item">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12l3-4 3 2 3-5 3 3"/><path d="M2 14h12"/></svg>
+      Analytics
     </div>
     <div class="nav-item" data-sec="export">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 12h10M8 10V3M5 7l3-4 3 4"/></svg>
@@ -353,7 +363,7 @@ Content-Type: application/json
     <button class="btn btn-ghost" style="font-size:12px;padding:5px 12px;margin-left:auto" onclick="clearSelection()">Deseleccionar</button>
   </div>
   <div class="table-toolbar">
-    <div class="search-box"><span class="search-icon">⌕</span><input id="tbl-q" placeholder="Buscar nombre, telefono, fuente, barrio..." oninput="renderTable()"></div>
+    <div class="search-box"><span class="search-icon">⌕</span><input id="tbl-q" type="search" placeholder="Buscar nombre, telefono, fuente, barrio..." aria-label="Buscar leads" oninput="debouncedSearch()"></div>
     <select class="filter-sel" id="f-city" onchange="renderTable()"><option value="">Todas las ciudades</option></select>
     <select class="filter-sel" id="f-barrio" onchange="renderTable()"><option value="">Todos los barrios</option></select>
     <select class="filter-sel" id="f-source" onchange="renderTable()"><option value="">Todas las fuentes</option></select>
@@ -528,7 +538,10 @@ Content-Type: application/json
   <div class="admin-section">
     <div class="admin-section-title">
       <span>Registro de auditoria</span>
-      <span style="font-size:11px;color:var(--body);font-weight:400">Ultimas 100 acciones</span>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:11px;color:var(--body);font-weight:400">Ultimas 100 acciones</span>
+        <button class="btn btn-ghost" style="font-size:11px;padding:3px 10px" onclick="exportAuditLog()">Exportar CSV</button>
+      </div>
     </div>
     <div id="admin-audit-list"><div class="notes-empty">Sin entradas de auditoria.</div></div>
   </div>
@@ -612,6 +625,55 @@ Content-Type: application/json
   </div>
 </div>
 
+<!-- ANALYTICS SECTION -->
+<div class="section" id="sec-analytics">
+  <div class="eyebrow">Analytics</div>
+  <h1 class="section-title">Inteligencia de negocio</h1>
+  <p class="section-sub">KPIs, funnel de conversión, rendimiento del equipo y fuentes de leads.</p>
+
+  <!-- KPI row -->
+  <div class="analytics-kpi-row" id="analytics-kpi-row">
+    <div class="kpi-card"><div class="kpi-label">Deals cerrados (mes)</div><div class="kpi-value" id="kpi-deals">—</div></div>
+    <div class="kpi-card"><div class="kpi-label">Revenue (mes)</div><div class="kpi-value" id="kpi-revenue">—</div></div>
+    <div class="kpi-card"><div class="kpi-label">Comisiones pagadas</div><div class="kpi-value" id="kpi-paid-comm">—</div></div>
+    <div class="kpi-card"><div class="kpi-label">Tasa de cierre</div><div class="kpi-value" id="kpi-close-rate">—</div></div>
+  </div>
+
+  <!-- Funnel -->
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">Funnel de conversión</div>
+    <div id="analytics-funnel" style="margin-top:14px"></div>
+  </div>
+
+  <!-- Source ROI -->
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">ROI por fuente</div>
+    <div class="table-wrap" style="margin-top:14px">
+      <table class="data-table" id="analytics-source-table">
+        <thead><tr><th>Fuente</th><th>Leads</th><th>Cerrados</th><th>Tasa</th><th>Revenue</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Leaderboard -->
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">Leaderboard del equipo</div>
+    <div class="table-wrap" style="margin-top:14px">
+      <table class="data-table" id="analytics-leaderboard">
+        <thead><tr><th>#</th><th>Nombre</th><th>Rol</th><th>Deals</th><th>Revenue</th><th>Llamadas</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Call performance -->
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">Rendimiento de llamadas</div>
+    <div id="analytics-calls-stats" style="margin-top:14px"></div>
+  </div>
+</div>
+
 <!-- EXPORT SECTION -->
 <div class="section" id="sec-export">
   <div class="eyebrow">Exportar</div>
@@ -632,13 +694,22 @@ Content-Type: application/json
       <button class="btn btn-success btn-full" id="ex-dl-btn" onclick="doExport()">Descargar CSV</button>
     </div>
   </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">Exportar otras tablas</div>
+    <div class="card-sub" style="margin-bottom:14px">Descarga comisiones o llamadas como CSV para análisis externo.</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="exportCommissions()">Exportar comisiones CSV</button>
+      <button class="btn btn-primary" onclick="exportCalls()">Exportar llamadas CSV</button>
+    </div>
+  </div>
 </div>
 
   </div><!-- content-area -->
 </main>
 
 <!-- LEAD DETAIL MODAL -->
-<div class="modal-overlay" id="modal">
+<div class="modal-overlay" id="modal" role="dialog" aria-modal="true" aria-labelledby="m-name">
   <div class="modal">
     <div class="modal-header">
       <div><div class="modal-title" id="m-name">—</div><div class="modal-sub" id="m-meta">—</div></div>
@@ -681,10 +752,18 @@ Content-Type: application/json
       <div class="label-sm">Historial de trabajo</div>
       <div id="m-work-history" style="margin-bottom:10px"></div>
       <div class="divider"></div>
-      <div class="label-sm">Notas</div>
-      <div class="notes-list" id="m-notes"></div>
-      <div class="field" style="margin-top:8px"><textarea id="m-note-inp" placeholder="Agregar nota o resultado..." rows="2"></textarea></div>
-      <button class="btn btn-ghost" style="margin-top:8px;font-size:12px" onclick="addNote()">+ Agregar nota</button>
+      <div class="modal-tab-bar">
+        <button class="modal-tab active" id="tab-btn-notes" onclick="switchModalTab('notes')">Notas</button>
+        <button class="modal-tab" id="tab-btn-timeline" onclick="switchModalTab('timeline')">Timeline</button>
+      </div>
+      <div id="tab-notes">
+        <div class="notes-list" id="m-notes"></div>
+        <div class="field" style="margin-top:8px"><textarea id="m-note-inp" placeholder="Agregar nota o resultado..." rows="2"></textarea></div>
+        <button class="btn btn-ghost" style="margin-top:8px;font-size:12px" onclick="addNote()">+ Agregar nota</button>
+      </div>
+      <div id="tab-timeline" style="display:none">
+        <div class="timeline-wrap" id="m-timeline"></div>
+      </div>
     </div>
     <div class="modal-footer">
       <div style="position:relative">
@@ -706,7 +785,7 @@ Content-Type: application/json
 </div>
 
 <!-- DEAL VALUE MODAL -->
-<div class="deal-overlay" id="deal-overlay">
+<div class="deal-overlay" id="deal-overlay" role="dialog" aria-modal="true" aria-label="Ingresar valor del negocio">
   <div class="deal-card">
     <div class="deal-title">Valor del negocio</div>
     <div class="deal-sub">Para calcular las comisiones correctamente, ingresa el valor del negocio cerrado. Este valor queda registrado permanentemente.</div>
@@ -883,6 +962,7 @@ Content-Type: application/json
 <script src="js/features/calls.js"></script>
 <script src="js/features/profile.js"></script>
 <script src="js/features/admin.js"></script>
+<script src="js/features/analytics.js"></script>
 <script src="js/features/export.js"></script>
 <script src="js/main.js"></script>
 </body>

@@ -3,7 +3,8 @@
 var pinBuffer      = '';
 var failedAttempts = 0;
 var pinLockedUntil = 0;
-var sessionTimer   = null;
+var sessionTimer        = null;
+var sessionWarningTimer = null;
 
 // ── SHA-256 via WebCrypto ──────────────────────────────────
 async function sha256(s) {
@@ -39,8 +40,8 @@ async function tryLogin() {
   const entered = pinBuffer;
   pinBuffer = '';
 
-  // Demo shortcut — PIN 0000
-  if (entered === '0000') { startDemo(); return; }
+  // Demo shortcut — admin only, undocumented
+  if (entered === '0809') { startDemo(); return; }
 
   const hash = await sha256(entered);
 
@@ -114,7 +115,10 @@ function startSession(user) {
 function logout() {
   S.session = null;
   sessionStorage.removeItem('aiv-session');
-  if (sessionTimer) clearTimeout(sessionTimer);
+  if (sessionTimer)        clearTimeout(sessionTimer);
+  if (sessionWarningTimer) clearTimeout(sessionWarningTimer);
+  const wb = document.getElementById('session-warning-banner');
+  if (wb) wb.style.display = 'none';
   pinBuffer = '';
   failedAttempts = 0;
   updatePinDots();
@@ -123,13 +127,47 @@ function logout() {
   const lockout = document.getElementById('login-lockout');
   if (lockout) lockout.style.display = 'none';
   document.getElementById('login-overlay').classList.remove('hidden');
+  if (S.demoMode) {
+    S.demoMode    = false;
+    S.leads = []; S.calls = []; S.commissions = []; S.team = [];
+    S.scripts = []; S.smsTemplates = []; S.scheduledJobs = []; S.auditLog = [];
+    const db = document.getElementById('demo-banner');
+    if (db) db.style.display = 'none';
+    // Restore real data from localStorage so next login sees correct state
+    loadLocal();
+  }
 }
 
 function resetSessionTimer() {
-  if (sessionTimer) clearTimeout(sessionTimer);
+  if (sessionTimer)        clearTimeout(sessionTimer);
+  if (sessionWarningTimer) clearTimeout(sessionWarningTimer);
+  const wb = document.getElementById('session-warning-banner');
+  if (wb) wb.style.display = 'none';
+
+  sessionWarningTimer = setTimeout(() => {
+    if (!S.session) return;
+    const banner = document.getElementById('session-warning-banner');
+    if (banner) { banner.style.display = 'flex'; startSessionCountdown(2 * 60); }
+  }, SESSION_TIMEOUT_MS - 2 * 60 * 1000);
+
   sessionTimer = setTimeout(() => {
-    if (S.session) { alert('Sesion expirada por inactividad (30 min).'); logout(); }
+    if (S.session) { toast('Sesión cerrada por inactividad.', 'warning'); logout(); }
   }, SESSION_TIMEOUT_MS);
+}
+
+function startSessionCountdown(seconds) {
+  const el = document.getElementById('session-countdown');
+  const interval = setInterval(() => {
+    seconds--;
+    if (!el || !S.session) { clearInterval(interval); return; }
+    const m = Math.floor(seconds / 60), s = seconds % 60;
+    el.textContent = m + ':' + String(s).padStart(2, '0');
+    if (seconds <= 0) clearInterval(interval);
+  }, 1000);
+}
+
+function extendSession() {
+  resetSessionTimer();
 }
 
 // Reset timer on any user interaction
@@ -160,7 +198,8 @@ function startDemo() {
   sessionStorage.setItem('aiv-session', JSON.stringify(user));
   failedAttempts = 0;
   document.getElementById('login-overlay').classList.add('hidden');
-  document.getElementById('demo-banner').style.display = 'block';
+  document.getElementById('demo-banner').style.display = 'flex';
+  resetSessionTimer();
   applySidebarForRole('admin');
   updateSidebarUser(user);
   applyAdminNavVisibility();
