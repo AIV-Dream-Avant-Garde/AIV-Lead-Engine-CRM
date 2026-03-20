@@ -3,6 +3,7 @@
 const SOURCES = [
   {val:'Google Maps',cls:'src-maps'},{val:'LinkedIn',cls:'src-linkedin'},
   {val:'Instagram',cls:'src-instagram'},{val:'Facebook',cls:'src-facebook'},
+  {val:'TikTok',cls:'src-default'},{val:'Feria / Evento',cls:'src-default'},
   {val:'Referido',cls:'src-referral'},{val:'WhatsApp',cls:'src-default'},
   {val:'Base de datos',cls:'src-default'},{val:'Web',cls:'src-default'},
   {val:'Manual',cls:'src-default'},{val:'Otro',cls:'src-default'},

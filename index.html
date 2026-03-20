@@ -242,10 +242,12 @@ Content-Type: application/json
       <div class="field"><label>Keyword (negocio)</label><select id="sc-kw"></select></div>
       <div class="field"><label>Radio de busqueda</label>
         <select id="sc-radius">
+          <option value="300">300m — muy denso</option>
           <option value="500">500m — solo ese barrio</option>
           <option value="1000" selected>1km — barrio + alrededores</option>
           <option value="2000">2km — zona amplia</option>
           <option value="5000">5km — todo el municipio</option>
+          <option value="10000">10km — ciudad amplia</option>
         </select>
       </div>
       <div class="field"><label>Max resultados</label><input type="number" id="sc-max" value="100" min="10" max="500"></div>
@@ -549,16 +551,18 @@ Content-Type: application/json
     </div>
     <div id="admin-scrape-trigger-status"></div>
     <div class="form-grid" style="margin-bottom:12px">
-      <div class="field"><label>Keyword (negocio)</label><input type="text" id="sj-keyword" placeholder="restaurante, salon de belleza..."></div>
-      <div class="field"><label>Ciudad</label><input type="text" id="sj-city" placeholder="Medellín"></div>
-      <div class="field"><label>Latitud</label><input type="number" id="sj-lat" placeholder="6.24452" step="0.00001"></div>
-      <div class="field"><label>Longitud</label><input type="number" id="sj-lng" placeholder="-75.57319" step="0.00001"></div>
-      <div class="field"><label>Radio (m)</label>
+      <div class="field"><label>Ciudad</label><select id="sj-city" onchange="fillBarrios('sj-barrio', this.value, null)"></select></div>
+      <div class="field"><label>Barrio / Sector</label><select id="sj-barrio"></select></div>
+      <div class="field"><label>Categoria</label><select id="sj-cat" onchange="fillKws('sj-keyword', this.value)"></select></div>
+      <div class="field"><label>Keyword (negocio)</label><select id="sj-keyword"></select></div>
+      <div class="field"><label>Radio de busqueda</label>
         <select id="sj-radius">
+          <option value="300">300m — muy denso</option>
           <option value="500">500m</option>
           <option value="1000" selected>1km</option>
           <option value="2000">2km</option>
           <option value="5000">5km</option>
+          <option value="10000">10km — ciudad amplia</option>
         </select>
       </div>
       <div class="field"><label>Max resultados</label><input type="number" id="sj-max" value="50" min="10" max="200"></div>

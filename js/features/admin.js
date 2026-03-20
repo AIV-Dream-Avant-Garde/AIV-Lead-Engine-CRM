@@ -348,16 +348,19 @@ function renderScheduledJobs() {
 }
 
 function addScheduledJob() {
-  const keyword = document.getElementById('sj-keyword')?.value?.trim();
-  const city    = document.getElementById('sj-city')?.value    || '';
-  const lat     = document.getElementById('sj-lat')?.value?.trim();
-  const lng     = document.getElementById('sj-lng')?.value?.trim();
-  const radius  = document.getElementById('sj-radius')?.value  || '1000';
-  const max     = parseInt(document.getElementById('sj-max')?.value || '50');
-  if (!keyword)      { alert('El keyword es requerido.');                    return; }
-  if (!lat || !lng)  { alert('Latitud y longitud son requeridas.');          return; }
+  const city        = document.getElementById('sj-city')?.value    || '';
+  const barrioParts = (document.getElementById('sj-barrio')?.value || '').split('|');
+  const barrio      = barrioParts[0] || '';
+  const lat         = parseFloat(barrioParts[1]) || (LOCATIONS[city]?.lat ?? 0);
+  const lng         = parseFloat(barrioParts[2]) || (LOCATIONS[city]?.lng ?? 0);
+  const keyword     = document.getElementById('sj-keyword')?.value || '';
+  const radius      = document.getElementById('sj-radius')?.value  || '1000';
+  const max         = parseInt(document.getElementById('sj-max')?.value || '50');
+  if (!city)    { alert('La ciudad es requerida.');    return; }
+  if (!keyword) { alert('El keyword es requerido.');   return; }
+  if (!lat || !lng) { alert('No se pudo determinar la ubicación. Selecciona un barrio.'); return; }
   if (!Array.isArray(S.scheduledJobs)) S.scheduledJobs = [];
-  S.scheduledJobs.push({keyword, city, lat, lng, radius, maxResults:max, source:'Scraper (auto)', active:true});
+  S.scheduledJobs.push({keyword, city, barrio, lat, lng, radius, maxResults:max, source:'Scraper (auto)', active:true});
   try { localStorage.setItem('aiv-sched-jobs', JSON.stringify(S.scheduledJobs)); } catch(e) {}
   if (S.config.scriptUrl) sheetsCall({action:'saveScheduledJobs', jobs:S.scheduledJobs});
   renderScheduledJobs();
@@ -628,5 +631,13 @@ function renderAdmin() {
   renderScheduledJobs();
   renderReportTrigger();
   renderSmsTemplates();
+  initAdminJobsForm();
   checkTriggerStatus(); // async — re-renders trigger rows when response arrives
+}
+
+function initAdminJobsForm() {
+  fillCities('sj-city');
+  const cityEl = document.getElementById('sj-city');
+  if (cityEl?.value) fillBarrios('sj-barrio', cityEl.value, null);
+  fillCats('sj-cat', 'sj-keyword');
 }
