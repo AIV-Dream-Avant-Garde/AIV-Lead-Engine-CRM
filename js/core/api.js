@@ -11,7 +11,7 @@ async function sheetsCall(params) {
     }
     const r = await fetch(url + '?action=' + params.action, {
       method:'POST', redirect:'follow',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Content-Type':'text/plain'},
       body: JSON.stringify({...params, _secret: S.config.crmSecret}),
     });
     return await r.json();
