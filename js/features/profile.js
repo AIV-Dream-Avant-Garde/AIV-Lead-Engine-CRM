@@ -24,9 +24,10 @@ function renderPerfil() {
     </div>`;
 
   // Lead stats
-  const myLeads  = S.leads.filter(l => l.providerId === uid_ || l.closerId === uid_);
+  const isAdmin  = role === 'admin';
+  const myLeads  = isAdmin ? S.leads : S.leads.filter(l => l.providerId === uid_ || l.closerId === uid_);
   const myClosed = myLeads.filter(l => l.status === 'Cerrado');
-  const myComm   = S.commissions.filter(c => c.providerId === uid_ || c.closerId === uid_);
+  const myComm   = isAdmin ? S.commissions : S.commissions.filter(c => c.providerId === uid_ || c.closerId === uid_);
   // Include clawbacks (negative amounts) to accurately reduce totalPaid on refunds
   const totalPaid = myComm.filter(c => c.status === 'paid' || c.status === 'clawback').reduce((s,c) => {
     let a = 0;
@@ -47,7 +48,8 @@ function renderPerfil() {
   setEl('pst-pending', fmtCOP(totalPending));
 
   // Call stats
-  const myCalls  = S.calls.filter(c => {
+  const myCalls  = isAdmin ? S.calls : S.calls.filter(c => {
+    if (c.calledBy) return c.calledBy === uid_;
     const lead = S.leads.find(l => l.id === c.leadId);
     return lead && (lead.closerId === uid_ || lead.providerId === uid_);
   });

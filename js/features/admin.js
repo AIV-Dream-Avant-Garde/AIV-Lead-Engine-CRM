@@ -150,7 +150,7 @@ async function saveTeamMember() {
   if (idx >= 0) S.team[idx] = {...S.team[idx], ...member};
   else           S.team.push(member);
 
-  localStorage.setItem('aiv-team', JSON.stringify(S.team));
+  saveLocal();
   if (S.config.scriptUrl) sheetsCall({action:'saveTeamMember', ...member});
   auditLog(isNew ? 'createTeamMember' : 'updateTeamMember', id, name + ' role=' + role);
   closeTeamModal();
@@ -163,7 +163,7 @@ function toggleTeamActive(memberId) {
   if (!m) return;
   const newActive = !(String(m.active) !== 'false');
   m.active = newActive;
-  localStorage.setItem('aiv-team', JSON.stringify(S.team));
+  saveLocal();
   if (S.config.scriptUrl) sheetsCall({action:'saveTeamMember', ...m});
   auditLog(newActive ? 'activateTeamMember' : 'deactivateTeamMember', memberId, m.name);
   renderAdmin();
@@ -279,7 +279,7 @@ function addSmsTemplate() {
   if (!body) { toast('Cuerpo del mensaje requerido.', 'error'); return; }
   if (!Array.isArray(S.smsTemplates)) S.smsTemplates = [];
   S.smsTemplates.push({id:uid(), name, body});
-  try { localStorage.setItem('aiv-sms-tpl', JSON.stringify(S.smsTemplates)); } catch(e) {}
+  saveLocal();
   document.getElementById('sms-tpl-name').value = '';
   document.getElementById('sms-tpl-body').value = '';
   renderSmsTemplates();
@@ -288,7 +288,7 @@ function addSmsTemplate() {
 function deleteSmsTemplate(idx) {
   if (!confirm('¿Eliminar esta plantilla?')) return;
   S.smsTemplates.splice(idx, 1);
-  try { localStorage.setItem('aiv-sms-tpl', JSON.stringify(S.smsTemplates)); } catch(e) {}
+  saveLocal();
   renderSmsTemplates();
 }
 
@@ -386,7 +386,7 @@ function addScheduledJob() {
   if (!lat || !lng) { toast('No se pudo determinar la ubicación. Selecciona un barrio.', 'error'); return; }
   if (!Array.isArray(S.scheduledJobs)) S.scheduledJobs = [];
   S.scheduledJobs.push({keyword, city, barrio, lat, lng, radius, maxResults:max, source:'Scraper (auto)', active:true});
-  try { localStorage.setItem('aiv-sched-jobs', JSON.stringify(S.scheduledJobs)); } catch(e) {}
+  saveLocal();
   if (S.config.scriptUrl) sheetsCall({action:'saveScheduledJobs', jobs:S.scheduledJobs});
   renderScheduledJobs();
 }
@@ -394,7 +394,7 @@ function addScheduledJob() {
 function toggleScheduledJob(idx) {
   if (!S.scheduledJobs?.[idx]) return;
   S.scheduledJobs[idx].active = !S.scheduledJobs[idx].active;
-  try { localStorage.setItem('aiv-sched-jobs', JSON.stringify(S.scheduledJobs)); } catch(e) {}
+  saveLocal();
   if (S.config.scriptUrl) sheetsCall({action:'saveScheduledJobs', jobs:S.scheduledJobs});
   renderScheduledJobs();
 }
@@ -402,7 +402,7 @@ function toggleScheduledJob(idx) {
 function deleteScheduledJob(idx) {
   if (!confirm('¿Eliminar este trabajo programado?')) return;
   S.scheduledJobs.splice(idx, 1);
-  try { localStorage.setItem('aiv-sched-jobs', JSON.stringify(S.scheduledJobs)); } catch(e) {}
+  saveLocal();
   if (S.config.scriptUrl) sheetsCall({action:'saveScheduledJobs', jobs:S.scheduledJobs});
   renderScheduledJobs();
 }

@@ -164,6 +164,8 @@ async function saveCallLog(goNext) {
     notes: document.getElementById('cw-notes').value.trim(),
     recordingUrl:'', driveUrl:'', consentConfirmed:CALL.consentConfirmed,
     calledAt: new Date().toISOString(),
+    calledBy: S.session?.userId || '',
+    calledByName: S.session?.userName || '',
   };
   S.calls.push(rec);
   saveLocal();

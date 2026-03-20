@@ -56,6 +56,7 @@ function renderAll() {
   applyAdminNavVisibility();
   if (document.getElementById('sec-pipeline')?.classList.contains('active')) renderPipeline();
   if (document.getElementById('sec-analytics')?.classList.contains('active')) renderAnalytics();
+  if (document.getElementById('sec-perfil')?.classList.contains('active')) renderPerfil();
 }
 
 // ── navigate — consolidated (all section logic merged) ─────
