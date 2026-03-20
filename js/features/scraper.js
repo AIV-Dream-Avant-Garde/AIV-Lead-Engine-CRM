@@ -105,6 +105,8 @@ async function runScraper() {
   scraperRunning = true;
   const btn      = document.getElementById('scraper-run-btn');
   const statusEl = document.getElementById('scraper-status');
+  const rc = document.getElementById('scraper-result-card');
+  if (rc) rc.style.display = 'none';
   if (btn)      { btn.disabled = true; btn.textContent = 'Scrapeando...'; }
   if (statusEl)   statusEl.textContent = 'Conectando con Apps Script...';
 
@@ -119,6 +121,12 @@ async function runScraper() {
     const now      = new Date().toISOString();
     const source   = srcDetail ? src + ' · ' + srcDetail : src;
     const existing = new Set(S.leads.map(l => l.phone).filter(Boolean));
+
+    // Attribution: provider/solo operators get credited as source of scraped leads
+    const sess       = S.session;
+    const isProvider = sess && (sess.role === 'provider' || sess.role === 'solo');
+    const isCloser   = sess && (sess.role === 'closer'   || sess.role === 'solo');
+
     let added = 0;
     res.leads.forEach(r => {
       if (r.phone && r.phone !== 'N/A' && !existing.has(r.phone)) {
@@ -127,7 +135,13 @@ async function runScraper() {
           website:r.website||'N/A', rating:r.rating||'N/A', reviews:r.reviews||'N/A',
           city, barrio, keyword:kw, source, sourceDetail:srcDetail,
           status:'Nuevo', dncReason:'', followUpDate:'', notes:[],
-          importedAt:now, updatedAt:now, _synced:false,
+          providerId:   isProvider ? sess.userId    : '',
+          providerRate: isProvider ? (sess.providerRate || 0) : 0,
+          closerId:     isCloser   ? sess.userId    : '',
+          closerRate:   isCloser   ? (sess.closerRate   || 0) : 0,
+          dealValue:'', providerCommission:'', closerCommission:'', commissionStatus:'',
+          lockedBy:'', lockedUntil:'', assignedAt: isProvider ? now : '',
+          workHistory:[], importedAt:now, updatedAt:now, _synced:false,
         };
         S.leads.push(lead);
         S.dirty.add(lead.id);
@@ -136,9 +150,23 @@ async function runScraper() {
       }
     });
     saveLocal();
-    if (statusEl) statusEl.textContent =
-      'Completado: ' + added + ' leads nuevos de ' + res.leads.length +
-      ' encontrados (' + (res.leads.length - added) + ' duplicados)';
+
+    // Show result card
+    if (statusEl) statusEl.textContent = '';
+    const rc = document.getElementById('scraper-result-card');
+    if (rc) {
+      rc.style.display = 'block';
+      rc.innerHTML = added > 0
+        ? `<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+             <div>
+               <div style="font-size:20px;font-weight:600;color:var(--pos)">+${added}</div>
+               <div style="font-size:11px;color:var(--body);margin-top:2px">leads añadidos al CRM</div>
+             </div>
+             <div style="color:var(--body);font-size:12px">${res.leads.length - added} duplicado${res.leads.length - added !== 1 ? 's' : ''} omitido${res.leads.length - added !== 1 ? 's' : ''}</div>
+             <button class="btn btn-ghost" style="font-size:12px;padding:5px 12px;margin-left:auto" onclick="navigate('leads')">Ver en Leads →</button>
+           </div>`
+        : `<div style="font-size:13px;color:var(--body)">Sin leads nuevos — ${res.leads.length} encontrados, todos duplicados.</div>`;
+    }
 
     // Persist scrape history (max 50 entries)
     if (!Array.isArray(S.scrapeHistory)) S.scrapeHistory = [];
@@ -163,7 +191,7 @@ async function runScraper() {
 }
 
 function renderScrapeHistory() {
-  const el = document.getElementById('scrape-history');
+  const el = document.getElementById('scrape-history-list');
   if (!el) return;
   if (!S.scrapeHistory || !S.scrapeHistory.length) {
     el.innerHTML = '<div style="font-size:12px;color:var(--body)">Sin historial de scrapes.</div>';

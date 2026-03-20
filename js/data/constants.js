@@ -30,8 +30,30 @@ const LS_LIMIT           = 5 * 1024 * 1024;     // ~5 MB localStorage budget
 const GET_ACTIONS = new Set(['ping','pull','getToken','twiml']);
 
 // Fields from scraped/imported lead data used for CSV mapping
-const CRM_FIELDS      = ['name','phone','address','website','rating','reviews'];
+const CRM_FIELDS      = ['name','phone','address','website','rating','reviews','calendarEventId'];
 const CRM_FIELD_LABELS = {name:'Nombre',phone:'Telefono',address:'Direccion',website:'Website',rating:'Rating',reviews:'Resenas'};
+
+const SCRIPT_STAGES = {
+  opening:    'Apertura',
+  pitch:      'Pitch',
+  objections: 'Objeciones',
+  close:      'Cierre',
+  rebuttals:  'Rebuttals',
+};
+
+// Lead priority scoring weights (tunable)
+const SCORE_WEIGHTS = {
+  hasPhone:       40,  // phone present and not 'N/A'
+  ratingHigh:     20,  // rating >= 4.0
+  ratingMid:      10,  // rating >= 3.0
+  reviewsHigh:    15,  // reviews >= 50
+  reviewsMid:      8,  // reviews >= 10
+  statusNuevo:    10,  // status === 'Nuevo'
+  statusContact:   5,  // status === 'Contactado'
+  fuOverdue:      25,  // follow-up is overdue
+  fuToday:        20,  // follow-up is today
+  hasWebsite:      5,  // has website
+};
 
 const ROLE_VISIBLE = {
   admin:    ['setup','scraper','import','leads','pipeline','llamadas','perfil','export'],

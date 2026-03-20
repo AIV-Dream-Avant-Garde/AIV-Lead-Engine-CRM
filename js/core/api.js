@@ -75,6 +75,7 @@ async function syncNow() {
     if (!res.isIncremental && res.calls) S.calls = res.calls;
     if (res.team)        { S.team        = res.team;        localStorage.setItem('aiv-team', JSON.stringify(S.team)); }
     if (res.commissions) { S.commissions = res.commissions; localStorage.setItem('aiv-comm', JSON.stringify(S.commissions)); }
+    if (res.scripts)     { S.scripts     = res.scripts;     localStorage.setItem('aiv-scripts', JSON.stringify(S.scripts)); }
     S.lastSyncTimestamp = new Date().toISOString();
     saveLocal();
     setSyncUI('ok','Sincronizado');
@@ -113,8 +114,19 @@ async function testConn() {
 function saveConfig() {
   S.config.scriptUrl = document.getElementById('cfg-url')?.value?.trim() || '';
   saveLocal();
-  if (S.config.scriptUrl) setSyncUI('','Configurado');
+  if (S.config.scriptUrl) {
+    setSyncUI('','Configurado');
+    const webhookEl = document.getElementById('webhook-url-display');
+    if (webhookEl) webhookEl.value = S.config.scriptUrl;
+  }
   alert('Configuracion guardada.');
+}
+
+function saveReportEmail() {
+  const email = document.getElementById('cfg-report-email')?.value?.trim();
+  if (!email) { alert('Ingresa un correo válido.'); return; }
+  if (!S.config.scriptUrl) { alert('Configura el Apps Script URL primero.'); return; }
+  sheetsCall({action:'saveReportEmail', email}).then(() => alert('Correo de reporte guardado.'));
 }
 
 async function pushLead(lead) {

@@ -74,13 +74,16 @@ function makeCall(leadId) {
   // Load talking-points panel
   const panel = document.getElementById('cw-script-panel');
   if (panel) {
-    const hasContent = S.config.pitchScript || S.config.objectionsScript || S.config.closeScript;
+    const hasContent = (S.scripts||[]).length > 0 || S.config.pitchScript || S.config.objectionsScript || S.config.closeScript;
     panel.classList.toggle('visible', !!hasContent);
     if (hasContent) cwTab('pitch');
   }
 
   document.querySelectorAll('.outcome-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('cw-notes').value = '';
+  const skipBtn = document.getElementById('cw-skip-btn');
+  if (skipBtn) skipBtn.style.display = S.dialerMode ? '' : 'none';
+  populateSmsTemplates();
   setCWStatus('ringing','Informa al prospecto primero');
   document.getElementById('call-widget').classList.add('visible');
 }
@@ -170,7 +173,7 @@ async function saveCallLog(goNext) {
   document.getElementById('call-widget').classList.remove('visible');
   CALL.activeCall = null;
   updateBadges(); renderCallsSection(); renderTable(); renderPerfil();
-  if (goNext) setTimeout(() => goNextLead(), 250);
+  if (goNext || S.dialerMode) setTimeout(() => goNextLead(), 250);
 }
 
 function renderCallsSection() {
@@ -242,13 +245,60 @@ function renderLeadCallHistory(leadId) {
 }
 
 function goNextLead() {
-  const next = (S.leads || []).find(l =>
+  if (S.dialerMode && S.dialerQueue.length > 0) {
+    const nextId = S.dialerQueue.shift();
+    updateDialerCounter();
+    const lead = S.leads.find(l => l.id === nextId);
+    if (lead && lead.status !== 'No llamar' && lead.phone && lead.phone !== 'N/A' && !isLockedByOther(lead)) {
+      setTimeout(() => makeCall(nextId), 300);
+    } else {
+      goNextLead(); // skip invalid, try next
+    }
+    return;
+  }
+  const next = getFiltered().find(l =>
     (l.status === 'Nuevo' || l.status === 'Contactado') &&
     l.status !== 'No llamar' && l.phone && l.phone !== 'N/A' &&
     !isLockedByOther(l)
   );
   if (next) { navigate('leads'); setTimeout(() => openLead(next.id), 150); }
   else       { alert('Sin más leads disponibles. ¡Buen trabajo!'); navigate('leads'); }
+}
+
+function toggleDialer() {
+  S.dialerMode = !S.dialerMode;
+  if (S.dialerMode) {
+    S.dialerQueue = getFiltered()
+      .filter(l => (l.status === 'Nuevo' || l.status === 'Contactado') && l.phone && l.phone !== 'N/A' && !isLockedByOther(l))
+      .map(l => l.id);
+    if (!S.dialerQueue.length) { S.dialerMode = false; alert('Sin leads disponibles para marcar con los filtros actuales.'); return; }
+  } else {
+    S.dialerQueue = [];
+  }
+  updateDialerCounter();
+  renderTable(); // re-render to show/hide dialer UI
+}
+
+function updateDialerCounter() {
+  const btn   = document.getElementById('dialer-toggle-btn');
+  const count = document.getElementById('dialer-queue-count');
+  if (btn) {
+    btn.textContent = S.dialerMode ? `⏹ Detener marcador (${S.dialerQueue.length})` : '▶ Marcador automatico';
+    btn.classList.toggle('btn-danger', S.dialerMode);
+    btn.classList.toggle('btn-primary', !S.dialerMode);
+  }
+  if (count) {
+    count.textContent = S.dialerMode ? S.dialerQueue.length + ' en cola' : '';
+    count.style.display = S.dialerMode ? '' : 'none';
+  }
+}
+
+function skipDialerLead() {
+  if (!S.dialerMode || !S.dialerQueue.length) return;
+  S.dialerQueue.shift();
+  updateDialerCounter();
+  if (S.dialerQueue.length) goNextLead();
+  else { S.dialerMode = false; updateDialerCounter(); alert('Cola terminada. Todos los leads trabajados.'); navigate('leads'); }
 }
 
 function answerIncoming() {
@@ -279,18 +329,25 @@ function rejectIncoming() {
 }
 
 function cwTab(tab) {
-  document.querySelectorAll('.cw-stab').forEach(b => {
-    b.classList.toggle('active',
-      (tab === 'pitch'      && b.textContent.trim() === 'Pitch')      ||
-      (tab === 'objections' && b.textContent.trim() === 'Objeciones') ||
-      (tab === 'close'      && b.textContent.trim() === 'Cierre')
-    );
-  });
+  document.querySelectorAll('.cw-stab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   const el = document.getElementById('cw-script-content');
   if (!el) return;
-  if (tab === 'pitch')      el.textContent = S.config.pitchScript      || 'Sin pitch configurado. Ve a Setup → Guion.';
-  if (tab === 'objections') el.textContent = S.config.objectionsScript || 'Sin objeciones configuradas.';
-  if (tab === 'close')      el.textContent = S.config.closeScript      || 'Sin guion de cierre configurado.';
+  // Look for admin-managed scripts for this stage first, fallback to config strings
+  const managed = (S.scripts||[]).filter(s => s.stage === tab);
+  if (managed.length) {
+    el.innerHTML = managed.map(s =>
+      `<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:600;color:var(--accent);margin-bottom:3px">${esc(s.name)}</div><div style="white-space:pre-wrap;font-size:12px;line-height:1.7;color:var(--hl)">${esc(s.body)}</div></div>`
+    ).join('<hr style="border:none;border-top:1px solid var(--border);margin:8px 0">');
+    return;
+  }
+  const fallbacks = {
+    opening:    getCallScript(),
+    pitch:      S.config.pitchScript      || 'Sin pitch configurado. Ve a Setup → Guion.',
+    objections: S.config.objectionsScript || 'Sin objeciones configuradas.',
+    close:      S.config.closeScript      || 'Sin guion de cierre configurado.',
+    rebuttals:  'Sin rebuttals configurados. Agrega uno en Admin → Guiones.',
+  };
+  el.textContent = fallbacks[tab] || '';
 }
 
 function saveCallScript() {
@@ -314,6 +371,39 @@ function previewScript() {
     box.textContent   = script.replace(/\[empresa\]/gi, company).replace(/\[tu empresa\]/gi, company);
   } else {
     box.style.display = 'none';
+  }
+}
+
+function populateSmsTemplates() {
+  const sel = document.getElementById('cw-sms-tpl');
+  if (!sel) return;
+  const templates = S.smsTemplates || [];
+  sel.innerHTML = templates.length
+    ? `<option value="">Selecciona plantilla...</option>` + templates.map((t,i) => `<option value="${i}">${esc(t.name)}</option>`).join('')
+    : `<option value="">Sin plantillas — agrega en Admin</option>`;
+}
+
+async function sendPostCallSms() {
+  if (!S.config.scriptUrl) { alert('Configura el Apps Script URL primero.'); return; }
+  const idx = document.getElementById('cw-sms-tpl')?.value;
+  if (idx === '' || idx === undefined) { alert('Selecciona una plantilla.'); return; }
+  const tpl  = (S.smsTemplates||[])[parseInt(idx)];
+  if (!tpl)  { alert('Plantilla no encontrada.'); return; }
+  const l    = S.leads.find(x => x.id === CALL.curLeadId);
+  if (!l || !l.phone || l.phone === 'N/A') { alert('Sin número de teléfono para este lead.'); return; }
+  const body = tpl.body
+    .replace(/\{nombre\}/gi,      l.name || '')
+    .replace(/\{empresa\}/gi,     S.config.companyName || '')
+    .replace(/\{seguimiento\}/gi, l.followUpDate || '');
+  const res = await sheetsCall({action:'sendSMS', to:l.phone, body});
+  if (res?.success) {
+    if (!Array.isArray(l.notes)) l.notes = [];
+    l.notes.push({date:new Date().toISOString(), text:'SMS enviado: ' + tpl.name});
+    l.updatedAt = new Date().toISOString();
+    pushLead(l);
+    alert('SMS enviado correctamente.');
+  } else {
+    alert('Error al enviar SMS: ' + (res?.error || 'Sin respuesta'));
   }
 }
 

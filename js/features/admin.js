@@ -226,6 +226,179 @@ async function bulkMarkPaid() {
   alert(pending.length + ' comisiones marcadas como pagadas.');
 }
 
+// ── SMS / WhatsApp templates ────────────────────────────────
+function renderSmsTemplates() {
+  const wrap = document.getElementById('admin-sms-list');
+  if (!wrap) return;
+  const templates = S.smsTemplates || [];
+  if (!templates.length) {
+    wrap.innerHTML = '<div class="notes-empty">Sin plantillas. Agrega una para enviar SMS/WhatsApp post-llamada.</div>';
+    return;
+  }
+  wrap.innerHTML = templates.map((t,i) =>
+    `<div class="team-row" style="margin-bottom:6px">
+      <div class="team-info">
+        <div class="team-name">${esc(t.name)}</div>
+        <div class="team-meta" style="white-space:pre-wrap;max-height:36px;overflow:hidden">${esc(t.body.slice(0,100))}${t.body.length>100?'…':''}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="btn btn-danger" style="font-size:11px;padding:4px 9px" onclick="deleteSmsTemplate(${i})">Borrar</button>
+      </div>
+    </div>`).join('');
+}
+
+function addSmsTemplate() {
+  const name = document.getElementById('sms-tpl-name')?.value?.trim();
+  const body = document.getElementById('sms-tpl-body')?.value?.trim();
+  if (!name) { alert('Nombre requerido.'); return; }
+  if (!body) { alert('Cuerpo del mensaje requerido.'); return; }
+  if (!Array.isArray(S.smsTemplates)) S.smsTemplates = [];
+  S.smsTemplates.push({id:uid(), name, body});
+  try { localStorage.setItem('aiv-sms-tpl', JSON.stringify(S.smsTemplates)); } catch(e) {}
+  document.getElementById('sms-tpl-name').value = '';
+  document.getElementById('sms-tpl-body').value = '';
+  renderSmsTemplates();
+}
+
+function deleteSmsTemplate(idx) {
+  if (!confirm('¿Eliminar esta plantilla?')) return;
+  S.smsTemplates.splice(idx, 1);
+  try { localStorage.setItem('aiv-sms-tpl', JSON.stringify(S.smsTemplates)); } catch(e) {}
+  renderSmsTemplates();
+}
+
+// ── Scheduled scraper jobs ─────────────────────────────────
+function renderScheduledJobs() {
+  const wrap = document.getElementById('admin-jobs-list');
+  if (!wrap) return;
+  const jobs = S.scheduledJobs || [];
+  if (!jobs.length) {
+    wrap.innerHTML = '<div class="notes-empty">Sin trabajos programados. Agrega uno para que el scraper corra automaticamente.</div>';
+    return;
+  }
+  wrap.innerHTML = jobs.map((j,i) =>
+    `<div class="team-row" style="margin-bottom:6px">
+      <div class="team-info">
+        <div class="team-name">${esc(j.keyword)} · ${esc(j.city||'')} ${esc(j.barrio||'')}</div>
+        <div class="team-meta">Radio: ${esc(String(j.radius||1000))}m · Max: ${esc(String(j.maxResults||50))} · ${j.active?'Activo':'Inactivo'}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="btn btn-ghost" style="font-size:11px;padding:4px 9px" onclick="toggleScheduledJob(${i})">${j.active?'Pausar':'Activar'}</button>
+        <button class="btn btn-danger" style="font-size:11px;padding:4px 9px" onclick="deleteScheduledJob(${i})">Borrar</button>
+      </div>
+    </div>`).join('');
+}
+
+function addScheduledJob() {
+  const keyword = document.getElementById('sj-keyword')?.value?.trim();
+  const city    = document.getElementById('sj-city')?.value    || '';
+  const lat     = document.getElementById('sj-lat')?.value?.trim();
+  const lng     = document.getElementById('sj-lng')?.value?.trim();
+  const radius  = document.getElementById('sj-radius')?.value  || '1000';
+  const max     = parseInt(document.getElementById('sj-max')?.value || '50');
+  if (!keyword)      { alert('El keyword es requerido.');                    return; }
+  if (!lat || !lng)  { alert('Latitud y longitud son requeridas.');          return; }
+  if (!Array.isArray(S.scheduledJobs)) S.scheduledJobs = [];
+  S.scheduledJobs.push({keyword, city, lat, lng, radius, maxResults:max, source:'Scraper (auto)', active:true});
+  try { localStorage.setItem('aiv-sched-jobs', JSON.stringify(S.scheduledJobs)); } catch(e) {}
+  if (S.config.scriptUrl) sheetsCall({action:'saveScheduledJobs', jobs:S.scheduledJobs});
+  renderScheduledJobs();
+}
+
+function toggleScheduledJob(idx) {
+  if (!S.scheduledJobs?.[idx]) return;
+  S.scheduledJobs[idx].active = !S.scheduledJobs[idx].active;
+  try { localStorage.setItem('aiv-sched-jobs', JSON.stringify(S.scheduledJobs)); } catch(e) {}
+  if (S.config.scriptUrl) sheetsCall({action:'saveScheduledJobs', jobs:S.scheduledJobs});
+  renderScheduledJobs();
+}
+
+function deleteScheduledJob(idx) {
+  if (!confirm('¿Eliminar este trabajo programado?')) return;
+  S.scheduledJobs.splice(idx, 1);
+  try { localStorage.setItem('aiv-sched-jobs', JSON.stringify(S.scheduledJobs)); } catch(e) {}
+  if (S.config.scriptUrl) sheetsCall({action:'saveScheduledJobs', jobs:S.scheduledJobs});
+  renderScheduledJobs();
+}
+
+// ── Script manager ─────────────────────────────────────────
+function openScriptModal(scriptId) {
+  document.getElementById('sc-modal-id').value    = scriptId || '';
+  document.getElementById('sc-modal-name').value  = '';
+  document.getElementById('sc-modal-stage').value = 'pitch';
+  document.getElementById('sc-modal-body').value  = '';
+  if (scriptId) {
+    const sc = (S.scripts||[]).find(x => x.id === scriptId);
+    if (sc) {
+      document.getElementById('sc-modal-name').value  = sc.name  || '';
+      document.getElementById('sc-modal-stage').value = sc.stage || 'pitch';
+      document.getElementById('sc-modal-body').value  = sc.body  || '';
+    }
+  }
+  document.getElementById('sc-modal').classList.add('open');
+}
+
+function closeScriptModal() {
+  document.getElementById('sc-modal')?.classList.remove('open');
+}
+
+function saveScript() {
+  const id    = document.getElementById('sc-modal-id').value.trim()   || uid();
+  const name  = document.getElementById('sc-modal-name').value.trim();
+  const stage = document.getElementById('sc-modal-stage').value;
+  const body  = document.getElementById('sc-modal-body').value.trim();
+  if (!name) { alert('El nombre del guion es requerido.'); return; }
+  if (!body) { alert('El cuerpo del guion es requerido.'); return; }
+  const now = new Date().toISOString();
+  const sc  = {id, name, stage, body, createdAt:now, updatedAt:now};
+  const idx = (S.scripts||[]).findIndex(x => x.id === id);
+  if (idx >= 0) S.scripts[idx] = sc;
+  else          { if (!Array.isArray(S.scripts)) S.scripts = []; S.scripts.push(sc); }
+  saveLocal();
+  if (S.config.scriptUrl) sheetsCall({action:'saveScript', ...sc});
+  closeScriptModal();
+  renderScripts();
+}
+
+function deleteScript(scriptId) {
+  if (!confirm('¿Eliminar este guion?')) return;
+  S.scripts = (S.scripts||[]).filter(x => x.id !== scriptId);
+  saveLocal();
+  if (S.config.scriptUrl) sheetsCall({action:'deleteScript', id:scriptId});
+  renderScripts();
+}
+
+function renderScripts() {
+  const wrap = document.getElementById('admin-scripts-list');
+  if (!wrap) return;
+  const scripts = S.scripts || [];
+  if (!scripts.length) {
+    wrap.innerHTML = '<div class="notes-empty">Sin guiones. Agrega uno para que aparezca en el widget de llamada.</div>';
+    return;
+  }
+  const stageOrder = ['opening','pitch','objections','close','rebuttals'];
+  const grouped = {};
+  stageOrder.forEach(s => { grouped[s] = scripts.filter(x => x.stage === s); });
+  wrap.innerHTML = stageOrder.map(stage => {
+    const entries = grouped[stage];
+    if (!entries.length) return '';
+    const label = SCRIPT_STAGES[stage] || stage;
+    return `<div style="margin-bottom:14px">
+      <div style="font-size:10px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:var(--body);margin-bottom:6px">${esc(label)}</div>
+      ${entries.map(sc => `<div class="team-row" style="margin-bottom:6px">
+        <div class="team-info">
+          <div class="team-name">${esc(sc.name)}</div>
+          <div class="team-meta" style="white-space:pre-wrap;max-height:50px;overflow:hidden">${esc(sc.body.slice(0,120))}${sc.body.length>120?'…':''}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button class="btn btn-ghost" style="font-size:11px;padding:4px 9px" onclick="openScriptModal('${sc.id}')">Editar</button>
+          <button class="btn btn-danger" style="font-size:11px;padding:4px 9px" onclick="deleteScript('${sc.id}')">Borrar</button>
+        </div>
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+
 // ── renderAdmin — consolidated (team + commissions + audit + locked + DNC + perf) ─
 function renderAdmin() {
   if (S.session?.role !== 'admin') return;
@@ -393,4 +566,7 @@ function renderAdmin() {
   }
 
   updateAdminBadge();
+  renderScripts();
+  renderScheduledJobs();
+  renderSmsTemplates();
 }

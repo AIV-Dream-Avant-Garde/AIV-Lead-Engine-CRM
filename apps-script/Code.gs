@@ -10,15 +10,16 @@ const TWILIO_AUTH_TOKEN  = 'your_auth_token';
 const TWILIO_TWIML_APP   = 'APxxxx';
 const TWILIO_FROM_NUMBER = '+15551234567';
 const DRIVE_FOLDER_ID    = 'TU_DRIVE_FOLDER_ID';
-const SHEETS = { leads:'Leads', calls:'Llamadas', team:'Team', commissions:'Commissions' };
+const SHEETS = { leads:'Leads', calls:'Llamadas', team:'Team', commissions:'Commissions', scripts:'Scripts' };
 
 // CSRF protection — paste the value from your browser's Setup page
 const CRM_SECRET = 'PASTE_YOUR_CRM_SECRET_HERE'; // Setup → shows after first load
 
-const LEAD_HDR = ['id','name','phone','address','website','rating','reviews','city','barrio','keyword','source','sourceDetail','status','providerId','providerRate','closerId','closerRate','dealValue','providerCommission','closerCommission','commissionStatus','lockedBy','lockedUntil','assignedAt','workHistory','dncReason','followUpDate','notes','importedAt','updatedAt'];
+const LEAD_HDR = ['id','name','phone','address','website','rating','reviews','city','barrio','keyword','source','sourceDetail','status','providerId','providerRate','closerId','closerRate','dealValue','providerCommission','closerCommission','commissionStatus','lockedBy','lockedUntil','assignedAt','workHistory','dncReason','followUpDate','notes','importedAt','updatedAt','calendarEventId'];
 const CALL_HDR = ['id','leadId','leadName','phone','callSid','outcome','duration','notes','recordingUrl','driveUrl','consentConfirmed','calledAt'];
 const TEAM_HDR = ['id','name','role','pinHash','providerRate','closerRate','contact','active','createdAt'];
-const COMM_HDR = ['id','leadId','leadName','dealValue','providerId','providerRate','providerAmount','closerId','closerRate','closerAmount','status','createdAt','paidAt','paidBy','paymentRef'];
+const COMM_HDR   = ['id','leadId','leadName','dealValue','providerId','providerRate','providerAmount','closerId','closerRate','closerAmount','status','createdAt','paidAt','paidBy','paymentRef'];
+const SCRIPT_HDR = ['id','name','stage','body','createdAt','updatedAt'];
 
 function getSheet(name, hdr) {
   const ss = SpreadsheetApp.openById(SHEET_ID);
@@ -49,10 +50,11 @@ function doGet(e) {
       const since = e.parameter.since;
       let leads = toObjs(getSheet(SHEETS.leads,LEAD_HDR)).map(l=>({...l,notes:tryParse(l.notes,[])}));
       if(since){const sd=new Date(since);leads=leads.filter(l=>!l.updatedAt||new Date(l.updatedAt)>=sd);}
-      const calls = toObjs(getSheet(SHEETS.calls,CALL_HDR));
-      const team  = toObjs(getSheet(SHEETS.team,TEAM_HDR));
-      const comms = toObjs(getSheet(SHEETS.commissions,COMM_HDR));
-      return ok({leads,calls,team,commissions:comms,serverTime:new Date().toISOString()});
+      const calls   = toObjs(getSheet(SHEETS.calls,CALL_HDR));
+      const team    = toObjs(getSheet(SHEETS.team,TEAM_HDR));
+      const comms   = toObjs(getSheet(SHEETS.commissions,COMM_HDR));
+      const scripts = toObjs(getSheet(SHEETS.scripts,SCRIPT_HDR));
+      return ok({leads,calls,team,commissions:comms,scripts,serverTime:new Date().toISOString()});
     }
     if (a === 'getToken') return ok({token:createToken(e.parameter.identity||'agent')});
     if (a === 'twiml') {
@@ -90,6 +92,24 @@ function doPost(e) {
       const ic=h.indexOf('id');
       for(let i=1;i<rows.length;i++){
         if(String(rows[i][ic])===String(b.id)){
+          // Calendar sync: create/update event if followUpDate changed
+          if(b.followUpDate){
+            try{
+              const calIdCol=h.indexOf('calendarEventId');
+              const oldCalId=calIdCol>=0?String(rows[i][calIdCol]||''):'';
+              const evDate=new Date(b.followUpDate);
+              const title='Seguimiento: '+(b.name||'Lead');
+              let calEventId=oldCalId;
+              if(oldCalId){
+                try{const ev=CalendarApp.getEventById(oldCalId);if(ev){ev.setTitle(title);ev.setAllDayDate(evDate);}}catch(ce){calEventId='';}
+              }
+              if(!calEventId){
+                const ev=CalendarApp.getDefaultCalendar().createAllDayEvent(title,evDate,{description:'CRM Lead ID: '+b.id});
+                calEventId=ev.getId();
+              }
+              b.calendarEventId=calEventId;
+            }catch(ce){Logger.log('Calendar error: '+ce.message);}
+          }
           h.forEach((col,ci)=>{
             if(Object.prototype.hasOwnProperty.call(b,col)){
               s.getRange(i+1,ci+1).setValue((col==='notes'||col==='workHistory')?JSON.stringify(b[col]||[]):(b[col]??''));
@@ -99,7 +119,7 @@ function doPost(e) {
           break;
         }
       }
-      return ok({updated:true});
+      return ok({updated:true,calendarEventId:b.calendarEventId||''});
     }
     if (a === 'delete') {
       const s=getSheet(SHEETS.leads,LEAD_HDR),rows=s.getDataRange().getValues(),h=rows[0],ic=h.indexOf('id');
@@ -141,6 +161,58 @@ function doPost(e) {
       }
       return ok({updated:true});
     }
+    if (a === 'sendSMS') {
+      const {to, body:msgBody} = b;
+      if (!to || !msgBody) return err_('to and body required');
+      const auth = Utilities.base64Encode(TWILIO_ACCOUNT_SID + ':' + TWILIO_AUTH_TOKEN);
+      const res  = UrlFetchApp.fetch(
+        'https://api.twilio.com/2010-04-01/Accounts/' + TWILIO_ACCOUNT_SID + '/Messages.json',
+        {method:'post', headers:{Authorization:'Basic '+auth},
+         payload:{From:TWILIO_FROM_NUMBER, To:to, Body:msgBody},
+         muteHttpExceptions:true}
+      );
+      const d = JSON.parse(res.getContentText());
+      if (d.sid) return ok({sid:d.sid});
+      return err_(d.message || 'SMS failed');
+    }
+    if (a === 'saveReportEmail') {
+      const ss=SpreadsheetApp.openById(SHEET_ID);
+      let cfg=ss.getSheetByName('Config');
+      if(!cfg){cfg=ss.insertSheet('Config');cfg.appendRow(['key','value']);}
+      const rows=cfg.getDataRange().getValues(),h=rows[0]||['key','value'],ki=h.indexOf('key'),vi=h.indexOf('value');
+      let found=false;
+      for(let i=1;i<rows.length;i++){if(rows[i][ki]==='reportEmail'){cfg.getRange(i+1,vi+1).setValue(b.email||'');found=true;break;}}
+      if(!found)cfg.appendRow(['reportEmail',b.email||'']);
+      return ok({saved:true});
+    }
+    if (a === 'saveScheduledJobs') {
+      const ss=SpreadsheetApp.openById(SHEET_ID);
+      let cfg=ss.getSheetByName('Config');
+      if(!cfg){cfg=ss.insertSheet('Config');cfg.appendRow(['key','value']);}
+      const rows=cfg.getDataRange().getValues(),h=rows[0]||['key','value'],ki=h.indexOf('key'),vi=h.indexOf('value');
+      let found=false;
+      for(let i=1;i<rows.length;i++){if(rows[i][ki]==='scheduledJobs'){cfg.getRange(i+1,vi+1).setValue(JSON.stringify(b.jobs||[]));found=true;break;}}
+      if(!found)cfg.appendRow(['scheduledJobs',JSON.stringify(b.jobs||[])]);
+      return ok({saved:true});
+    }
+    if (a === 'saveScript') {
+      const s=getSheet(SHEETS.scripts,SCRIPT_HDR),rows=s.getDataRange().getValues(),h=rows[0]||SCRIPT_HDR,ic=h.indexOf('id');
+      let found=false;
+      for(let i=1;i<rows.length;i++){
+        if(String(rows[i][ic])===String(b.id)){
+          h.forEach((col,ci)=>{if(Object.prototype.hasOwnProperty.call(b,col))s.getRange(i+1,ci+1).setValue(b[col]??'');});
+          s.getRange(i+1,h.indexOf('updatedAt')+1).setValue(new Date().toISOString());
+          found=true;break;
+        }
+      }
+      if(!found)s.appendRow(SCRIPT_HDR.map(h=>b[h]??''));
+      return ok({saved:true,updated:found});
+    }
+    if (a === 'deleteScript') {
+      const s=getSheet(SHEETS.scripts,SCRIPT_HDR),rows=s.getDataRange().getValues(),h=rows[0],ic=h.indexOf('id');
+      for(let i=rows.length-1;i>=1;i--){if(String(rows[i][ic])===String(b.id)){s.deleteRow(i+1);break;}}
+      return ok({deleted:true});
+    }
     if (a === 'rec_hook') {
       const callSid=b.CallSid||e.parameter.CallSid, recUrl=b.RecordingUrl||e.parameter.RecordingUrl;
       if(callSid&&recUrl){ try{const du=saveToDrive(recUrl,callSid);patchCallRec(callSid,recUrl,du);}catch(ex){Logger.log(ex.message);} }
@@ -163,6 +235,33 @@ function doPost(e) {
         Utilities.sleep(2000);
       }
       return ok({leads});
+    }
+    if (a === 'inbound') {
+      const s=getSheet(SHEETS.leads,LEAD_HDR),rows=s.getDataRange().getValues();
+      const ph=rows[0]||LEAD_HDR, pc=ph.indexOf('phone');
+      const phone=String(b.phone||'').trim();
+      if(!phone||phone==='N/A') return err_('phone required');
+      const duplicate=rows.slice(1).some(r=>String(r[pc]).trim()===phone);
+      if(duplicate) return ok({added:false,duplicate:true});
+      const now=new Date().toISOString();
+      const lead={
+        id:b.id||Utilities.getUuid(),
+        name:b.name||'Sin nombre',phone,
+        address:b.address||'N/A',website:b.website||'N/A',
+        rating:'N/A',reviews:'N/A',
+        city:b.city||'',barrio:b.barrio||'',keyword:b.keyword||'',
+        source:b.source||'Inbound',sourceDetail:b.sourceDetail||'',
+        status:b.status||'Nuevo',dncReason:'',followUpDate:'',
+        notes:JSON.stringify([]),
+        providerId:b.providerId||'',providerRate:b.providerRate||0,
+        closerId:b.closerId||'',closerRate:b.closerRate||0,
+        dealValue:'',providerCommission:'',closerCommission:'',commissionStatus:'',
+        lockedBy:'',lockedUntil:'',assignedAt:'',
+        workHistory:JSON.stringify([]),
+        importedAt:now,updatedAt:now,
+      };
+      s.appendRow(LEAD_HDR.map(h=>lead[h]??''));
+      return ok({added:true,duplicate:false});
     }
     return ok({received:true});
   } catch(err) { return err_(err.message) }
@@ -189,6 +288,145 @@ function patchCallRec(callSid,recUrl,driveUrl){
   const s=getSheet(SHEETS.calls,CALL_HDR),rows=s.getDataRange().getValues(),h=rows[0];
   const sc=h.indexOf('callSid'),rc=h.indexOf('recordingUrl'),dc=h.indexOf('driveUrl');
   for(let i=1;i<rows.length;i++){if(rows[i][sc]===callSid){s.getRange(i+1,rc+1).setValue(recUrl);s.getRange(i+1,dc+1).setValue(driveUrl);break;}}
+}
+
+// ── Weekly report (time-triggered) ─────────────────────────
+// Admin adds time trigger: Triggers → sendWeeklyReport → Time-based → Week timer → Monday 8am
+function sendWeeklyReport() {
+  const ss  = SpreadsheetApp.openById(SHEET_ID);
+  const cfg = ss.getSheetByName('Config');
+  let recipientEmail = '';
+  if (cfg) {
+    const rows = cfg.getDataRange().getValues(), h = rows[0] || ['key','value'];
+    const ki = h.indexOf('key'), vi = h.indexOf('value');
+    const r  = rows.slice(1).find(r => r[ki] === 'reportEmail');
+    recipientEmail = r ? r[vi] : '';
+  }
+  if (!recipientEmail) { Logger.log('No reportEmail configured in Config sheet.'); return; }
+
+  const leads      = toObjs(getSheet(SHEETS.leads, LEAD_HDR));
+  const calls      = toObjs(getSheet(SHEETS.calls, CALL_HDR));
+  const now        = new Date();
+  const weekAgo    = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
+  const newLeads   = leads.filter(l => new Date(l.importedAt) >= weekAgo).length;
+  const weekCalls  = calls.filter(c => new Date(c.calledAt)  >= weekAgo);
+  const answered   = weekCalls.filter(c => c.outcome === 'answered').length;
+  const closedAll  = leads.filter(l => l.status === 'Cerrado').length;
+  const interAll   = leads.filter(l => l.status === 'Interesado').length;
+  const dncAll     = leads.filter(l => l.status === 'No llamar').length;
+  const ansRate    = weekCalls.length ? Math.round(answered / weekCalls.length * 100) : 0;
+  const byStatus   = {};
+  leads.forEach(l => { byStatus[l.status] = (byStatus[l.status]||0) + 1; });
+
+  const html = `
+<div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#1a1a2e">
+  <div style="background:linear-gradient(135deg,#0f0f23,#1a1a2e);padding:28px 32px;border-radius:12px 12px 0 0">
+    <h2 style="color:#fff;margin:0;font-size:20px">AIV CRM — Reporte Semanal</h2>
+    <p style="color:rgba(255,255,255,.6);margin:6px 0 0;font-size:13px">${now.toLocaleDateString('es-CO',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
+  </div>
+  <div style="background:#f9f9fb;padding:24px 32px;border-radius:0 0 12px 12px">
+    <h3 style="font-size:14px;color:#888;text-transform:uppercase;letter-spacing:.8px;margin:0 0 16px">Esta semana</h3>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px">
+      <div style="background:#fff;border-radius:8px;padding:14px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+        <div style="font-size:28px;font-weight:700;color:#4b72ff">${newLeads}</div>
+        <div style="font-size:11px;color:#888;margin-top:4px">Leads nuevos</div>
+      </div>
+      <div style="background:#fff;border-radius:8px;padding:14px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+        <div style="font-size:28px;font-weight:700;color:#2dd4bf">${weekCalls.length}</div>
+        <div style="font-size:11px;color:#888;margin-top:4px">Llamadas</div>
+      </div>
+      <div style="background:#fff;border-radius:8px;padding:14px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+        <div style="font-size:28px;font-weight:700;color:#22c55e">${ansRate}%</div>
+        <div style="font-size:11px;color:#888;margin-top:4px">Tasa respuesta</div>
+      </div>
+    </div>
+    <h3 style="font-size:14px;color:#888;text-transform:uppercase;letter-spacing:.8px;margin:0 0 12px">Acumulado total</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <tr style="background:#f0f0f5"><td style="padding:8px 12px;border-radius:6px">Total leads</td><td style="padding:8px 12px;text-align:right;font-weight:600">${leads.length}</td></tr>
+      <tr><td style="padding:8px 12px">Cerrados</td><td style="padding:8px 12px;text-align:right;font-weight:600;color:#22c55e">${closedAll}</td></tr>
+      <tr style="background:#f0f0f5"><td style="padding:8px 12px;border-radius:6px">Interesados</td><td style="padding:8px 12px;text-align:right;font-weight:600;color:#2dd4bf">${interAll}</td></tr>
+      <tr><td style="padding:8px 12px">No llamar</td><td style="padding:8px 12px;text-align:right;color:#888">${dncAll}</td></tr>
+    </table>
+  </div>
+  <p style="font-size:11px;color:#aaa;text-align:center;margin-top:16px">Generado automaticamente por AIV CRM</p>
+</div>`;
+
+  MailApp.sendEmail({
+    to: recipientEmail,
+    subject: 'AIV CRM — Reporte semanal ' + now.toLocaleDateString('es-CO'),
+    htmlBody: html,
+  });
+  Logger.log('Weekly report sent to ' + recipientEmail);
+}
+
+// ── Scheduled scraper (time-triggered) ─────────────────────
+// Admin adds time trigger: Triggers → runScheduledScrapes → Time-based → Every day 6am
+function runScheduledScrapes() {
+  const ss   = SpreadsheetApp.openById(SHEET_ID);
+  const cfg  = ss.getSheetByName('Config');
+  if (!cfg) return;
+  const rows = cfg.getDataRange().getValues();
+  const hi   = rows[0];
+  const ki   = hi.indexOf('key'), vi = hi.indexOf('value');
+  const find = key => { const r = rows.slice(1).find(r => r[ki] === key); return r ? r[vi] : ''; };
+  const jobsRaw = find('scheduledJobs');
+  if (!jobsRaw) return;
+  let jobs;
+  try { jobs = JSON.parse(jobsRaw); } catch(e) { return; }
+  if (!Array.isArray(jobs) || !jobs.length) return;
+
+  const leadsSheet = getSheet(SHEETS.leads, LEAD_HDR);
+  const lRows      = leadsSheet.getDataRange().getValues();
+  const ph         = lRows[0] || LEAD_HDR, pc = ph.indexOf('phone');
+  const existing   = new Set(lRows.slice(1).map(r => String(r[pc]).trim()).filter(Boolean));
+
+  const url = 'https://places.googleapis.com/v1/places:searchText';
+  const hdr = {'Content-Type':'application/json','X-Goog-Api-Key':PLACES_API_KEY,
+    'X-Goog-FieldMask':'places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount'};
+
+  const now = new Date().toISOString();
+  let totalAdded = 0;
+
+  jobs.filter(j => j.active).forEach(job => {
+    let leads = [], token = null, tries = 0;
+    const max = parseInt(job.maxResults) || 50;
+    while (leads.length < max && tries < 10) {
+      const body = token
+        ? {textQuery:job.keyword, pageToken:token}
+        : {textQuery:job.keyword, locationBias:{circle:{center:{latitude:parseFloat(job.lat),longitude:parseFloat(job.lng)},radius:parseFloat(job.radius||1000)}},maxResultCount:20};
+      const r = UrlFetchApp.fetch(url,{method:'post',headers:hdr,payload:JSON.stringify(body),muteHttpExceptions:true});
+      const d = JSON.parse(r.getContentText());
+      (d.places||[]).forEach(p => {
+        if(leads.length < max) leads.push({
+          name:p.displayName?.text||'N/A', phone:p.nationalPhoneNumber||'N/A',
+          address:p.formattedAddress||'N/A', website:p.websiteUri||'N/A',
+          rating:p.rating||'N/A', reviews:p.userRatingCount||'N/A'
+        });
+      });
+      token = d.nextPageToken; tries++;
+      if (!token) break;
+      Utilities.sleep(2000);
+    }
+    leads.forEach(l => {
+      const phone = String(l.phone||'').trim();
+      if (phone && phone !== 'N/A' && !existing.has(phone)) {
+        const lead = {
+          id:Utilities.getUuid(), name:l.name, phone, address:l.address, website:l.website,
+          rating:l.rating, reviews:l.reviews, city:job.city||'', barrio:job.barrio||'',
+          keyword:job.keyword, source:job.source||'Scraper (auto)', sourceDetail:'',
+          status:'Nuevo', dncReason:'', followUpDate:'', notes:JSON.stringify([]),
+          providerId:'', providerRate:0, closerId:'', closerRate:0,
+          dealValue:'', providerCommission:'', closerCommission:'', commissionStatus:'',
+          lockedBy:'', lockedUntil:'', assignedAt:'', workHistory:JSON.stringify([]),
+          importedAt:now, updatedAt:now
+        };
+        leadsSheet.appendRow(LEAD_HDR.map(h => lead[h] ?? ''));
+        existing.add(phone);
+        totalAdded++;
+      }
+    });
+  });
+  Logger.log('Scheduled scrape complete. Added: ' + totalAdded + ' leads.');
 }
 
 function ok(d){return ContentService.createTextOutput(JSON.stringify({success:true,...d})).setMimeType(ContentService.MimeType.JSON)}

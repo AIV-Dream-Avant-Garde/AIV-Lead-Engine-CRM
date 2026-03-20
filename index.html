@@ -183,6 +183,50 @@
       <div class="step-row"><div class="step-num">5</div><div class="step-text">Haz click en "Probar conexion" para verificar</div></div>
     </div>
   </div>
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">Reporte semanal automatico</div>
+    <div class="card-sub" style="margin-bottom:12px">Activa el trigger en Apps Script (Triggers → sendWeeklyReport → Time-based → Monday 8am) y recibe un resumen semanal por correo.</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <input type="email" id="cfg-report-email" placeholder="admin@empresa.com" style="flex:1;padding:7px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--hl);font-size:13px">
+      <button class="btn btn-primary" style="padding:6px 14px;font-size:12px;flex-shrink:0" onclick="saveReportEmail()">Guardar</button>
+    </div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <div class="card-title">Webhook de entrada</div>
+    <div class="card-sub" style="margin-bottom:14px">Recibe leads automaticamente desde Facebook/Google Ads, tu sitio web, Zapier, Make o n8n. Sin configuracion adicional — tu GAS URL ya es el endpoint.</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+      <input type="text" id="webhook-url-display" readonly style="flex:1;font-family:'DM Mono',monospace;font-size:11px;color:var(--sub);background:var(--surface-hi);border:1px solid var(--border);border-radius:6px;padding:7px 10px" placeholder="Guarda la URL del Apps Script primero">
+      <button class="btn btn-ghost" style="padding:6px 14px;font-size:12px;flex-shrink:0" onclick="copyWebhookUrl()">Copiar URL</button>
+    </div>
+    <div style="font-size:12px;font-weight:600;color:var(--body);margin-bottom:8px">Formato JSON esperado:</div>
+    <pre style="background:var(--surface-hi);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font-size:11px;font-family:'DM Mono',monospace;color:var(--hl);overflow-x:auto;margin:0 0 14px 0;line-height:1.7">POST {GAS_URL}?action=inbound
+Content-Type: application/json
+
+{
+  "_secret": "tu-crm-secret",
+  "name":         "Juan Perez",
+  "phone":        "+573001234567",
+  "source":       "Facebook Ads",
+  "sourceDetail": "Campaña Restaurantes Medellín Abril",
+  "city":         "Medellín",
+  "address":      "Calle 50 #10-20",
+  "email":        "juan@email.com"
+}</pre>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
+      <div style="background:var(--surface-hi);border-radius:8px;padding:10px 12px">
+        <div style="font-size:11px;font-weight:600;color:var(--accent);margin-bottom:4px">Facebook / Google Ads</div>
+        <div style="font-size:11px;color:var(--body);line-height:1.6">Meta Ads Manager → Integraciones CRM → Webhook URL → pega la URL → mapea campos</div>
+      </div>
+      <div style="background:var(--surface-hi);border-radius:8px;padding:10px 12px">
+        <div style="font-size:11px;font-weight:600;color:var(--accent);margin-bottom:4px">Sitio web / Formulario</div>
+        <div style="font-size:11px;color:var(--body);line-height:1.6">Un <code style="background:var(--bg);padding:1px 4px;border-radius:3px">fetch()</code> en el submit handler del formulario. Tarea de 10 minutos para tu desarrollador.</div>
+      </div>
+      <div style="background:var(--surface-hi);border-radius:8px;padding:10px 12px">
+        <div style="font-size:11px;font-weight:600;color:var(--accent);margin-bottom:4px">Zapier / Make / n8n</div>
+        <div style="font-size:11px;color:var(--body);line-height:1.6">Modulo "HTTP Request" → POST a la URL → mapea campos. Conecta a cualquier fuente sin codigo.</div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- SCRAPER SECTION -->
@@ -211,8 +255,9 @@
     <div class="field" style="margin-bottom:16px"><label>Coordenadas GPS (auto)</label><input id="sc-gps" disabled></div>
     <button class="btn btn-primary btn-full" id="scraper-run-btn" onclick="runScraper()">Iniciar scrape via Apps Script</button>
     <div id="scraper-status" style="font-size:12px;color:var(--sub);margin-top:10px;font-family:'DM Mono',monospace;min-height:18px"></div>
+    <div id="scraper-result-card" style="display:none;margin-top:12px;padding:12px 14px;background:rgba(45,212,191,.07);border:1px solid rgba(45,212,191,.2);border-radius:8px"></div>
   </div>
-  <div class="info-row">Despues de scraper, los leads se guardan automaticamente en el CRM y en Google Sheets.</div>
+  <div class="info-row">Los leads scraped se añaden directamente al CRM y Google Sheets — sin pasos intermedios.</div>
   <div class="card" style="margin-top:14px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <span class="label-sm" style="margin-bottom:0">Historial de scrapes</span>
@@ -279,11 +324,23 @@
   <div class="bulk-bar" id="bulk-bar">
     <span class="bulk-count" id="bulk-count">0 seleccionados</span>
     <select id="bulk-status" class="filter-sel">
-      <option value="">Cambiar estado a...</option>
+      <option value="">Cambiar estado...</option>
       <option>Nuevo</option><option>Contactado</option><option>Interesado</option>
       <option>Cerrado</option><option>Negociacion fallida</option><option>No interesado</option>
     </select>
     <button class="btn btn-amber" style="font-size:12px;padding:5px 12px" onclick="applyBulkStatus()">Aplicar</button>
+    <div class="bulk-divider"></div>
+    <select id="bulk-action" class="filter-sel" onchange="onBulkActionChange()">
+      <option value="">Otra accion...</option>
+      <option value="followup">Fijar seguimiento</option>
+      <option value="source">Cambiar fuente</option>
+      <option value="closer">Asignar cerrador (yo)</option>
+      <option value="provider">Asignar proveedor (yo)</option>
+      <option value="dnc">Marcar No llamar</option>
+    </select>
+    <input type="date" id="bulk-action-date" style="display:none;font-size:12px;padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--hl)">
+    <input type="text" id="bulk-action-text" style="display:none;font-size:12px;padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--hl);width:140px" placeholder="">
+    <button class="btn btn-primary" style="font-size:12px;padding:5px 12px" onclick="applyBulkAction()">Aplicar</button>
     <button class="btn btn-danger" style="font-size:12px;padding:5px 12px" onclick="deleteSelected()">Eliminar</button>
     <button class="btn btn-ghost" style="font-size:12px;padding:5px 12px;margin-left:auto" onclick="clearSelection()">Deseleccionar</button>
   </div>
@@ -305,11 +362,14 @@
       <option value="has">Con fecha</option>
     </select>
     <button class="btn btn-ghost" style="font-size:12px;padding:6px 11px" onclick="clearFilters()">&#x2715;</button>
+    <button class="btn btn-primary" id="dialer-toggle-btn" style="font-size:12px;padding:6px 13px;flex-shrink:0" onclick="toggleDialer()">&#9654; Marcador automatico</button>
+    <span id="dialer-queue-count" style="display:none;font-size:11px;color:var(--pos);font-family:'DM Mono',monospace;white-space:nowrap"></span>
   </div>
   <div class="table-wrap">
     <table>
       <thead><tr>
         <th style="width:32px"><input type="checkbox" id="chk-all" onchange="toggleAll(this)"></th>
+        <th class="sortable" onclick="sortBy('score')" style="width:28px" title="Ordenar por prioridad">P</th>
         <th class="sortable" onclick="sortBy('name')">Nombre</th>
         <th>Telefono</th>
         <th class="sortable" onclick="sortBy('city')">Ciudad</th>
@@ -481,6 +541,55 @@
     </div>
     <div id="admin-dnc-list"><div class="notes-empty">Sin leads marcados como No llamar.</div></div>
   </div>
+
+  <!-- Scheduled scraper jobs -->
+  <div class="admin-section">
+    <div class="admin-section-title">
+      <span>Scrapes programados</span>
+    </div>
+    <div style="font-size:11px;color:var(--body);margin-bottom:12px">Configura trabajos para que el scraper corra automaticamente. Luego activa el trigger en Apps Script: <strong>Triggers → runScheduledScrapes → Time-based → Every day 6am</strong></div>
+    <div class="form-grid" style="margin-bottom:12px">
+      <div class="field"><label>Keyword (negocio)</label><input type="text" id="sj-keyword" placeholder="restaurante, salon de belleza..."></div>
+      <div class="field"><label>Ciudad</label><input type="text" id="sj-city" placeholder="Medellín"></div>
+      <div class="field"><label>Latitud</label><input type="number" id="sj-lat" placeholder="6.24452" step="0.00001"></div>
+      <div class="field"><label>Longitud</label><input type="number" id="sj-lng" placeholder="-75.57319" step="0.00001"></div>
+      <div class="field"><label>Radio (m)</label>
+        <select id="sj-radius">
+          <option value="500">500m</option>
+          <option value="1000" selected>1km</option>
+          <option value="2000">2km</option>
+          <option value="5000">5km</option>
+        </select>
+      </div>
+      <div class="field"><label>Max resultados</label><input type="number" id="sj-max" value="50" min="10" max="200"></div>
+    </div>
+    <button class="btn btn-primary" style="font-size:12px;padding:5px 14px;margin-bottom:12px" onclick="addScheduledJob()">+ Agregar trabajo</button>
+    <div id="admin-jobs-list"><div class="notes-empty">Sin trabajos programados.</div></div>
+  </div>
+
+  <!-- SMS/WhatsApp templates -->
+  <div class="admin-section">
+    <div class="admin-section-title">
+      <span>Plantillas SMS / WhatsApp</span>
+    </div>
+    <div style="font-size:11px;color:var(--body);margin-bottom:12px">Usa <code style="background:var(--surface-hi);padding:1px 4px;border-radius:3px">{nombre}</code>, <code style="background:var(--surface-hi);padding:1px 4px;border-radius:3px">{empresa}</code>, <code style="background:var(--surface-hi);padding:1px 4px;border-radius:3px">{seguimiento}</code> como variables.</div>
+    <div class="form-grid col1" style="margin-bottom:10px">
+      <div class="field"><label>Nombre de la plantilla</label><input type="text" id="sms-tpl-name" placeholder="Follow-up post llamada"></div>
+      <div class="field"><label>Mensaje</label><textarea class="script-editor" id="sms-tpl-body" rows="3" placeholder="Hola {nombre}, le escribo de {empresa}..."></textarea></div>
+    </div>
+    <button class="btn btn-primary" style="font-size:12px;padding:5px 14px;margin-bottom:12px" onclick="addSmsTemplate()">+ Agregar plantilla</button>
+    <div id="admin-sms-list"><div class="notes-empty">Sin plantillas SMS.</div></div>
+  </div>
+
+  <!-- Script manager -->
+  <div class="admin-section">
+    <div class="admin-section-title">
+      <span>Guiones de llamada</span>
+      <button class="btn btn-primary" style="font-size:12px;padding:5px 14px" onclick="openScriptModal(null)">+ Agregar guion</button>
+    </div>
+    <div style="font-size:11px;color:var(--body);margin-bottom:12px">Los guiones aparecen en el widget de llamada. Organiza por etapa: Apertura, Pitch, Objeciones, Cierre, Rebuttals.</div>
+    <div id="admin-scripts-list"><div class="notes-empty">Sin guiones configurados.</div></div>
+  </div>
 </div>
 
 <!-- EXPORT SECTION -->
@@ -620,6 +729,32 @@
   </div>
 </div>
 
+<!-- SCRIPT MODAL -->
+<div class="tm-modal-overlay" id="sc-modal">
+  <div class="tm-modal-card" style="max-width:540px">
+    <div class="tm-modal-title">Guion de llamada</div>
+    <input type="hidden" id="sc-modal-id">
+    <div class="form-grid col1">
+      <div class="field"><label>Nombre del guion</label><input type="text" id="sc-modal-name" placeholder="Pitch principal restaurantes"></div>
+      <div class="field"><label>Etapa</label>
+        <select id="sc-modal-stage">
+          <option value="opening">Apertura (consent + intro)</option>
+          <option value="pitch" selected>Pitch (puntos de venta)</option>
+          <option value="objections">Objeciones y respuestas</option>
+          <option value="close">Cierre</option>
+          <option value="rebuttals">Rebuttals (respuestas rapidas)</option>
+        </select>
+      </div>
+      <div class="field"><label>Guion / Contenido</label><textarea class="script-editor" id="sc-modal-body" rows="8" placeholder="Escribe aqui el guion, puntos clave, o preguntas y respuestas..."></textarea></div>
+    </div>
+    <div class="info-row" style="margin-top:6px;margin-bottom:14px">Este guion aparecera en la pestaña correspondiente del widget de llamada en tiempo real.</div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="saveScript()">Guardar guion</button>
+      <button class="btn btn-ghost" onclick="closeScriptModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <!-- INCOMING CALL BANNER -->
 <div class="incoming-banner" id="incoming-banner">
   <div class="ib-label">Llamada entrante</div>
@@ -647,9 +782,11 @@
     <div class="cw-script-panel" id="cw-script-panel">
       <div class="cw-script-label">Guion &amp; Objeciones</div>
       <div class="cw-script-tabs">
-        <button class="cw-stab active" onclick="cwTab('pitch')">Pitch</button>
-        <button class="cw-stab" onclick="cwTab('objections')">Objeciones</button>
-        <button class="cw-stab" onclick="cwTab('close')">Cierre</button>
+        <button class="cw-stab active" data-tab="pitch"      onclick="cwTab('pitch')">Pitch</button>
+        <button class="cw-stab"        data-tab="objections" onclick="cwTab('objections')">Objeciones</button>
+        <button class="cw-stab"        data-tab="close"      onclick="cwTab('close')">Cierre</button>
+        <button class="cw-stab"        data-tab="rebuttals"  onclick="cwTab('rebuttals')">Rebuttals</button>
+        <button class="cw-stab"        data-tab="opening"    onclick="cwTab('opening')">Apertura</button>
       </div>
       <div class="cw-script-content" id="cw-script-content"></div>
     </div>
@@ -674,6 +811,14 @@
     <textarea class="cw-notes-inp" id="cw-notes" rows="2" placeholder="Notas de la llamada..."></textarea>
     <button class="btn btn-primary btn-full" onclick="saveCallLog(false)" style="font-size:12px;padding:8px">Guardar y cerrar</button>
     <button class="cw-next-btn" onclick="saveCallLog(true)">Guardar e ir al siguiente lead →</button>
+    <button class="btn btn-ghost" id="cw-skip-btn" style="display:none;font-size:11px;padding:5px 12px;margin-top:4px;width:100%" onclick="skipDialerLead()">Saltar este lead (marcador)</button>
+    <div id="cw-sms-wrap" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+      <div style="font-size:11px;color:var(--body);margin-bottom:6px">Enviar SMS/WhatsApp</div>
+      <div style="display:flex;gap:6px">
+        <select id="cw-sms-tpl" class="filter-sel" style="flex:1;font-size:11px"></select>
+        <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px;flex-shrink:0" onclick="sendPostCallSms()">Enviar</button>
+      </div>
+    </div>
   </div>
 </div>
 

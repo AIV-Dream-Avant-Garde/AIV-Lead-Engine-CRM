@@ -23,9 +23,14 @@ const S = {
   serverTimeOffset:    0,
   lastSyncTimestamp:   null,
   scrapeHistory:   [],
+  scripts:         [],
   auditLog:        [],
   failCount:       0,      // PIN login failure counter; reset on success
   lockoutUntil:    null,   // Date ISO string; set after MAX_FAIL_ATTEMPTS exceeded
+  dialerMode:      false,  // Power Dialer — auto-advance to next lead after saveCallLog
+  dialerQueue:     [],     // Ordered lead IDs for the current dialer session
+  scheduledJobs:   [],     // Scheduled scrape jobs (synced to GAS Config sheet)
+  smsTemplates:    [],     // SMS/WhatsApp message templates (stored in localStorage)
 };
 
 // Active call state — property names must match all reads/writes in calls.js

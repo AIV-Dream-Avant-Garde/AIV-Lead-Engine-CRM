@@ -23,7 +23,10 @@ function loadLocal() {
   try { S.leads  = JSON.parse(localStorage.getItem('aiv-leads') || '[]'); } catch(e) {}
   try { S.calls  = JSON.parse(localStorage.getItem('aiv-calls') || '[]'); } catch(e) {}
   try { S.team   = JSON.parse(localStorage.getItem('aiv-team')  || '[]'); } catch(e) {}
-  try { S.commissions = JSON.parse(localStorage.getItem('aiv-comm') || '[]'); } catch(e) {}
+  try { S.commissions = JSON.parse(localStorage.getItem('aiv-comm')    || '[]'); } catch(e) {}
+  try { S.scripts      = JSON.parse(localStorage.getItem('aiv-scripts') || '[]'); } catch(e) {}
+  try { S.smsTemplates = JSON.parse(localStorage.getItem('aiv-sms-tpl') || '[]'); } catch(e) {}
+  try { S.scheduledJobs = JSON.parse(localStorage.getItem('aiv-sched-jobs') || '[]'); } catch(e) {}
 }
 
 function checkStorage() {

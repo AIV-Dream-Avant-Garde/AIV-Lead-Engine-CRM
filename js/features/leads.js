@@ -26,6 +26,35 @@ function srcBadgeHTML(source) {
   return `<span class="src-badge ${info ? info.cls : 'src-default'}" title="${esc(source)}">${esc(label)}</span>`;
 }
 
+// ── Lead scoring ───────────────────────────────────────────
+function scoreLead(l) {
+  let s = 0;
+  const W = SCORE_WEIGHTS;
+  if (l.phone && l.phone !== 'N/A')               s += W.hasPhone;
+  const rat = parseFloat(l.rating);
+  if (!isNaN(rat)) {
+    if (rat >= 4.0)                                s += W.ratingHigh;
+    else if (rat >= 3.0)                           s += W.ratingMid;
+  }
+  const rev = parseInt(l.reviews, 10);
+  if (!isNaN(rev)) {
+    if (rev >= 50)                                 s += W.reviewsHigh;
+    else if (rev >= 10)                            s += W.reviewsMid;
+  }
+  if (l.status === 'Nuevo')                        s += W.statusNuevo;
+  else if (l.status === 'Contactado')              s += W.statusContact;
+  if (isOverdue(l))                                s += W.fuOverdue;
+  else if (isTodayFU(l))                           s += W.fuToday;
+  if (l.website && l.website !== 'N/A')            s += W.hasWebsite;
+  return s;
+}
+
+function scoreDotHTML(l) {
+  const s = scoreLead(l);
+  const tier = s >= 60 ? 'high' : s >= 30 ? 'mid' : 'low';
+  return `<span class="score-dot score-${tier}" title="Prioridad: ${s} pts"></span>`;
+}
+
 // ── Filter / sort ──────────────────────────────────────────
 function getFiltered() {
   const q    = (document.getElementById('tbl-q')?.value    || '').toLowerCase();
@@ -54,6 +83,9 @@ function getFiltered() {
 
 function getSorted(arr) {
   const col = S.sortCol, dir = S.sortDir;
+  if (col === 'score') {
+    return [...arr].sort((a,b) => (scoreLead(b) - scoreLead(a)) * dir);
+  }
   return [...arr].sort((a,b) => {
     const av = a[col] || '', bv = b[col] || '';
     return av < bv ? -dir : av > bv ? dir : 0;
@@ -78,7 +110,7 @@ function renderTable() {
 
   if (!slice.length) {
     // colspan=12: ☐ name phone city barrio source fu rating status updated lastCall + lock
-    tbody.innerHTML = '<tr><td colspan="12" class="table-empty">Sin leads con los filtros actuales.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="13" class="table-empty">Sin leads con los filtros actuales.</td></tr>';
   } else {
     tbody.innerHTML = slice.map(l => {
       const sc   = STATUS_CLS[l.status] || 'new';
@@ -95,6 +127,7 @@ function renderTable() {
       else                    lockCell = `<button class="claim-btn" onclick="event.stopPropagation();claimLead('${l.id}')">Reclamar</button>`;
       return `<tr class="${sel} ${dnc}" onclick="rowClick(event,'${l.id}')">
         <td onclick="event.stopPropagation()"><input type="checkbox" ${S.selected.has(l.id)?'checked':''} onchange="toggleSel('${l.id}',this.checked)"></td>
+        <td style="text-align:center;width:28px">${scoreDotHTML(l)}</td>
         <td class="name-cell">${esc(l.name)}</td>
         <td style="font-family:'DM Mono',monospace;font-size:11px">${esc(l.phone)}</td>
         <td style="font-size:11px">${esc(l.city   || '--')}</td>
@@ -159,6 +192,73 @@ function applyBulkStatus() {
   const st = document.getElementById('bulk-status')?.value;
   if (!st) { alert('Selecciona un estado.'); return; }
   S.leads.forEach(l => { if (S.selected.has(l.id)) { l.status = st; l.updatedAt = new Date().toISOString(); pushLead(l); } });
+  clearSelection(); renderAll();
+}
+
+function onBulkActionChange() {
+  const act  = document.getElementById('bulk-action')?.value || '';
+  const date = document.getElementById('bulk-action-date');
+  const text = document.getElementById('bulk-action-text');
+  if (date) date.style.display = 'none';
+  if (text) text.style.display = 'none';
+  if (act === 'followup' && date) { date.style.display = ''; }
+  if (act === 'source'   && text) { text.style.display = ''; text.placeholder = 'Nueva fuente...'; }
+  if (act === 'dnc'      && text) { text.style.display = ''; text.placeholder = 'Razon DNC...'; }
+}
+
+function applyBulkAction() {
+  const act  = document.getElementById('bulk-action')?.value || '';
+  if (!act) { alert('Selecciona una accion.'); return; }
+  if (S.selected.size === 0) { alert('Selecciona al menos un lead.'); return; }
+  const now  = new Date().toISOString();
+  const sess = S.session;
+
+  if (act === 'followup') {
+    const d = document.getElementById('bulk-action-date')?.value;
+    if (!d) { alert('Selecciona una fecha de seguimiento.'); return; }
+    S.leads.forEach(l => { if (S.selected.has(l.id)) { l.followUpDate = d; l.updatedAt = now; pushLead(l); } });
+  } else if (act === 'source') {
+    const src = document.getElementById('bulk-action-text')?.value?.trim();
+    if (!src) { alert('Ingresa la nueva fuente.'); return; }
+    S.leads.forEach(l => { if (S.selected.has(l.id)) { l.source = src; l.updatedAt = now; pushLead(l); } });
+  } else if (act === 'closer') {
+    if (!sess) { alert('Debes iniciar sesion.'); return; }
+    S.leads.forEach(l => {
+      if (S.selected.has(l.id)) {
+        l.closerId   = sess.userId;
+        l.closerRate = sess.closerRate || 0;
+        l.assignedAt = l.assignedAt || now;
+        l.updatedAt  = now;
+        pushLead(l);
+      }
+    });
+  } else if (act === 'provider') {
+    if (!sess) { alert('Debes iniciar sesion.'); return; }
+    S.leads.forEach(l => {
+      if (S.selected.has(l.id)) {
+        l.providerId   = sess.userId;
+        l.providerRate = sess.providerRate || 0;
+        l.assignedAt   = l.assignedAt || now;
+        l.updatedAt    = now;
+        pushLead(l);
+      }
+    });
+  } else if (act === 'dnc') {
+    const reason = document.getElementById('bulk-action-text')?.value?.trim();
+    if (!reason) { alert('Ingresa la razon para No llamar — requerido como registro legal.'); return; }
+    if (!confirm(`¿Marcar ${S.selected.size} lead(s) como "No llamar"?`)) return;
+    S.leads.forEach(l => {
+      if (S.selected.has(l.id)) {
+        l.status    = 'No llamar';
+        l.dncReason = reason;
+        l.updatedAt = now;
+        pushLead(l);
+      }
+    });
+  }
+
+  document.getElementById('bulk-action').value = '';
+  onBulkActionChange();
   clearSelection(); renderAll();
 }
 function deleteSelected() {

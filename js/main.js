@@ -141,6 +141,9 @@ document.addEventListener('keydown', e => {
   const secretEl = document.getElementById('crm-secret-display');
   if (secretEl && S.config.crmSecret) secretEl.textContent = S.config.crmSecret;
 
+  const webhookEl = document.getElementById('webhook-url-display');
+  if (webhookEl && S.config.scriptUrl) webhookEl.value = S.config.scriptUrl;
+
   // 4. Wire sidebar navigation
   document.querySelectorAll('.nav-item[data-sec]').forEach(item => {
     item.addEventListener('click', () => navigate(item.dataset.sec));

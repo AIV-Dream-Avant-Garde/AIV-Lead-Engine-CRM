@@ -55,6 +55,15 @@ function copyCrmSecret() {
   });
 }
 
+function copyWebhookUrl() {
+  const url = S.config.scriptUrl || '';
+  if (!url) { alert('Guarda la URL del Apps Script primero.'); return; }
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.querySelector('[onclick="copyWebhookUrl()"]');
+    if (btn) { btn.textContent = 'Copiado!'; setTimeout(() => btn.textContent = 'Copiar URL', 2000); }
+  });
+}
+
 function copyEl(elId, btnId, label) {
   const t = document.getElementById(elId)?.textContent || '';
   navigator.clipboard.writeText(t).then(() => {
