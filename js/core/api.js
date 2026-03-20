@@ -77,7 +77,14 @@ async function syncNow() {
       }
     });
     if (!res.isIncremental && res.calls) S.calls = res.calls;
-    if (res.team)        { S.team        = res.team;        localStorage.setItem('aiv-team', JSON.stringify(S.team)); }
+    if (res.team) {
+      // Preserve pinPlain (local-only) when merging server team data
+      S.team = res.team.map(m => {
+        const local = S.team.find(x => x.id === m.id);
+        return local ? {...m, pinPlain: local.pinPlain || m.pinPlain || ''} : m;
+      });
+      localStorage.setItem('aiv-team', JSON.stringify(S.team));
+    }
     if (res.commissions) { S.commissions = res.commissions; localStorage.setItem('aiv-comm', JSON.stringify(S.commissions)); }
     if (res.scripts)     { S.scripts     = res.scripts;     localStorage.setItem('aiv-scripts', JSON.stringify(S.scripts)); }
     S.lastSyncTimestamp = new Date().toISOString();
