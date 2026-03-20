@@ -37,7 +37,13 @@
     </div>
     <div class="login-hint" id="login-hint">Ingresa tu PIN para acceder</div>
     <div class="login-lockout" id="login-lockout"></div>
+    <button class="btn btn-ghost" style="width:100%;margin-top:10px;font-size:12px;opacity:.65;letter-spacing:.3px" onclick="startDemo()">Probar en modo demo</button>
   </div>
+</div>
+
+<!-- DEMO BANNER -->
+<div id="demo-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--amber);color:#000;font-size:11px;font-weight:700;text-align:center;padding:4px 8px;letter-spacing:.5px">
+  MODO DEMO — Los cambios no se guardan ni se sincronizan
 </div>
 
 <!-- SIDEBAR -->
@@ -662,6 +668,11 @@ Content-Type: application/json
       <div id="m-dnc-wrap" style="display:none">
         <div class="field" style="margin-bottom:14px"><label>Razon "No llamar" (requerido — registro legal)</label><input type="text" id="m-dnc-reason" placeholder="Ej: Solicito no ser contactado el 15/03/2025"></div>
       </div>
+      <div class="field" id="m-deal-wrap" style="margin-bottom:14px">
+        <label>Valor del negocio (COP)</label>
+        <input type="number" id="m-deal-value" placeholder="Ej: 5000000" min="0" step="100000" oninput="onDealValueInput()">
+        <div id="m-deal-preview" style="font-size:11px;color:var(--sub);margin-top:4px"></div>
+      </div>
       <div class="divider"></div>
       <div class="label-sm">Llamadas a este lead</div>
       <div id="m-call-history" style="margin-bottom:12px"></div>
@@ -730,8 +741,25 @@ Content-Type: application/json
       </div>
       <div class="field"><label>PIN (4 digitos)</label><input type="password" id="tm-pin" placeholder="••••" maxlength="4" pattern="[0-9]{4}"></div>
       <div class="field"><label>Confirmar PIN</label><input type="password" id="tm-pin2" placeholder="••••" maxlength="4"></div>
-      <div class="field"><label>Tasa proveedor (1-5%)</label><input type="number" id="tm-prate" value="3" min="0" max="5" step="0.5"></div>
-      <div class="field"><label>Tasa closer (1-19%)</label><input type="number" id="tm-crate" value="10" min="0" max="19" step="0.5"></div>
+      <div class="field"><label>Tasa proveedor (%)</label>
+        <select id="tm-prate" style="background:var(--surface-hi);border:1px solid var(--border);border-radius:6px;padding:8px 11px;font-size:13px;color:var(--hl);outline:none;width:100%;font-family:'DM Sans',sans-serif">
+          <option value="0">0%</option><option value="0.5">0.5%</option><option value="1">1%</option>
+          <option value="1.5">1.5%</option><option value="2">2%</option><option value="2.5">2.5%</option>
+          <option value="3" selected>3%</option><option value="3.5">3.5%</option><option value="4">4%</option>
+          <option value="4.5">4.5%</option><option value="5">5%</option><option value="6">6%</option>
+          <option value="7">7%</option><option value="8">8%</option><option value="10">10%</option>
+        </select>
+      </div>
+      <div class="field"><label>Tasa closer (%)</label>
+        <select id="tm-crate" style="background:var(--surface-hi);border:1px solid var(--border);border-radius:6px;padding:8px 11px;font-size:13px;color:var(--hl);outline:none;width:100%;font-family:'DM Sans',sans-serif">
+          <option value="5">5%</option><option value="7">7%</option><option value="8">8%</option>
+          <option value="10" selected>10%</option><option value="12">12%</option><option value="13">13%</option>
+          <option value="15">15%</option><option value="17">17%</option><option value="18">18%</option>
+          <option value="20">20%</option><option value="22">22%</option><option value="25">25%</option>
+          <option value="28">28%</option><option value="30">30%</option><option value="35">35%</option>
+          <option value="40">40%</option>
+        </select>
+      </div>
     </div>
     <div class="form-grid col1" style="margin-top:4px;margin-bottom:4px"><div class="field"><label>WhatsApp / Email (opcional)</label><input type="text" id="tm-contact" placeholder="+57 300 000 0000 o correo@empresa.com"></div></div>
     <div class="info-row" style="margin-top:4px;margin-bottom:14px">El PIN se guarda como hash SHA-256 — ni tu puedes verlo despues. Si lo olvidan, asignales uno nuevo.</div>
@@ -839,6 +867,7 @@ Content-Type: application/json
 <script src="js/data/keywords.js"></script>
 <script src="js/data/locations.js"></script>
 <script src="js/data/constants.js"></script>
+<script src="js/data/demo-data.js"></script>
 <script src="js/core/state.js"></script>
 <script src="js/core/utils.js"></script>
 <script src="js/core/storage.js"></script>

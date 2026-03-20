@@ -35,10 +35,23 @@ function previewExport() {
 function doExport() {
   const leads = getExportLeads();
   const hdrs  = ['name','phone','address','website','rating','reviews','city','barrio','keyword',
-                  'source','sourceDetail','status','dncReason','followUpDate','importedAt','updatedAt'];
+                  'source','sourceDetail','status','dncReason','followUpDate','importedAt','updatedAt',
+                  'dealValue','providerCommission','closerCommission','commissionStatus',
+                  'providerName','closerName','callCount'];
   const csv   = [
     hdrs.join(','),
-    ...leads.map(l => hdrs.map(h => `"${(l[h]||'').toString().replace(/"/g,'""')}"`).join(',')),
+    ...leads.map(l => {
+      const {providerAmount, closerAmount} = l.dealValue ? calcCommissions(l, parseFloat(l.dealValue)) : {providerAmount:0, closerAmount:0};
+      const enriched = {
+        ...l,
+        providerCommission: providerAmount || '',
+        closerCommission:   closerAmount   || '',
+        providerName: S.team.find(m => m.id === l.providerId)?.name || '',
+        closerName:   S.team.find(m => m.id === l.closerId)?.name   || '',
+        callCount:    S.calls.filter(c => c.leadId === l.id).length,
+      };
+      return hdrs.map(h => `"${(enriched[h]||'').toString().replace(/"/g,'""')}"`).join(',');
+    }),
   ].join('\n');
   const a = document.createElement('a');
   a.href     = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'}));

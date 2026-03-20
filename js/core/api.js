@@ -1,6 +1,7 @@
 /* ── CORE: Google Apps Script API layer & sync ────────────── */
 
 async function sheetsCall(params) {
+  if (S.demoMode) return Promise.resolve({success:true, leads:[], calls:[], team:[], commissions:[], scripts:[], serverTime: new Date().toISOString()});
   const url = S.config.scriptUrl;
   if (!url) return null;
   try {

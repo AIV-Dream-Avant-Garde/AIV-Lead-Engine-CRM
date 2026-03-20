@@ -122,14 +122,13 @@ async function saveTeamMember() {
   const crate      = parseFloat(document.getElementById('tm-crate').value || 0);
 
   if (!name)                          { alert('El nombre es requerido.');             return; }
-  if (prate < 0 || prate > 5)         { alert('Tasa de proveedor: 0–5%.');            return; }
-  if (crate < 0 || crate > 19)        { alert('Tasa de closer: 0–19%.');              return; }
   const isNew = !existingId;
   if (isNew && !pin)                  { alert('El PIN es requerido para nuevos miembros.'); return; }
   if (pin && pin.length !== 4)        { alert('El PIN debe tener exactamente 4 dígitos.'); return; }
   if (pin && !/^\d{4}$/.test(pin))    { alert('El PIN solo puede contener dígitos.'); return; }
   if (pin && pin !== pin2)            { alert('Los PINs no coinciden.'); return; }
   if (pin === '2819')                 { alert('El PIN 2819 está reservado para Admin.'); return; }
+  if (pin === '0000')                 { alert('El PIN 0000 está reservado para Demo.'); return; }
 
   if (pin) {
     const newHash   = await sha256(pin);

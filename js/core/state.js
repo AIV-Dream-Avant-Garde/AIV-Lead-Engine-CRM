@@ -32,6 +32,7 @@ const S = {
   scheduledJobs:   [],     // Scheduled scrape jobs (synced to GAS Config sheet)
   smsTemplates:    [],     // SMS/WhatsApp message templates (stored in localStorage)
   triggerStatus:   { scrape: false, report: false }, // GAS time-trigger state
+  demoMode:        false,  // Demo mode — no GAS calls, preloaded sample data
 };
 
 // Active call state — property names must match all reads/writes in calls.js

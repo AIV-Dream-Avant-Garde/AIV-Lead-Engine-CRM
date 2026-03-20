@@ -38,6 +38,10 @@ async function tryLogin() {
   if (Date.now() < pinLockedUntil) { pinBuffer = ''; updatePinDots(); return; }
   const entered = pinBuffer;
   pinBuffer = '';
+
+  // Demo shortcut — PIN 0000
+  if (entered === '0000') { startDemo(); return; }
+
   const hash = await sha256(entered);
 
   // Admin PIN check
@@ -143,6 +147,27 @@ document.addEventListener('keydown', e => {
     }
   }
 });
+
+// ── Demo mode ──────────────────────────────────────────────
+function startDemo() {
+  S.demoMode    = true;
+  S.leads       = DEMO_DATA.leads.map(l => ({...l}));
+  S.calls       = DEMO_DATA.calls.map(c => ({...c}));
+  S.team        = DEMO_DATA.team.map(m => ({...m}));
+  S.commissions = DEMO_DATA.commissions.map(c => ({...c}));
+  const user    = {userId:'demo-admin', userName:'Demo Usuario', role:'admin', providerRate:3, closerRate:12};
+  S.session     = user;
+  sessionStorage.setItem('aiv-session', JSON.stringify(user));
+  failedAttempts = 0;
+  document.getElementById('login-overlay').classList.add('hidden');
+  document.getElementById('demo-banner').style.display = 'block';
+  applySidebarForRole('admin');
+  updateSidebarUser(user);
+  applyAdminNavVisibility();
+  populateFilters();
+  navigate('leads');
+  renderAll();
+}
 
 // ── Role-based sidebar ─────────────────────────────────────
 function applySidebarForRole(role) {

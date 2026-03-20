@@ -20,13 +20,21 @@ function renderPipeline() {
     if (fc) cards = cards.filter(l => l.city === fc);
     if (q)  cards = cards.filter(l => `${l.name} ${l.phone} ${l.barrio}`.toLowerCase().includes(q));
     const total = cards.length;
-    const html  = cards.slice(0, CAP).map(l =>
-      `<div class="kanban-card" onclick="openLead('${l.id}')">
-        <div class="kc-name">${esc(l.name)}</div>
+    const now   = Date.now();
+    const html  = cards.slice(0, CAP).map(l => {
+      const ageDays = l.updatedAt ? Math.floor((now - new Date(l.updatedAt)) / 86400000) : 0;
+      const ageBadge = ageDays > 0
+        ? `<span style="font-size:10px;background:var(--surface-hi);border-radius:4px;padding:1px 5px;margin-left:4px;color:var(--sub)">${ageDays}d</span>`
+        : '';
+      const dealChip = col.k === 'Cerrado' && l.dealValue
+        ? `<div style="font-size:10px;color:var(--green);font-weight:600;margin-top:3px">${fmtCOP(l.dealValue)}</div>`
+        : '';
+      return `<div class="kanban-card" onclick="openLead('${l.id}')">
+        <div class="kc-name">${esc(l.name)}${ageBadge}</div>
         <div class="kc-meta">${esc(l.phone || '--')}</div>
-        <div class="kc-meta">${esc(l.barrio || l.city || '')}</div>
-      </div>`
-    ).join('') +
+        <div class="kc-meta">${esc(l.barrio || l.city || '')}${dealChip}</div>
+      </div>`;
+    }).join('') +
       (total > CAP
         ? `<div style="font-size:11px;color:var(--body);padding:7px;text-align:center">+${total-CAP} mas</div>`
         : total === 0

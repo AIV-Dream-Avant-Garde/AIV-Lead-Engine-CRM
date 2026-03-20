@@ -288,6 +288,10 @@ function openLead(id) {
   document.getElementById('m-status').value    = l.status     || 'Nuevo';
   document.getElementById('m-followup').value  = l.followUpDate || '';
 
+  const dvEl = document.getElementById('m-deal-value');
+  if (dvEl) dvEl.value = l.dealValue || '';
+  renderDealPreview(l);
+
   const dncWrap = document.getElementById('m-dnc-wrap');
   if (dncWrap) dncWrap.style.display = l.status === 'No llamar' ? 'block' : 'none';
   if (l.dncReason) { const dr = document.getElementById('m-dnc-reason'); if (dr) dr.value = l.dncReason; }
@@ -402,9 +406,20 @@ function saveLead() {
   const np = document.getElementById('edit-phone')?.value?.trim();
   const na = document.getElementById('edit-address')?.value?.trim();
   const nn = document.getElementById('m-name')?.textContent?.trim();
-  if (np && np !== l.phone)   l.phone   = np;
+  if (np) {
+    const normPhone = normalizePhone(np);
+    if (normPhone !== normalizePhone(l.phone || '')) {
+      const dup = S.leads.find(x => x.id !== l.id && normalizePhone(x.phone || '') === normPhone && normPhone);
+      if (dup && !confirm(`El teléfono ya existe en el lead "${dup.name}". ¿Continuar de todas formas?`)) return;
+      l.phone = normPhone;
+    }
+  }
   if (na && na !== l.address) l.address = na;
   if (nn && nn !== l.name)    l.name    = nn;
+
+  // Save deal value
+  const dv = parseFloat(document.getElementById('m-deal-value')?.value || 0);
+  if (dv > 0) l.dealValue = dv;
 
   const newStatus = document.getElementById('m-status')?.value;
 
@@ -478,6 +493,29 @@ function setFuQuick(days) {
   const d = new Date();
   d.setDate(d.getDate() + days);
   inp.value = d.toISOString().slice(0,10);
+}
+
+function normalizePhone(raw) {
+  let p = String(raw || '').replace(/[\s\-\(\)\.]/g, '');
+  if (/^3\d{9}$/.test(p))   p = '+57' + p;  // Colombian mobile: 3xxxxxxxxx
+  if (/^57\d{10}$/.test(p)) p = '+' + p;    // 573xxxxxxxxx
+  return p;
+}
+
+function onDealValueInput() {
+  const l = S.leads.find(x => x.id === S.curLeadId);
+  if (l) renderDealPreview(l);
+}
+
+function renderDealPreview(lead) {
+  const wrap = document.getElementById('m-deal-preview');
+  if (!wrap) return;
+  const val = parseFloat(document.getElementById('m-deal-value')?.value || lead.dealValue || 0);
+  if (!val) { wrap.textContent = ''; return; }
+  const {providerAmount, closerAmount} = calcCommissions(lead, val);
+  const pName = S.team.find(m => m.id === lead.providerId)?.name || '—';
+  const cName = S.team.find(m => m.id === lead.closerId)?.name || S.session?.userName || '—';
+  wrap.innerHTML = `Prov. (${esc(pName)}): <strong>${fmtCOP(providerAmount)}</strong> · Closer (${esc(cName)}): <strong>${fmtCOP(closerAmount)}</strong>`;
 }
 
 function startCallFromModal(leadId) { closeModal(); makeCall(leadId); }
