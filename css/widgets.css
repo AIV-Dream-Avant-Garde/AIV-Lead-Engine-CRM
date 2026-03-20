@@ -40,7 +40,7 @@
 .cw-btn-mute.active{background:rgba(245,158,11,.12);color:var(--amber);border-color:rgba(245,158,11,.3)}
 .cw-btn-hangup{background:rgba(255,69,69,.12);color:var(--red);border:1px solid rgba(255,69,69,.3)}
 .cw-btn-hangup:hover{background:rgba(255,69,69,.25)}
-.cw-btn-icon{font-size:18px;line-height:1}
+.cw-btn-icon{display:flex;align-items:center;justify-content:center;width:20px;height:20px}
 .cw-post{border-top:1px solid var(--border);padding:14px 16px;display:none}
 .cw-post.visible{display:block}
 .cw-post-title{font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--body);margin-bottom:8px}

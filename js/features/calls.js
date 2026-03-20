@@ -295,7 +295,9 @@ function updateDialerCounter() {
   const btn   = document.getElementById('dialer-toggle-btn');
   const count = document.getElementById('dialer-queue-count');
   if (btn) {
-    btn.textContent = S.dialerMode ? `⏹ Detener marcador (${S.dialerQueue.length})` : '▶ Marcador automatico';
+    btn.innerHTML = S.dialerMode
+      ? `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;vertical-align:middle;margin-right:5px"><rect x="3.5" y="3.5" width="9" height="9" rx="1"/></svg>Detener marcador (${S.dialerQueue.length})`
+      : `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;vertical-align:middle;margin-right:5px"><path d="M5 3.5l7 4.5-7 4.5z"/></svg>Marcador automatico`;
     btn.classList.toggle('btn-danger', S.dialerMode);
     btn.classList.toggle('btn-primary', !S.dialerMode);
   }

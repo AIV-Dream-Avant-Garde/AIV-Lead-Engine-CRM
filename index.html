@@ -286,7 +286,7 @@ Content-Type: application/json
   <h1 class="section-title">Importar leads desde CSV</h1>
   <p class="section-sub">Sube un CSV de cualquier fuente — Google Maps, LinkedIn export, base de datos, etc. Los duplicados (mismo telefono) se omiten automaticamente.</p>
   <div class="dropzone" id="dropzone" onclick="document.getElementById('csv-inp').click()">
-    <div class="dropzone-icon">📂</div>
+    <div class="dropzone-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:32px;height:32px"><path d="M2.5 11v2a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-2M8 3v8M5.5 5.5L8 3l2.5 2.5"/></svg></div>
     <div class="dropzone-text">Haz click o arrastra tu archivo CSV aqui</div>
     <div class="dropzone-hint">name, phone, address, website, rating, reviews — o cualquier columna disponible</div>
   </div>
@@ -898,8 +898,8 @@ Content-Type: application/json
     <div class="cw-lead-name" id="cw-lead-name">—</div>
     <div class="cw-phone" id="cw-phone">—</div>
     <div class="cw-controls" id="cw-controls" style="display:none">
-      <button class="cw-btn cw-btn-mute" id="cw-mute-btn" onclick="toggleMute()"><span class="cw-btn-icon">🎙</span><span id="cw-mute-label">Silenciar</span></button>
-      <button class="cw-btn cw-btn-hangup" onclick="hangUp()"><span class="cw-btn-icon">📵</span>Colgar</button>
+      <button class="cw-btn cw-btn-mute" id="cw-mute-btn" onclick="toggleMute()"><span class="cw-btn-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:16px;height:16px"><rect x="5" y="1" width="6" height="9" rx="3"/><path d="M3 8.5a5 5 0 0 0 10 0M8 13.5V15M6 15h4"/></svg></span><span id="cw-mute-label">Silenciar</span></button>
+      <button class="cw-btn cw-btn-hangup" onclick="hangUp()"><span class="cw-btn-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:16px;height:16px"><path d="M5 1.5H3.5A1.5 1.5 0 0 0 2 3C2 9.6 6.4 14 13 14a1.5 1.5 0 0 0 1.5-1.5V11l-3-1-1 1.5C9 10.7 5.3 7 4.5 5.5L6 4.5l-1-3z"/><path d="M1.5 1.5l13 13"/></svg></span>Colgar</button>
     </div>
   </div>
   <div class="cw-post" id="cw-post">

@@ -147,7 +147,7 @@ function renderTable() {
   if (!slice.length) {
     tbody.innerHTML = `<tr><td colspan="13" class="table-empty">
       <div style="padding:40px;text-align:center">
-        <div style="font-size:32px;margin-bottom:8px">🔍</div>
+        <div style="margin-bottom:8px;opacity:.35"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:32px;height:32px"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg></div>
         <div style="font-weight:600;color:var(--hl);margin-bottom:4px">Sin resultados</div>
         <div style="font-size:12px;color:var(--sub);margin-bottom:12px">${q ? 'No se encontraron leads con "' + esc(q) + '"' : 'No hay leads con los filtros actuales'}</div>
         ${q || hasFilters ? '<button class="btn btn-ghost" style="font-size:12px" onclick="clearFilters()">Limpiar filtros</button>' : ''}
@@ -376,11 +376,11 @@ function openLead(id) {
 
   // Action buttons
   const addr    = l.address && l.address !== 'N/A' ? l.address : l.name;
-  const mapsLink = addr ? `<a class="action-btn" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}" target="_blank">📍 Maps</a>` : '';
+  const mapsLink = addr ? `<a class="action-btn" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}" target="_blank"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;vertical-align:middle;margin-right:4px"><path d="M8 1a5 5 0 0 0-5 5c0 3.5 5 9 5 9s5-5.5 5-9a5 5 0 0 0-5-5z"/><circle cx="8" cy="6" r="1.5"/></svg>Maps</a>` : '';
   const canCall  = l.status !== 'No llamar' && l.phone && l.phone !== 'N/A';
   const callBtn  = canCall
-    ? `<button class="action-btn" onclick="startCallFromModal('${l.id}')">📞 Llamar</button>`
-    : '<span class="action-btn red-btn">🚫 No llamar</span>';
+    ? `<button class="action-btn" onclick="startCallFromModal('${l.id}')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;vertical-align:middle;margin-right:4px"><path d="M5 1.5H3.5A1.5 1.5 0 0 0 2 3C2 9.6 6.4 14 13 14a1.5 1.5 0 0 0 1.5-1.5V11l-3-1-1 1.5C9 10.7 5.3 7 4.5 5.5L6 4.5l-1-3z"/></svg>Llamar</button>`
+    : `<span class="action-btn red-btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;vertical-align:middle;margin-right:4px"><circle cx="8" cy="8" r="6.5"/><path d="M3.5 3.5l9 9"/></svg>No llamar</span>`;
   document.getElementById('m-action-btns').innerHTML = mapsLink + callBtn;
 
   renderLeadCallHistory(id);
@@ -423,21 +423,21 @@ function renderLeadTimeline(l) {
   S.calls.filter(c => c.leadId === l.id).forEach(c => {
     events.push({
       date: c.calledAt,
-      icon: '📞',
+      icon: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:13px;height:13px"><path d="M5 1.5H3.5A1.5 1.5 0 0 0 2 3C2 9.6 6.4 14 13 14a1.5 1.5 0 0 0 1.5-1.5V11l-3-1-1 1.5C9 10.7 5.3 7 4.5 5.5L6 4.5l-1-3z"/></svg>',
       text: 'Llamada: ' + (OUTCOME_LABELS[c.outcome] || c.outcome) + ' · ' + fmtSec(parseInt(c.duration || 0)) + (c.notes ? ' — ' + c.notes : ''),
     });
   });
 
   (Array.isArray(l.notes) ? l.notes : []).forEach(n => {
-    events.push({date: n.date, icon: '📝', text: n.text});
+    events.push({date: n.date, icon: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:13px;height:13px"><path d="M11.5 2a1.5 1.5 0 0 1 2.1 2.1L4.5 13.1l-3 .5.5-3L11.5 2z"/></svg>', text: n.text});
   });
 
   (Array.isArray(l.workHistory) ? l.workHistory : []).forEach(w => {
     const ts = w.closedAt || w.releasedAt || w.claimedAt || '';
-    events.push({date: ts, icon: '🔄', text: (w.closerName || w.closerId || '—') + ': ' + (w.outcome || '')});
+    events.push({date: ts, icon: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:13px;height:13px"><circle cx="8" cy="8" r="6.5"/><path d="M8 4.5V8l2.5 2.5"/></svg>', text: (w.closerName || w.closerId || '—') + ': ' + (w.outcome || '')});
   });
 
-  if (l.importedAt) events.push({date: l.importedAt, icon: '➕', text: 'Lead importado'});
+  if (l.importedAt) events.push({date: l.importedAt, icon: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:13px;height:13px"><path d="M8 3v10M3 8h10"/></svg>', text: 'Lead importado'});
 
   events.sort((a, b) => new Date(b.date) - new Date(a.date));
 
