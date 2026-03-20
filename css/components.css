@@ -25,9 +25,10 @@
 .form-grid.col1{grid-template-columns:1fr}
 .field{display:flex;flex-direction:column;gap:5px}
 .field label{font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--body)}
-.field input,.field select,.field textarea{background:var(--surface-hi);border:1px solid var(--border);border-radius:var(--r-sm);padding:8px 11px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--hl);outline:none;transition:border-color var(--t-fast),box-shadow var(--t-fast);width:100%}
+.field input,.field select,.field textarea{background:var(--surface-hi);border:1px solid var(--border);border-radius:var(--r-sm);padding:8px 11px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--hl);outline:none;transition:border-color var(--t-fast),box-shadow var(--t-fast);width:100%;-webkit-appearance:none;appearance:none}
 .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(75,114,255,.15)}
 .field input::placeholder,.field textarea::placeholder{color:var(--body)}
+.field select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238B93A8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:30px}
 .field select option{background:#1A1E2A;color:var(--hl)}
 .field textarea{resize:vertical;min-height:80px;line-height:1.6}
 .field input:disabled{opacity:.5;cursor:not-allowed}
@@ -50,10 +51,10 @@
 /* TABLE */
 .table-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap}
 .search-box{flex:1;min-width:180px;position:relative}
-.search-box input{background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:8px 11px 8px 32px;font-size:13px;color:var(--hl);outline:none;width:100%;transition:border-color .15s}
+.search-box input{background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:8px 11px 8px 32px;font-size:13px;color:var(--hl);outline:none;width:100%;transition:border-color .15s;-webkit-appearance:none;appearance:none}
 .search-box input:focus{border-color:var(--accent)}
 .search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--body);font-size:14px;pointer-events:none}
-.filter-sel{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:12px;color:var(--sub);outline:none;cursor:pointer;font-family:'DM Sans',sans-serif}
+.filter-sel{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:7px 28px 7px 10px;font-size:12px;color:var(--sub);outline:none;cursor:pointer;font-family:'DM Sans',sans-serif;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238B93A8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center}
 .filter-sel:focus{border-color:var(--accent)}
 .bulk-bar{display:none;align-items:center;gap:10px;padding:10px 14px;background:var(--acc-m);border:1px solid rgba(75,114,255,.2);border-radius:8px;margin-bottom:12px}
 .bulk-bar.visible{display:flex;flex-wrap:wrap}
