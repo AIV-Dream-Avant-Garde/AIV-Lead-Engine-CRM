@@ -7,8 +7,8 @@
 .kanban-title{font-size:10px;font-weight:600;letter-spacing:.4px;text-transform:uppercase}
 .kanban-count{font-family:'DM Mono',monospace;font-size:10px;background:var(--surface-hi);padding:1px 6px;border-radius:6px;color:var(--sub)}
 .kanban-cards{padding:8px;display:flex;flex-direction:column;gap:7px;min-height:60px;max-height:400px;overflow-y:auto}
-.kanban-card{background:var(--surface-hi);border:1px solid var(--border);border-radius:7px;padding:9px 11px;cursor:pointer;transition:all .15s}
-.kanban-card:hover{border-color:var(--border-hi);transform:translateY(-1px)}
+.kanban-card{background:var(--surface-hi);border:1px solid var(--border);border-radius:var(--r-sm);padding:9px 11px;cursor:pointer;transition:transform var(--t-fast),box-shadow var(--t-fast),border-color var(--t-fast);box-shadow:var(--shadow-xs)}
+.kanban-card:hover{border-color:var(--border-hi);transform:translateY(-1px);box-shadow:var(--shadow-sm)}
 .kc-name{font-size:11px;font-weight:500;color:var(--hl);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kc-meta{font-size:10px;color:var(--body)}
 
@@ -60,7 +60,7 @@
 .cw-next-btn:hover{background:rgba(45,212,191,.2)}
 
 /* CALLS SECTION */
-.call-entry{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:8px;transition:border-color .15s}
+.call-entry{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 14px;margin-bottom:8px;transition:border-color var(--t-fast),background var(--t-fast)}
 .call-entry:hover{border-color:var(--border-hi)}
 .call-entry-top{display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap}
 .call-outcome-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600}
@@ -88,7 +88,7 @@
 /* LOGIN OVERLAY */
 .login-overlay{position:fixed;inset:0;background:var(--bg);z-index:999;display:flex;align-items:center;justify-content:center;flex-direction:column}
 .login-overlay.hidden{display:none}
-.login-card{background:var(--surface);border:1px solid var(--border-hi);border-radius:16px;padding:40px;width:360px;text-align:center}
+.login-card{background:var(--surface);border:1px solid var(--border-hi);border-radius:var(--r-xl);padding:40px;width:360px;text-align:center;box-shadow:var(--shadow-lg)}
 .login-logo{font-family:'DM Serif Display',serif;font-size:36px;letter-spacing:-1.5px;color:var(--hl);display:flex;align-items:center;justify-content:center;gap:9px;margin-bottom:4px}
 .login-logo-dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 14px rgba(75,114,255,.7);flex-shrink:0}
 .login-sub{font-size:10px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,.2);margin-bottom:32px}
@@ -124,7 +124,7 @@
 .rate-badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
 .rate-provider{background:rgba(45,212,191,.08);color:var(--pos);border:1px solid rgba(45,212,191,.25)}
 .rate-closer{background:rgba(75,114,255,.08);color:var(--accent);border:1px solid rgba(75,114,255,.25)}
-.comm-item{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:11px 14px;margin-bottom:7px;display:flex;align-items:center;gap:12px}
+.comm-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:11px 14px;margin-bottom:7px;display:flex;align-items:center;gap:12px;transition:border-color var(--t-fast)}
 .comm-item:hover{border-color:var(--border-hi)}
 .comm-info{flex:1;min-width:0}
 .comm-lead{font-size:13px;font-weight:500;color:var(--hl);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -141,7 +141,7 @@
 /* ADMIN PANEL */
 .admin-section{margin-bottom:28px}
 .admin-section-title{font-size:13px;font-weight:600;color:var(--hl);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
-.team-row{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:7px;display:flex;align-items:center;gap:12px;transition:border-color .15s}
+.team-row{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 14px;margin-bottom:7px;display:flex;align-items:center;gap:12px;transition:border-color var(--t-fast)}
 .team-row:hover{border-color:var(--border-hi)}
 .team-avatar{width:32px;height:32px;border-radius:50%;background:var(--acc-m);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:var(--accent);flex-shrink:0}
 .team-info{flex:1;min-width:0}
@@ -154,7 +154,7 @@
 .audit-time{font-family:'DM Mono',monospace;color:var(--body);font-size:10px;flex-shrink:0;margin-top:1px}
 .audit-action{font-weight:500;color:var(--hl)}
 .audit-detail{color:var(--sub)}
-.admin-comm-row{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:11px 14px;margin-bottom:7px;display:flex;align-items:center;gap:10px}
+.admin-comm-row{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:11px 14px;margin-bottom:7px;display:flex;align-items:center;gap:10px;transition:border-color var(--t-fast)}
 .admin-comm-row:hover{border-color:var(--border-hi)}
 .admin-comm-info{flex:1;min-width:0}
 .admin-comm-lead{font-size:13px;font-weight:500;color:var(--hl);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
