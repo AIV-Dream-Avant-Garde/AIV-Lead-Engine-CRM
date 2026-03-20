@@ -14,7 +14,7 @@
 .nav-item.active{background:var(--acc-m);color:var(--accent);font-weight:500;border-left:2px solid var(--accent);padding-left:8px}
 .nav-item svg{width:15px;height:15px;flex-shrink:0;opacity:.6}
 .nav-item.active svg{opacity:1}
-.nav-item.role-hidden{display:none}
+.nav-item.role-hidden,.role-hidden{display:none}
 .nav-badge{margin-left:auto;background:var(--accent);color:#fff;font-size:10px;font-weight:600;padding:1px 6px;border-radius:10px;font-family:'DM Mono',monospace;min-width:18px;text-align:center}
 .nav-badge.warn{background:var(--amber)}
 
