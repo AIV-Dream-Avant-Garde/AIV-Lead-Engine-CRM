@@ -39,7 +39,7 @@ const SCRIPT_STAGES = {
   pitch:      'Pitch',
   objections: 'Objeciones',
   close:      'Cierre',
-  rebuttals:  'Rebuttals',
+  rebuttals:  'Respuestas rápidas',
 };
 
 // Lead priority scoring weights (tunable)

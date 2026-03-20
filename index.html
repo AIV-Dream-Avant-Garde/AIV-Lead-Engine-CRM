@@ -135,8 +135,8 @@
 
 <!-- SETUP SECTION -->
 <div class="section active" id="sec-setup">
-  <div class="eyebrow">Configuracion</div>
-  <h1 class="section-title">Setup</h1>
+  <div class="eyebrow">Configuración</div>
+  <h1 class="section-title">Configuración</h1>
   <p class="section-sub">La URL del Apps Script es todo lo que necesitas aqui. Todos los API keys viven en el servidor — nunca en el navegador.</p>
   <div class="stats-grid">
     <div class="stat-card"><div class="stat-val blue" id="st-total">0</div><div class="stat-label">Total leads</div></div>
@@ -615,7 +615,7 @@ Content-Type: application/json
       <span>Guiones de llamada</span>
       <button class="btn btn-primary btn-sm" onclick="openScriptModal(null)">+ Agregar guion</button>
     </div>
-    <div style="font-size:11px;color:var(--body);margin-bottom:12px">Los guiones aparecen en el widget de llamada. Organiza por etapa: Apertura, Pitch, Objeciones, Cierre, Rebuttals.</div>
+    <div style="font-size:11px;color:var(--body);margin-bottom:12px">Los guiones aparecen en el widget de llamada. Organiza por etapa: Apertura, Pitch, Objeciones, Cierre, Respuestas rápidas.</div>
     <div id="admin-scripts-list"><div class="notes-empty">Sin guiones configurados.</div></div>
   </div>
 </div>
@@ -711,6 +711,7 @@ Content-Type: application/json
       <button class="modal-close" onclick="closeModal()">×</button>
     </div>
     <div class="modal-body">
+      <div id="m-lock-wrap" style="margin-bottom:8px"></div>
       <div class="detail-grid" id="m-details"></div>
       <div id="m-action-btns" style="margin-bottom:4px"></div>
       <div class="divider"></div>
@@ -749,7 +750,7 @@ Content-Type: application/json
       <div class="divider"></div>
       <div class="modal-tab-bar">
         <button class="modal-tab active" id="tab-btn-notes" onclick="switchModalTab('notes')">Notas</button>
-        <button class="modal-tab" id="tab-btn-timeline" onclick="switchModalTab('timeline')">Timeline</button>
+        <button class="modal-tab" id="tab-btn-timeline" onclick="switchModalTab('timeline')">Cronología</button>
       </div>
       <div id="tab-notes">
         <div class="notes-list" id="m-notes"></div>
@@ -858,7 +859,7 @@ Content-Type: application/json
           <option value="pitch" selected>Pitch (puntos de venta)</option>
           <option value="objections">Objeciones y respuestas</option>
           <option value="close">Cierre</option>
-          <option value="rebuttals">Rebuttals (respuestas rapidas)</option>
+          <option value="rebuttals">Respuestas rápidas</option>
         </select>
       </div>
       <div class="field"><label>Guion / Contenido</label><textarea class="script-editor" id="sc-modal-body" rows="8" placeholder="Escribe aqui el guion, puntos clave, o preguntas y respuestas..."></textarea></div>
@@ -901,7 +902,7 @@ Content-Type: application/json
         <button class="cw-stab active" data-tab="pitch"      onclick="cwTab('pitch')">Pitch</button>
         <button class="cw-stab"        data-tab="objections" onclick="cwTab('objections')">Objeciones</button>
         <button class="cw-stab"        data-tab="close"      onclick="cwTab('close')">Cierre</button>
-        <button class="cw-stab"        data-tab="rebuttals"  onclick="cwTab('rebuttals')">Rebuttals</button>
+        <button class="cw-stab"        data-tab="rebuttals"  onclick="cwTab('rebuttals')">Respuestas rápidas</button>
         <button class="cw-stab"        data-tab="opening"    onclick="cwTab('opening')">Apertura</button>
       </div>
       <div class="cw-script-content" id="cw-script-content"></div>
@@ -909,7 +910,7 @@ Content-Type: application/json
     <div class="cw-lead-name" id="cw-lead-name">—</div>
     <div class="cw-phone" id="cw-phone">—</div>
     <div class="cw-controls" id="cw-controls" style="display:none">
-      <button class="cw-btn cw-btn-mute" id="cw-mute-btn" onclick="toggleMute()"><span class="cw-btn-icon">🎙</span><span id="cw-mute-label">Mute</span></button>
+      <button class="cw-btn cw-btn-mute" id="cw-mute-btn" onclick="toggleMute()"><span class="cw-btn-icon">🎙</span><span id="cw-mute-label">Silenciar</span></button>
       <button class="cw-btn cw-btn-hangup" onclick="hangUp()"><span class="cw-btn-icon">📵</span>Colgar</button>
     </div>
   </div>

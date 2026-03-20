@@ -45,7 +45,7 @@ function processCSV(file) {
       if (norm === 'resenas' || norm === 'reviews') autoMap[h] = 'reviews';
     });
 
-    const mapperEl = document.getElementById('csv-mapper');
+    const mapperEl = document.getElementById('csv-mapper-rows');
     if (mapperEl) {
       mapperEl.innerHTML = headers.map(h => {
         const preview = rows[0]?.[h] || '';
@@ -90,7 +90,7 @@ function splitCSV(line) {
 }
 
 function applyMapping(rows) {
-  const selects = document.querySelectorAll('#csv-mapper .mapper-sel');
+  const selects = document.querySelectorAll('#csv-mapper-rows .mapper-sel');
   const mapping = {};
   selects.forEach(sel => { if (sel.value) mapping[sel.dataset.col] = sel.value; });
   return rows.map(r => {

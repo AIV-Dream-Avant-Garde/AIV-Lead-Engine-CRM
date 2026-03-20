@@ -135,7 +135,7 @@ function toggleMute() {
   CALL.muted = !CALL.muted;
   CALL.activeCall.mute(CALL.muted);
   document.getElementById('cw-mute-btn').classList.toggle('active', CALL.muted);
-  document.getElementById('cw-mute-label').textContent = CALL.muted ? 'Unmute' : 'Mute';
+  document.getElementById('cw-mute-label').textContent = CALL.muted ? 'Reanudar' : 'Silenciar';
 }
 
 function onCallEnd() {
@@ -357,7 +357,7 @@ function cwTab(tab) {
     pitch:      S.config.pitchScript      || 'Sin pitch configurado. Ve a Setup → Guion.',
     objections: S.config.objectionsScript || 'Sin objeciones configuradas.',
     close:      S.config.closeScript      || 'Sin guion de cierre configurado.',
-    rebuttals:  'Sin rebuttals configurados. Agrega uno en Admin → Guiones.',
+    rebuttals:  'Sin respuestas rápidas configuradas. Agrega una en Admin → Guiones.',
   };
   el.textContent = fallbacks[tab] || '';
 }
