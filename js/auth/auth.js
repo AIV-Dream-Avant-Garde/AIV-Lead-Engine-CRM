@@ -210,6 +210,11 @@ function applySidebarForRole(role) {
   document.querySelectorAll('.nav-item[data-sec]').forEach(el => {
     el.classList.toggle('role-hidden', !allowed.includes(el.dataset.sec));
   });
+  const toolsLabel = document.getElementById('sb-tools-label');
+  if (toolsLabel) {
+    const hasTools = allowed.some(s => ['setup','scraper','import'].includes(s));
+    toolsLabel.classList.toggle('role-hidden', !hasTools);
+  }
 }
 
 function updateSidebarUser(user) {
