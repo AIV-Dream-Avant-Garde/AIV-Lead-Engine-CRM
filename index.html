@@ -547,7 +547,7 @@ Content-Type: application/json
     <div class="admin-section-title">
       <span>Scrapes programados</span>
     </div>
-    <div style="font-size:11px;color:var(--body);margin-bottom:12px">Configura trabajos para que el scraper corra automaticamente. Luego activa el trigger en Apps Script: <strong>Triggers → runScheduledScrapes → Time-based → Every day 6am</strong></div>
+    <div id="admin-scrape-trigger-status"></div>
     <div class="form-grid" style="margin-bottom:12px">
       <div class="field"><label>Keyword (negocio)</label><input type="text" id="sj-keyword" placeholder="restaurante, salon de belleza..."></div>
       <div class="field"><label>Ciudad</label><input type="text" id="sj-city" placeholder="Medellín"></div>
@@ -579,6 +579,15 @@ Content-Type: application/json
     </div>
     <button class="btn btn-primary" style="font-size:12px;padding:5px 14px;margin-bottom:12px" onclick="addSmsTemplate()">+ Agregar plantilla</button>
     <div id="admin-sms-list"><div class="notes-empty">Sin plantillas SMS.</div></div>
+  </div>
+
+  <!-- Weekly report trigger -->
+  <div class="admin-section">
+    <div class="admin-section-title">
+      <span>Reporte semanal</span>
+    </div>
+    <div style="font-size:11px;color:var(--body);margin-bottom:12px">Activa el envio automatico del reporte semanal cada lunes a las 8am. Configura el correo destinatario en la pagina de Configuracion.</div>
+    <div id="admin-report-trigger"></div>
   </div>
 
   <!-- Script manager -->

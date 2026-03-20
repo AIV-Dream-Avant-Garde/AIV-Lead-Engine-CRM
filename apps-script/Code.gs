@@ -57,6 +57,13 @@ function doGet(e) {
       return ok({leads,calls,team,commissions:comms,scripts,serverTime:new Date().toISOString()});
     }
     if (a === 'getToken') return ok({token:createToken(e.parameter.identity||'agent')});
+    if (a === 'checkTriggers') {
+      const triggers = ScriptApp.getProjectTriggers();
+      return ok({
+        scrapeTrigger: triggers.some(t => t.getHandlerFunction() === 'runScheduledScrapes'),
+        reportTrigger: triggers.some(t => t.getHandlerFunction() === 'sendWeeklyReport'),
+      });
+    }
     if (a === 'twiml') {
       const xml = ContentService.createTextOutput(
         '<?xml version="1.0"?><Response><Dial callerId="'+TWILIO_FROM_NUMBER+'" record="record-from-answer" recordingStatusCallback="'+ScriptApp.getService().getUrl()+'?action=rec_hook"><Number>'+(e.parameter.To||'')+'</Number></Dial></Response>'
@@ -235,6 +242,21 @@ function doPost(e) {
         Utilities.sleep(2000);
       }
       return ok({leads});
+    }
+    if (a === 'setTrigger') {
+      const fn = b.fn;
+      if (fn !== 'runScheduledScrapes' && fn !== 'sendWeeklyReport') return err_('Invalid fn');
+      ScriptApp.getProjectTriggers()
+        .filter(t => t.getHandlerFunction() === fn)
+        .forEach(t => ScriptApp.deleteTrigger(t));
+      if (b.enabled) {
+        if (fn === 'runScheduledScrapes') {
+          ScriptApp.newTrigger(fn).timeBased().everyDays(1).atHour(6).inTimezone('America/Bogota').create();
+        } else if (fn === 'sendWeeklyReport') {
+          ScriptApp.newTrigger(fn).timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(8).inTimezone('America/Bogota').create();
+        }
+      }
+      return ok({set: b.enabled, fn});
     }
     if (a === 'inbound') {
       const s=getSheet(SHEETS.leads,LEAD_HDR),rows=s.getDataRange().getValues();

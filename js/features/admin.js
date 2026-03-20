@@ -267,8 +267,66 @@ function deleteSmsTemplate(idx) {
   renderSmsTemplates();
 }
 
+// ── GAS trigger control ────────────────────────────────────
+async function checkTriggerStatus() {
+  if (!S.config.scriptUrl) return;
+  const res = await sheetsCall({action:'checkTriggers'});
+  if (res?.success) {
+    S.triggerStatus = { scrape: !!res.scrapeTrigger, report: !!res.reportTrigger };
+    renderScheduledJobs();
+    renderReportTrigger();
+  }
+}
+
+async function setTrigger(fn, enabled) {
+  if (!S.config.scriptUrl) { alert('Configura el Apps Script URL primero.'); return; }
+  const res = await sheetsCall({action:'setTrigger', fn, enabled});
+  if (res?.success) {
+    if (fn === 'runScheduledScrapes') S.triggerStatus.scrape = enabled;
+    if (fn === 'sendWeeklyReport')    S.triggerStatus.report = enabled;
+    renderScheduledJobs();
+    renderReportTrigger();
+  } else {
+    alert('Error al actualizar el trigger. Verifica que el script esté desplegado con los permisos correctos.');
+  }
+}
+
+function renderReportTrigger() {
+  const wrap = document.getElementById('admin-report-trigger');
+  if (!wrap) return;
+  const active = S.triggerStatus?.report;
+  wrap.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:13px;color:var(--body)">Trigger automático (lunes 8am):</span>
+      <span style="font-size:13px;font-weight:600;color:${active?'var(--green)':'var(--body)'}">
+        ${active ? '● Activo' : '○ Inactivo'}
+      </span>
+      <button class="btn ${active?'btn-danger':'btn-success'}" style="font-size:11px;padding:4px 10px"
+        onclick="setTrigger('sendWeeklyReport',${!active})">
+        ${active ? 'Desactivar' : 'Activar'}
+      </button>
+    </div>`;
+}
+
 // ── Scheduled scraper jobs ─────────────────────────────────
 function renderScheduledJobs() {
+  // Update trigger status toggle
+  const triggerWrap = document.getElementById('admin-scrape-trigger-status');
+  if (triggerWrap) {
+    const active = S.triggerStatus?.scrape;
+    triggerWrap.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+        <span style="font-size:13px;color:var(--body)">Trigger automático (diario 6am):</span>
+        <span style="font-size:13px;font-weight:600;color:${active?'var(--green)':'var(--body)'}">
+          ${active ? '● Activo' : '○ Inactivo'}
+        </span>
+        <button class="btn ${active?'btn-danger':'btn-success'}" style="font-size:11px;padding:4px 10px"
+          onclick="setTrigger('runScheduledScrapes',${!active})">
+          ${active ? 'Desactivar' : 'Activar'}
+        </button>
+      </div>`;
+  }
+
   const wrap = document.getElementById('admin-jobs-list');
   if (!wrap) return;
   const jobs = S.scheduledJobs || [];
@@ -568,5 +626,7 @@ function renderAdmin() {
   updateAdminBadge();
   renderScripts();
   renderScheduledJobs();
+  renderReportTrigger();
   renderSmsTemplates();
+  checkTriggerStatus(); // async — re-renders trigger rows when response arrives
 }

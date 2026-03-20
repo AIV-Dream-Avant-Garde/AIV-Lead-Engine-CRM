@@ -31,6 +31,7 @@ const S = {
   dialerQueue:     [],     // Ordered lead IDs for the current dialer session
   scheduledJobs:   [],     // Scheduled scrape jobs (synced to GAS Config sheet)
   smsTemplates:    [],     // SMS/WhatsApp message templates (stored in localStorage)
+  triggerStatus:   { scrape: false, report: false }, // GAS time-trigger state
 };
 
 // Active call state — property names must match all reads/writes in calls.js

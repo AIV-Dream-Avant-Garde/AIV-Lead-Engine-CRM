@@ -27,7 +27,7 @@ const MAX_FAIL_ATTEMPTS  = 5;
 const LOCKOUT_MS         = 15 * 60 * 1000;      // 15 min lockout
 const LS_LIMIT           = 5 * 1024 * 1024;     // ~5 MB localStorage budget
 
-const GET_ACTIONS = new Set(['ping','pull','getToken','twiml']);
+const GET_ACTIONS = new Set(['ping','pull','getToken','twiml','checkTriggers']);
 
 // Fields from scraped/imported lead data used for CSV mapping
 const CRM_FIELDS      = ['name','phone','address','website','rating','reviews','calendarEventId'];
