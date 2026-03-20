@@ -25,3 +25,21 @@ _(none)_
 
 ## Review Template
 > Add after each task: what worked, what didn't, staff-engineer verdict.
+
+### [2026-03-19] Full codebase audit — all 26 files
+- [x] Audit JS completeness vs original HTML (3 parallel subagents)
+- [x] Audit CSS completeness and organization (4 files)
+- [x] Audit index.html structure fidelity and onclick handler resolution
+- [x] Audit Code.gs accuracy and HTML entity decoding
+- [x] Fix CALL state object in js/core/state.js (wrong property names + missing properties)
+- [x] Add failCount + lockoutUntil to S object in state.js
+- [x] Commit and push fix
+
+**Findings:**
+- CSS: PASS — all 484 lines extracted, zero missing rules, all 22 CSS vars defined
+- JS functions: PASS — every function from original present
+- JS logic: PASS — syncNow, saveLead, renderTable, startSession, confirmImport all equivalent or improved
+- index.html: PASS — all elements, ids, onclick handlers verified; script load order correct
+- Security: PASS — esc() consistent, SHA-256 PINs, CSRF token, no eval()
+- Code.gs: PASS — all functions, TEAM_HDR/COMM_HDR added, scoping bug fixed
+- **BUG FIXED**: CALL object had 4 wrong property names (conn/leadId/startTime/consentGiven) and 5 missing properties (activeCall/muted/callSid/outcome/incomingCall); curLeadId also missing

@@ -24,14 +24,20 @@ const S = {
   lastSyncTimestamp:   null,
   scrapeHistory:   [],
   auditLog:        [],
+  failCount:       0,      // PIN login failure counter; reset on success
+  lockoutUntil:    null,   // Date ISO string; set after MAX_FAIL_ATTEMPTS exceeded
 };
 
-// Active call state
+// Active call state — property names must match all reads/writes in calls.js
 const CALL = {
-  device:    null,
-  conn:      null,
-  leadId:    null,
-  startTime: null,
-  timer:     null,
-  consentGiven: false,
+  device:           null,   // initTwilio → CALL.device.register()
+  activeCall:       null,   // confirmConsentAndCall, hangUp, toggleMute, answerIncoming
+  curLeadId:        null,   // makeCall, saveCallLog, onCallEnd, answerIncoming
+  seconds:          0,      // timer increment; must be 0 (not null) for fmtSec()
+  timer:            null,   // setInterval handle; cleared in onCallEnd + answerIncoming
+  muted:            false,  // toggleMute
+  callSid:          null,   // set from 'accept' event CallSid; saved in saveCallLog
+  outcome:          null,   // set by setOutcome(); required before saveCallLog
+  consentConfirmed: false,  // set in confirmConsentAndCall; saved in saveCallLog
+  incomingCall:     null,   // set in initTwilio 'incoming' handler; used in answerIncoming/rejectIncoming
 };
