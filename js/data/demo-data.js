@@ -82,5 +82,7 @@ const DEMO_DATA = (() => {
     {id:'dcomm-04',leadId:'dl-18',leadName:'Hotel Gran Reserva Cartagena',dealValue:-8500000,collectedAmount:0,providerId:'demo-prov-1',providerName:'Juan García Restrepo',providerAmount:-255000,closerId:'demo-solo-1',closerName:'Carlos Restrepo H.',closerAmount:-1275000,status:'clawback',createdAt:ts(5),paidAt:'',paidBy:'',paymentRef:'',refundReason:'Cliente canceló servicio — cambio de administración hotelera',adjustedBy:'Admin',adjustedAt:ts(5)},
   ];
 
+  // All demo leads are Colombian — stamp country so demo mode matches the migrated real-data shape
+  leads.forEach(l => { if (!l.country) l.country = 'Colombia'; });
   return {leads, team, calls, commissions};
 })();

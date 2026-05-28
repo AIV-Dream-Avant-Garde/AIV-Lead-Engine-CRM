@@ -1,6 +1,7 @@
-/* ── DATA: Colombian city/barrio locations with GPS coords ── */
+/* ── DATA: Country → city → barrio locations with GPS coords ── */
 
 const LOCATIONS = {
+ 'Colombia': {
   'Medellín':{type:'comunas',data:{
     'C1 – Popular':{lat:6.2980,lng:-75.5610,b:['Popular','Granizal','Villa Guadalupe','Carpinelo','La Avanzada','El Compromiso','Bello Oriente','La Esperanza N°2','San Pablo','Aldea Pablo VI','Nuevo Horizonte','Moscú N°1','Moscú N°2','La Isla','Golondrinas','El Jardín N°2']},
     'C2 – Santa Cruz':{lat:6.2840,lng:-75.5580,b:['Santa Cruz','La Francia','Villa del Socorro','Villa Niza','Palermo','La Rosa','Andalucía','El Playón de los Comuneros','La Isla','Moscú N°1','Oriente']},
@@ -74,4 +75,11 @@ const LOCATIONS = {
   'Neiva':{type:'flat',lat:2.9273,lng:-75.2819,b:['El Centro','Comuneros','Miraflores','Altico','La Gaitana','Santa Rita','El Recreo','La Playa','Timanco','Las Vegas','Cándido','Los Mártires','Surcolombiana','La Libertad','San Rodrigo']},
   'Montería':{type:'flat',lat:8.7575,lng:-75.8851,b:['El Centro','Boston','La Granja','La Castellana','El Recreo','Los Laureles','Los Andes','El Dorado','La Ceiba','Villa Cielo','Las Américas','Mocarí','P5','Urbina','La Coquera']},
   'Medellín (todo)':{type:'flat',lat:6.2442,lng:-75.5812,b:['Área Metropolitana completa']},
+ },
+ 'Estados Unidos': {
+  'Miami':{type:'flat',lat:25.7617,lng:-80.1918,b:['Downtown','Brickell','Wynwood','Little Havana','Coral Gables','Coconut Grove','Doral','Hialeah','Kendall','Miami Beach','South Beach','Edgewater','Allapattah','Liberty City','Overtown','Little Haiti','Design District','Midtown','Flagami','Westchester','Sweetwater','Aventura','North Miami','Homestead','Cutler Bay','Pinecrest']},
+  'Orlando':{type:'flat',lat:28.5383,lng:-81.3792,b:['Downtown','Lake Nona','Winter Park','Baldwin Park','College Park','Thornton Park','Dr. Phillips','Mills 50','Audubon Park','Lake Eola Heights','Conway','Azalea Park','Pine Hills','MetroWest','Hunters Creek','Lake Buena Vista','Kissimmee','Altamonte Springs','Apopka','Sanford']},
+  'Tampa':{type:'flat',lat:27.9506,lng:-82.4572,b:['Downtown','Ybor City','Hyde Park','Channelside','Westshore','South Tampa','Seminole Heights','Davis Islands','Bayshore','SoHo','Tampa Heights','Palma Ceia','Carrollwood','Town N Country','Brandon','Riverview','Temple Terrace','New Tampa','Wesley Chapel','Clearwater','St. Petersburg']},
+  'Jacksonville':{type:'flat',lat:30.3322,lng:-81.6557,b:['Downtown','Riverside','Avondale','San Marco','Springfield','Mandarin','Southside','Arlington','Murray Hill','Ortega','Baymeadows','Jacksonville Beach','Atlantic Beach','Neptune Beach','Brooklyn','Northside','Westside','Mayport','Fort Caroline','Argyle Forest']},
+ },
 };

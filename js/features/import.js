@@ -102,6 +102,7 @@ function applyMapping(rows) {
 
 async function confirmImport() {
   if (!S.pendingImport) return;
+  const country   = document.getElementById('imp-country')?.value || DEFAULT_COUNTRY;
   const city      = document.getElementById('imp-city')?.value    || '';
   const bv        = document.getElementById('imp-barrio')?.value  || '';
   const barrio    = bv.split('|')[0];
@@ -122,7 +123,7 @@ async function confirmImport() {
       id:uid(), name:r.name||'Sin nombre', phone:r.phone||'N/A',
       address:r.address||'N/A', website:r.website||'N/A',
       rating:r.rating||'N/A', reviews:r.reviews||'N/A',
-      city, barrio, keyword:kw, source, sourceDetail:srcDetail,
+      country, city, barrio, keyword:kw, source, sourceDetail:srcDetail,
       status:'Nuevo', providerId, providerRate,
       closerId:'', closerRate:0, dealValue:'',
       providerCommission:'', closerCommission:'', commissionStatus:'',

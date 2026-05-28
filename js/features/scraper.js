@@ -15,17 +15,26 @@ function barrioCoords(base, name) {
   };
 }
 
-function fillCities(selId) {
+function fillCountries(selId) {
   const s = document.getElementById(selId);
   if (!s) return;
+  const cur = s.value;
   s.innerHTML = Object.keys(LOCATIONS).map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  if (LOCATIONS[cur]) s.value = cur;
 }
 
-function fillBarrios(selId, city, onch) {
+function fillCities(selId, country) {
   const s = document.getElementById(selId);
   if (!s) return;
-  const loc = LOCATIONS[city];
-  if (!loc) { s.innerHTML = ''; return; }
+  const cities = LOCATIONS[country] ? Object.keys(LOCATIONS[country]) : [];
+  s.innerHTML = cities.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+}
+
+function fillBarrios(selId, country, city, onch) {
+  const s = document.getElementById(selId);
+  if (!s) return;
+  const loc = LOCATIONS[country] && LOCATIONS[country][city];
+  if (!loc) { s.innerHTML = ''; if (onch) s.onchange = onch; return; }
   s.innerHTML = '';
   if (loc.type === 'comunas') {
     Object.entries(loc.data).forEach(([com, d]) => {
@@ -52,18 +61,20 @@ function fillBarrios(selId, city, onch) {
   if (onch) s.onchange = onch;
 }
 
-function fillCats(selId, kwSelId) {
+function fillCats(selId, kwSelId, country) {
   const s = document.getElementById(selId);
   if (!s) return;
-  s.innerHTML = Object.keys(KEYWORDS).map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
-  s.onchange = () => fillKws(kwSelId, s.value);
-  fillKws(kwSelId, s.value);
+  const cats = KEYWORDS[country] ? Object.keys(KEYWORDS[country]) : [];
+  s.innerHTML = cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  s.onchange = () => fillKws(kwSelId, country, s.value);
+  fillKws(kwSelId, country, s.value);
 }
 
-function fillKws(selId, cat) {
+function fillKws(selId, country, cat) {
   const s = document.getElementById(selId);
   if (!s) return;
-  s.innerHTML = (KEYWORDS[cat] || []).map(k => `<option value="${esc(k)}">${esc(k)}</option>`).join('');
+  const list = (KEYWORDS[country] && KEYWORDS[country][cat]) || [];
+  s.innerHTML = list.map(k => `<option value="${esc(k)}">${esc(k)}</option>`).join('');
 }
 
 function fillSources(selId) {
@@ -81,10 +92,46 @@ function updateGPS() {
   }
 }
 
-function onCityChange()    { fillBarrios('sc-barrio',  document.getElementById('sc-city')?.value  || '', updateGPS); updateGPS(); }
-function onCatChange()     { fillKws('sc-kw',          document.getElementById('sc-cat')?.value   || ''); }
-function onImpCityChange() { fillBarrios('imp-barrio', document.getElementById('imp-city')?.value || '', null); }
-function onImpCatChange()  { fillKws('imp-kw',         document.getElementById('imp-cat')?.value  || ''); }
+// Scraper cascade: country → city → barrio, and country → category → keyword
+function onCountryChange() {
+  const country = document.getElementById('sc-country')?.value || DEFAULT_COUNTRY;
+  fillCities('sc-city', country);
+  onCityChange();
+  fillCats('sc-cat', 'sc-kw', country);
+}
+function onCityChange() {
+  const country = document.getElementById('sc-country')?.value || DEFAULT_COUNTRY;
+  fillBarrios('sc-barrio', country, document.getElementById('sc-city')?.value || '', updateGPS);
+  updateGPS();
+}
+function onCatChange() {
+  const country = document.getElementById('sc-country')?.value || DEFAULT_COUNTRY;
+  fillKws('sc-kw', country, document.getElementById('sc-cat')?.value || '');
+}
+
+// Import cascade (mirror of the scraper cascade)
+function onImpCountryChange() {
+  const country = document.getElementById('imp-country')?.value || DEFAULT_COUNTRY;
+  fillCities('imp-city', country);
+  onImpCityChange();
+  fillCats('imp-cat', 'imp-kw', country);
+}
+function onImpCityChange() {
+  const country = document.getElementById('imp-country')?.value || DEFAULT_COUNTRY;
+  fillBarrios('imp-barrio', country, document.getElementById('imp-city')?.value || '', null);
+}
+function onImpCatChange() {
+  const country = document.getElementById('imp-country')?.value || DEFAULT_COUNTRY;
+  fillKws('imp-kw', country, document.getElementById('imp-cat')?.value || '');
+}
+
+// Scheduled-jobs cascade (admin)
+function onSjCountryChange() {
+  const country = document.getElementById('sj-country')?.value || DEFAULT_COUNTRY;
+  fillCities('sj-city', country);
+  fillBarrios('sj-barrio', country, document.getElementById('sj-city')?.value || '', null);
+  fillCats('sj-cat', 'sj-keyword', country);
+}
 
 // ── Scraper ────────────────────────────────────────────────
 let scraperRunning = false;
@@ -92,6 +139,8 @@ let scraperRunning = false;
 async function runScraper() {
   if (scraperRunning) { alert('Hay un scrape en curso.'); return; }
   if (!S.config.scriptUrl) { alert('Configura el Apps Script URL primero.'); return; }
+  const country   = document.getElementById('sc-country')?.value || DEFAULT_COUNTRY;
+  const region    = COUNTRY_REGION[country] || '';
   const city      = document.getElementById('sc-city')?.value   || '';
   const bv        = document.getElementById('sc-barrio')?.value || '';
   const [barrio, lat, lng] = bv.split('|');
@@ -111,7 +160,7 @@ async function runScraper() {
   if (statusEl)   statusEl.textContent = 'Conectando con Apps Script...';
 
   try {
-    const res = await sheetsCall({action:'scrape', keyword:kw, lat, lng, radius, maxResults:max});
+    const res = await sheetsCall({action:'scrape', keyword:kw, lat, lng, radius, maxResults:max, region});
     if (!res || !res.success || !res.leads) {
       if (statusEl) statusEl.textContent = 'Error: ' + (res?.error || 'Sin respuesta');
       scraperRunning = false;
@@ -133,7 +182,7 @@ async function runScraper() {
         const lead = {
           id:uid(), name:r.name||'Sin nombre', phone:r.phone, address:r.address||'N/A',
           website:r.website||'N/A', rating:r.rating||'N/A', reviews:r.reviews||'N/A',
-          city, barrio, keyword:kw, source, sourceDetail:srcDetail,
+          country, city, barrio, keyword:kw, source, sourceDetail:srcDetail,
           status:'Nuevo', dncReason:'', followUpDate:'', notes:[],
           providerId:   isProvider ? sess.userId    : '',
           providerRate: isProvider ? (sess.providerRate || 0) : 0,
@@ -170,7 +219,7 @@ async function runScraper() {
 
     // Persist scrape history (max 50 entries)
     if (!Array.isArray(S.scrapeHistory)) S.scrapeHistory = [];
-    S.scrapeHistory.unshift({date:new Date().toISOString(), city, barrio, keyword:kw, found:res.leads.length, added});
+    S.scrapeHistory.unshift({date:new Date().toISOString(), country, city, barrio, keyword:kw, found:res.leads.length, added});
     if (S.scrapeHistory.length > 50) S.scrapeHistory = S.scrapeHistory.slice(0,50);
     try { localStorage.setItem('aiv-scrape-history', JSON.stringify(S.scrapeHistory)); } catch(e) {}
     renderScrapeHistory();
@@ -200,7 +249,7 @@ function renderScrapeHistory() {
   el.innerHTML = S.scrapeHistory.map(h =>
     `<div class="scrape-log-item">
       <span class="scrape-log-date">${fmtD(h.date)} ${fmtT(h.date)}</span>
-      <span class="scrape-log-info">${esc(h.city)} · ${esc(h.barrio)} · ${esc(h.keyword)}</span>
+      <span class="scrape-log-info">${esc([h.country, h.city, h.barrio, h.keyword].filter(Boolean).join(' · '))}</span>
       <span class="scrape-log-count">+${h.added}/${h.found}</span>
     </div>`
   ).join('');

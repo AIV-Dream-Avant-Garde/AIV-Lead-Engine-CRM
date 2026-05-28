@@ -15,7 +15,7 @@ const SHEETS = { leads:'Leads', calls:'Llamadas', team:'Team', commissions:'Comm
 // CSRF protection — paste the value from your browser's Setup page
 const CRM_SECRET = 'PASTE_YOUR_CRM_SECRET_HERE'; // Setup → shows after first load
 
-const LEAD_HDR = ['id','name','phone','address','website','rating','reviews','city','barrio','keyword','source','sourceDetail','status','providerId','providerRate','closerId','closerRate','dealValue','collectedAmount','providerCommission','closerCommission','commissionStatus','lockedBy','lockedUntil','assignedAt','workHistory','dncReason','followUpDate','notes','importedAt','updatedAt','calendarEventId','refundAmount','refundReason','refundedAt'];
+const LEAD_HDR = ['id','name','phone','address','website','rating','reviews','city','barrio','keyword','source','sourceDetail','status','providerId','providerRate','closerId','closerRate','dealValue','collectedAmount','providerCommission','closerCommission','commissionStatus','lockedBy','lockedUntil','assignedAt','workHistory','dncReason','followUpDate','notes','importedAt','updatedAt','calendarEventId','refundAmount','refundReason','refundedAt','country'];
 const CALL_HDR = ['id','leadId','leadName','phone','callSid','outcome','duration','notes','recordingUrl','driveUrl','consentConfirmed','calledAt'];
 const TEAM_HDR = ['id','name','role','pinHash','providerRate','closerRate','contact','active','createdAt'];
 const COMM_HDR   = ['id','leadId','leadName','dealValue','collectedAmount','providerId','providerRate','providerAmount','closerId','closerRate','closerAmount','status','createdAt','paidAt','paidBy','paymentRef','refundReason','adjustedBy','adjustedAt'];
@@ -277,10 +277,11 @@ function doPost(e) {
       return ok({ok:true});
     }
     if (a === 'scrape') {
-      const {keyword,lat,lng,radius,maxResults} = b;
+      const {keyword,lat,lng,radius,maxResults,region} = b;
       const url='https://places.googleapis.com/v1/places:searchText';
       const hdr={'Content-Type':'application/json','X-Goog-Api-Key':PLACES_API_KEY,'X-Goog-FieldMask':'places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount,nextPageToken'};
       let body={textQuery:keyword,locationBias:{circle:{center:{latitude:parseFloat(lat),longitude:parseFloat(lng)},radius:parseFloat(radius)}},maxResultCount:20};
+      if(region)body.regionCode=region;
       const MAX_API_CALLS = 15; // Guard against quota exhaustion
       let leads=[],token=null,tries=0,apiCalls=0;
       while(leads.length<(maxResults||100)&&tries<10&&apiCalls<MAX_API_CALLS){
@@ -324,7 +325,7 @@ function doPost(e) {
         name:b.name||'Sin nombre',phone,
         address:b.address||'N/A',website:b.website||'N/A',
         rating:'N/A',reviews:'N/A',
-        city:b.city||'',barrio:b.barrio||'',keyword:b.keyword||'',
+        country:b.country||'',city:b.city||'',barrio:b.barrio||'',keyword:b.keyword||'',
         source:b.source||'Inbound',sourceDetail:b.sourceDetail||'',
         status:b.status||'Nuevo',dncReason:'',followUpDate:'',
         notes:JSON.stringify([]),
@@ -468,7 +469,7 @@ function runScheduledScrapes() {
     while (leads.length < max && tries < 10) {
       const body = token
         ? {textQuery:job.keyword, pageToken:token}
-        : {textQuery:job.keyword, locationBias:{circle:{center:{latitude:parseFloat(job.lat),longitude:parseFloat(job.lng)},radius:parseFloat(job.radius||1000)}},maxResultCount:20};
+        : {textQuery:job.keyword, locationBias:{circle:{center:{latitude:parseFloat(job.lat),longitude:parseFloat(job.lng)},radius:parseFloat(job.radius||1000)}},maxResultCount:20, ...(job.region?{regionCode:job.region}:{})};
       const r = UrlFetchApp.fetch(url,{method:'post',headers:hdr,payload:JSON.stringify(body),muteHttpExceptions:true});
       const d = JSON.parse(r.getContentText());
       (d.places||[]).forEach(p => {
@@ -487,7 +488,7 @@ function runScheduledScrapes() {
       if (phone && phone !== 'N/A' && !existing.has(phone)) {
         const lead = {
           id:Utilities.getUuid(), name:l.name, phone, address:l.address, website:l.website,
-          rating:l.rating, reviews:l.reviews, city:job.city||'', barrio:job.barrio||'',
+          rating:l.rating, reviews:l.reviews, country:job.country||'', city:job.city||'', barrio:job.barrio||'',
           keyword:job.keyword, source:job.source||'Scraper (auto)', sourceDetail:'',
           status:'Nuevo', dncReason:'', followUpDate:'', notes:JSON.stringify([]),
           providerId:'', providerRate:0, closerId:'', closerRate:0,

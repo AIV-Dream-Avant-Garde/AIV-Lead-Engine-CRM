@@ -67,10 +67,11 @@ async function syncNow() {
     // Merge incoming leads
     const sm = {};
     (res.leads || []).forEach(l => { if (l.id) sm[l.id] = l; });
-    S.leads.forEach(l => { if (sm[l.id]) { Object.assign(l, sm[l.id]); l._synced = true; } });
+    S.leads.forEach(l => { if (sm[l.id]) { Object.assign(l, sm[l.id]); l.country = l.country || DEFAULT_COUNTRY; l._synced = true; } });
     (res.leads || []).forEach(l => {
       if (l.id && !S.leads.find(x => x.id === l.id)) {
         S.leads.push({...l, _synced:true,
+          country:     l.country || DEFAULT_COUNTRY,
           notes:       Array.isArray(l.notes)       ? l.notes       : [],
           workHistory: Array.isArray(l.workHistory) ? l.workHistory : [],
         });

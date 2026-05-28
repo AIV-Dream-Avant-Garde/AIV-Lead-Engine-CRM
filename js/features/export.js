@@ -19,7 +19,7 @@ function getExportLeads() {
 function previewExport() {
   const leads = getExportLeads();
   if (!leads.length) { toast('Sin leads con estos filtros.', 'error'); return; }
-  const hdrs  = ['name','phone','address','website','rating','city','barrio','keyword','source','sourceDetail','status','followUpDate'];
+  const hdrs  = ['name','phone','address','website','rating','country','city','barrio','keyword','source','sourceDetail','status','followUpDate'];
   const lines = [
     hdrs.join(','),
     ...leads.slice(0,5).map(l => hdrs.map(h => `"${(l[h]||'').toString().replace(/"/g,'""')}"`).join(',')),
@@ -34,7 +34,7 @@ function previewExport() {
 
 function doExport() {
   const leads = getExportLeads();
-  const hdrs  = ['name','phone','address','website','rating','reviews','city','barrio','keyword',
+  const hdrs  = ['name','phone','address','website','rating','reviews','country','city','barrio','keyword',
                   'source','sourceDetail','status','dncReason','followUpDate','importedAt','updatedAt',
                   'dealValue','collectedAmount','closerCommission','commissionStatus',
                   'closerName','callCount',

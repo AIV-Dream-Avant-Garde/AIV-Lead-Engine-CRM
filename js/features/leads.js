@@ -70,6 +70,7 @@ function highlight(text, q) {
 // ── Filter / sort ──────────────────────────────────────────
 function getFiltered() {
   const q    = (document.getElementById('tbl-q')?.value    || '').toLowerCase();
+  const fco  = document.getElementById('f-country')?.value || '';
   const fc   = document.getElementById('f-city')?.value    || '';
   const fb   = document.getElementById('f-barrio')?.value  || '';
   const fsrc = document.getElementById('f-source')?.value  || '';
@@ -77,6 +78,7 @@ function getFiltered() {
   const ff   = document.getElementById('f-followup')?.value || '';
   const fm   = document.getElementById('f-mine')?.value    || '';
   return S.leads.filter(l => {
+    if (fco  && l.country !== fco)                         return false;
     if (fc   && l.city   !== fc)                           return false;
     if (fb   && l.barrio !== fb)                           return false;
     if (fsrc && !l.source?.startsWith(fsrc))               return false;
@@ -88,7 +90,7 @@ function getFiltered() {
     if (ff === 'overdue' && !isOverdue(l))   return false;
     if (ff === 'today'   && !isTodayFU(l))   return false;
     if (ff === 'has'     && !l.followUpDate) return false;
-    if (q && !`${l.name} ${l.phone} ${l.address} ${l.barrio} ${l.keyword} ${l.source} ${l.sourceDetail}`.toLowerCase().includes(q)) return false;
+    if (q && !`${l.name} ${l.phone} ${l.address} ${l.country} ${l.city} ${l.barrio} ${l.keyword} ${l.source} ${l.sourceDetail}`.toLowerCase().includes(q)) return false;
     return true;
   });
 }
@@ -140,7 +142,7 @@ function renderTable() {
     renderPagination(total, pages);
   }
 
-  const hasFilters = ['f-city','f-barrio','f-source','f-status','f-followup','f-mine'].some(id => {
+  const hasFilters = ['f-country','f-city','f-barrio','f-source','f-status','f-followup','f-mine'].some(id => {
     const el = document.getElementById(id); return el && el.value;
   });
 
@@ -214,9 +216,17 @@ function renderPagination(total, pages) {
 
 function goPage(p)    { S.page = p; renderTable(); }
 function clearFilters() {
-  ['tbl-q','f-city','f-barrio','f-source','f-status','f-followup'].forEach(id => {
+  ['tbl-q','f-country','f-city','f-barrio','f-source','f-status','f-followup'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
+  populateFilters();   // restore the full (un-narrowed) city list
+  renderTable();
+}
+
+// Country filter cascade: narrow the city dropdown to the selected country, then re-render
+function onFilterCountryChange() {
+  const fc = document.getElementById('f-city'); if (fc) fc.value = '';
+  populateFilters();
   renderTable();
 }
 function rowClick(e, id) { if (!e.target.matches('input')) openLead(id); }
@@ -316,7 +326,7 @@ function openLead(id) {
     titleEl.title           = 'Click para editar';
   }
   document.getElementById('m-meta').textContent =
-    (l.city || '') + (l.barrio ? ' · ' + l.barrio : '') + (l.keyword ? ' · ' + l.keyword : '');
+    [l.country, l.city, l.barrio, l.keyword].filter(Boolean).join(' · ');
   document.getElementById('m-status').value    = l.status     || 'Nuevo';
   document.getElementById('m-followup').value  = l.followUpDate || '';
 

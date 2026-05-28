@@ -2,9 +2,10 @@
 
 // ── Filter / badge helpers shared across sections ──────────
 function populateFilters() {
-  const cities  = [...new Set(S.leads.map(l => l.city).filter(Boolean))].sort();
-  const barrios = [...new Set(S.leads.map(l => l.barrio).filter(Boolean))].sort();
-  const sources = [...new Set(S.leads.map(l => l.source ? l.source.split(' · ')[0] : '').filter(Boolean))].sort();
+  const cities    = [...new Set(S.leads.map(l => l.city).filter(Boolean))].sort();
+  const barrios   = [...new Set(S.leads.map(l => l.barrio).filter(Boolean))].sort();
+  const sources   = [...new Set(S.leads.map(l => l.source ? l.source.split(' · ')[0] : '').filter(Boolean))].sort();
+  const countries = [...new Set(S.leads.map(l => l.country).filter(Boolean))].sort();
 
   const fillSel = (id, vals, def) => {
     const s = document.getElementById(id);
@@ -14,7 +15,14 @@ function populateFilters() {
     if (vals.includes(cur)) s.value = cur;
   };
 
-  fillSel('f-city',    cities,  'Todas las ciudades');
+  // Leads table: country filter + city list narrowed to the selected country
+  fillSel('f-country', countries, 'Todos los países');
+  const fcountry = document.getElementById('f-country')?.value || '';
+  const fCities  = fcountry
+    ? [...new Set(S.leads.filter(l => l.country === fcountry).map(l => l.city).filter(Boolean))].sort()
+    : cities;
+  fillSel('f-city',    fCities, 'Todas las ciudades');
+
   fillSel('f-barrio',  barrios, 'Todos los barrios');
   fillSel('f-source',  sources, 'Todas las fuentes');
   fillSel('kb-city',   cities,  'Todas las ciudades');
@@ -84,11 +92,11 @@ function navigate(id) {
     renderAdmin();
   }
   if (id === 'scraper') {
-    fillCities('sc-city'); onCityChange(); fillCats('sc-cat','sc-kw'); fillSources('sc-source');
+    fillCountries('sc-country'); onCountryChange(); fillSources('sc-source');
     renderScrapeHistory();
   }
   if (id === 'import') {
-    fillCities('imp-city'); onImpCityChange(); fillCats('imp-cat','imp-kw'); fillSources('imp-source');
+    fillCountries('imp-country'); onImpCountryChange(); fillSources('imp-source');
   }
   if (id === 'setup') {
     setTimeout(() => {

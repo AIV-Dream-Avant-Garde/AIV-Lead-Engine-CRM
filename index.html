@@ -247,6 +247,7 @@ Content-Type: application/json
   <p class="section-sub">El scraper corre en el servidor — la API key nunca toca el navegador. Selecciona ciudad, barrio y tipo de negocio.</p>
   <div class="card hl">
     <div class="form-grid">
+      <div class="field"><label>País</label><select id="sc-country" onchange="onCountryChange()"></select></div>
       <div class="field"><label>Ciudad</label><select id="sc-city" onchange="onCityChange()"></select></div>
       <div class="field"><label>Barrio / Sector</label><select id="sc-barrio" onchange="updateGPS()"></select></div>
       <div class="field"><label>Categoria</label><select id="sc-cat" onchange="onCatChange()"></select></div>
@@ -314,6 +315,7 @@ Content-Type: application/json
       <div class="card-title" id="imp-summary">—</div>
       <div class="card-sub" style="margin-bottom:14px">Asigna la fuente y el contexto de estos leads antes de importar:</div>
       <div class="form-grid">
+        <div class="field"><label>País</label><select id="imp-country" onchange="onImpCountryChange()"></select></div>
         <div class="field"><label>Ciudad</label><select id="imp-city" onchange="onImpCityChange()"></select></div>
         <div class="field"><label>Barrio</label><select id="imp-barrio"></select></div>
         <div class="field"><label>Categoria</label><select id="imp-cat" onchange="onImpCatChange()"></select></div>
@@ -358,6 +360,7 @@ Content-Type: application/json
   </div>
   <div class="table-toolbar">
     <div class="search-box"><span class="search-icon">⌕</span><input id="tbl-q" type="search" placeholder="Buscar nombre, telefono, fuente, barrio..." aria-label="Buscar leads" oninput="debouncedSearch()"></div>
+    <select class="filter-sel" id="f-country" onchange="onFilterCountryChange()"><option value="">Todos los países</option></select>
     <select class="filter-sel" id="f-city" onchange="renderTable()"><option value="">Todas las ciudades</option></select>
     <select class="filter-sel" id="f-barrio" onchange="renderTable()"><option value="">Todos los barrios</option></select>
     <select class="filter-sel" id="f-source" onchange="renderTable()"><option value="">Todas las fuentes</option></select>
@@ -565,9 +568,10 @@ Content-Type: application/json
     </div>
     <div id="admin-scrape-trigger-status"></div>
     <div class="form-grid" style="margin-bottom:12px">
-      <div class="field"><label>Ciudad</label><select id="sj-city" onchange="fillBarrios('sj-barrio', this.value, null)"></select></div>
+      <div class="field"><label>País</label><select id="sj-country" onchange="onSjCountryChange()"></select></div>
+      <div class="field"><label>Ciudad</label><select id="sj-city" onchange="fillBarrios('sj-barrio', document.getElementById('sj-country').value, this.value, null)"></select></div>
       <div class="field"><label>Barrio / Sector</label><select id="sj-barrio"></select></div>
-      <div class="field"><label>Categoria</label><select id="sj-cat" onchange="fillKws('sj-keyword', this.value)"></select></div>
+      <div class="field"><label>Categoria</label><select id="sj-cat" onchange="fillKws('sj-keyword', document.getElementById('sj-country').value, this.value)"></select></div>
       <div class="field"><label>Keyword (negocio)</label><select id="sj-keyword"></select></div>
       <div class="field"><label>Radio de busqueda</label>
         <select id="sj-radius">
