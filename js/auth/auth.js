@@ -45,8 +45,8 @@ async function tryLogin() {
 
   const hash = await sha256(entered);
 
-  // Admin PIN check
-  if (hash === ADMIN_HASH) {
+  // Admin PIN check — a rotated PIN (S.config.adminHash) overrides the built-in default
+  if (hash === (S.config.adminHash || ADMIN_HASH)) {
     startSession({userId:'admin', userName:'Admin', role:'admin', closerRate:0});
     return;
   }
@@ -55,10 +55,11 @@ async function tryLogin() {
   const member = S.team.find(m => m.pinHash === hash && String(m.active) !== 'false');
   if (member) {
     startSession({
-      userId:     member.id,
-      userName:   member.name,
-      role:       member.role || 'closer',
-      closerRate: parseFloat(member.closerRate || 0),
+      userId:       member.id,
+      userName:     member.name,
+      role:         member.role || 'closer',
+      closerRate:   parseFloat(member.closerRate || 0),
+      providerRate: parseFloat(member.providerRate || 0),
     });
     return;
   }

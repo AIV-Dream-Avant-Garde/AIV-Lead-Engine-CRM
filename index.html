@@ -6,10 +6,10 @@
 <title>AIV — Lead Engine &amp; CRM</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@twilio/voice-sdk@2.9.0/dist/twilio.min.js"></script>
-<link rel="stylesheet" href="css/base.css?v=20260528a">
-<link rel="stylesheet" href="css/layout.css?v=20260528a">
-<link rel="stylesheet" href="css/components.css?v=20260528a">
-<link rel="stylesheet" href="css/widgets.css?v=20260528a">
+<link rel="stylesheet" href="css/base.css?v=20260528b">
+<link rel="stylesheet" href="css/layout.css?v=20260528b">
+<link rel="stylesheet" href="css/components.css?v=20260528b">
+<link rel="stylesheet" href="css/widgets.css?v=20260528b">
 </head>
 <body>
 
@@ -182,6 +182,16 @@
       <div class="card-title" style="font-size:12px">Tu CRM Secret (para el Apps Script)</div>
       <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--accent);margin-top:6px;word-break:break-all;cursor:pointer" id="crm-secret-display" onclick="copyCrmSecret()" title="Click para copiar">—</div>
       <div style="font-size:11px;color:var(--body);margin-top:5px">Copia este valor y pegalo como <code style="background:var(--surface-hi);padding:1px 5px;border-radius:3px">CRM_SECRET</code> en el Apps Script.</div>
+    </div>
+    <div class="card" style="margin-top:12px;border-color:rgba(245,158,11,.25)">
+      <div class="card-title" style="font-size:12px">Cambiar PIN de administrador</div>
+      <div style="font-size:11px;color:var(--body);margin:4px 0 10px">Rota el PIN de admin sin editar el código. Se guarda solo en este navegador.</div>
+      <div class="form-grid">
+        <div class="field"><label>PIN actual</label><input type="password" id="apin-cur" maxlength="4" placeholder="••••"></div>
+        <div class="field"><label>Nuevo PIN (4 dígitos)</label><input type="password" id="apin-new" maxlength="4" placeholder="••••"></div>
+        <div class="field"><label>Confirmar nuevo PIN</label><input type="password" id="apin-new2" maxlength="4" placeholder="••••"></div>
+      </div>
+      <button class="btn btn-primary" style="margin-top:10px" onclick="changeAdminPin()">Actualizar PIN</button>
     </div>
   </div>
   <div class="card">
@@ -794,6 +804,7 @@ Content-Type: application/json
     </div>
     <div id="deal-preview" class="deal-preview">
       <div class="deal-preview-row"><span id="dp-closer-label">Closer (--%):</span><span id="dp-closer-amt">$0</span></div>
+      <div class="deal-preview-row" id="dp-provider-row" style="display:none"><span id="dp-provider-label">Proveedor (--%):</span><span id="dp-provider-amt">$0</span></div>
       <div class="deal-preview-row deal-preview-total"><span>Total comisiones:</span><span id="dp-total">$0</span></div>
     </div>
     <div class="btn-row" style="margin-top:20px">
@@ -826,6 +837,14 @@ Content-Type: application/json
           <option value="20">20%</option><option value="22">22%</option><option value="25">25%</option>
           <option value="28">28%</option><option value="30">30%</option><option value="35">35%</option>
           <option value="40">40%</option>
+        </select>
+      </div>
+      <div class="field"><label>Tasa proveedor (%)</label>
+        <select id="tm-prate">
+          <option value="0" selected>0%</option><option value="2">2%</option><option value="3">3%</option>
+          <option value="4">4%</option><option value="5">5%</option><option value="6">6%</option>
+          <option value="7">7%</option><option value="8">8%</option><option value="10">10%</option>
+          <option value="12">12%</option><option value="15">15%</option>
         </select>
       </div>
     </div>
@@ -932,26 +951,26 @@ Content-Type: application/json
 </div>
 
 <!-- JS: load order matters — data → core → auth → locks → commission → features → main -->
-<script src="js/data/keywords.js?v=20260528a"></script>
-<script src="js/data/locations.js?v=20260528a"></script>
-<script src="js/data/constants.js?v=20260528a"></script>
-<script src="js/data/demo-data.js?v=20260528a"></script>
-<script src="js/core/state.js?v=20260528a"></script>
-<script src="js/core/utils.js?v=20260528a"></script>
-<script src="js/core/storage.js?v=20260528a"></script>
-<script src="js/core/api.js?v=20260528a"></script>
-<script src="js/auth/auth.js?v=20260528a"></script>
-<script src="js/locks.js?v=20260528a"></script>
-<script src="js/commission.js?v=20260528a"></script>
-<script src="js/features/scraper.js?v=20260528a"></script>
-<script src="js/features/import.js?v=20260528a"></script>
-<script src="js/features/leads.js?v=20260528a"></script>
-<script src="js/features/pipeline.js?v=20260528a"></script>
-<script src="js/features/calls.js?v=20260528a"></script>
-<script src="js/features/profile.js?v=20260528a"></script>
-<script src="js/features/admin.js?v=20260528a"></script>
-<script src="js/features/analytics.js?v=20260528a"></script>
-<script src="js/features/export.js?v=20260528a"></script>
-<script src="js/main.js?v=20260528a"></script>
+<script src="js/data/keywords.js?v=20260528b"></script>
+<script src="js/data/locations.js?v=20260528b"></script>
+<script src="js/data/constants.js?v=20260528b"></script>
+<script src="js/data/demo-data.js?v=20260528b"></script>
+<script src="js/core/state.js?v=20260528b"></script>
+<script src="js/core/utils.js?v=20260528b"></script>
+<script src="js/core/storage.js?v=20260528b"></script>
+<script src="js/core/api.js?v=20260528b"></script>
+<script src="js/auth/auth.js?v=20260528b"></script>
+<script src="js/locks.js?v=20260528b"></script>
+<script src="js/commission.js?v=20260528b"></script>
+<script src="js/features/scraper.js?v=20260528b"></script>
+<script src="js/features/import.js?v=20260528b"></script>
+<script src="js/features/leads.js?v=20260528b"></script>
+<script src="js/features/pipeline.js?v=20260528b"></script>
+<script src="js/features/calls.js?v=20260528b"></script>
+<script src="js/features/profile.js?v=20260528b"></script>
+<script src="js/features/admin.js?v=20260528b"></script>
+<script src="js/features/analytics.js?v=20260528b"></script>
+<script src="js/features/export.js?v=20260528b"></script>
+<script src="js/main.js?v=20260528b"></script>
 </body>
 </html>

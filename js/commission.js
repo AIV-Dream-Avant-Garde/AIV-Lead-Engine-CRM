@@ -8,11 +8,15 @@ function fmtCOP(n) {
 }
 
 function calcCommissions(lead, dealValue) {
-  const closer  = S.team.find(m => m.id === lead.closerId);
+  const closer   = S.team.find(m => m.id === lead.closerId);
   const closRate = parseFloat(closer?.closerRate || lead.closerRate || 0);
+  const provider = S.team.find(m => m.id === lead.providerId);
+  const provRate = parseFloat(provider?.providerRate || lead.providerRate || 0);
   return {
-    closerAmount: dealValue * closRate / 100,
+    closerAmount:   dealValue * closRate / 100,
+    providerAmount: dealValue * provRate / 100,
     closRate,
+    provRate,
   };
 }
 
@@ -23,12 +27,25 @@ function updateDealPreview() {
   if (!val || val <= 0) { preview.style.display = 'none'; return; }
   const lead = S.leads.find(l => l.id === S.pendingCerrado);
   if (!lead) return;
-  const {closerAmount, closRate} = calcCommissions(lead, val);
+  const {closerAmount, providerAmount, closRate, provRate} = calcCommissions(lead, val);
   const closerMember = S.team.find(m => m.id === (lead.closerId || S.session?.userId));
   document.getElementById('dp-closer-label').textContent =
     (closerMember ? closerMember.name.split(' ')[0] : 'Closer') + ' (' + closRate + '%):';
   document.getElementById('dp-closer-amt').textContent = fmtCOP(closerAmount);
-  document.getElementById('dp-total').textContent      = fmtCOP(closerAmount);
+
+  const provRow = document.getElementById('dp-provider-row');
+  if (provRow) {
+    if (provRate > 0) {
+      const providerMember = S.team.find(m => m.id === lead.providerId);
+      document.getElementById('dp-provider-label').textContent =
+        (providerMember ? providerMember.name.split(' ')[0] : 'Proveedor') + ' (' + provRate + '%):';
+      document.getElementById('dp-provider-amt').textContent = fmtCOP(providerAmount);
+      provRow.style.display = '';
+    } else {
+      provRow.style.display = 'none';
+    }
+  }
+  document.getElementById('dp-total').textContent = fmtCOP(closerAmount + providerAmount);
   preview.style.display = 'block';
 }
 
@@ -64,9 +81,10 @@ function confirmCerradoWithValue(leadId, dealValue) {
     lead.closerId   = S.session.userId;
     lead.closerRate = S.session.closerRate || 0;
   }
-  const {closerAmount} = calcCommissions(lead, dealValue);
-  lead.dealValue        = dealValue;
-  lead.closerCommission = closerAmount.toFixed(0);
+  const {closerAmount, providerAmount, closRate, provRate} = calcCommissions(lead, dealValue);
+  lead.dealValue          = dealValue;
+  lead.closerCommission   = closerAmount.toFixed(0);
+  lead.providerCommission = providerAmount.toFixed(0);
   lead.commissionStatus   = 'pending';
   lead.status             = 'Cerrado';
   lead.updatedAt          = new Date().toISOString();
@@ -80,16 +98,22 @@ function confirmCerradoWithValue(leadId, dealValue) {
   });
   pushLead(lead);
   const commRec = {
-    id:           uid(),
-    leadId:       lead.id,
-    leadName:     lead.name,
+    id:             uid(),
+    leadId:         lead.id,
+    leadName:       lead.name,
     dealValue,
-    closerId:     lead.closerId,
-    closerName:   S.team.find(m => m.id === lead.closerId)?.name || S.session?.userName || '',
-    closerAmount: lead.closerCommission,
-    status:       'pending',
+    collectedAmount: '',
+    providerId:     lead.providerId || '',
+    providerName:   S.team.find(m => m.id === lead.providerId)?.name || '',
+    providerRate:   provRate,
+    providerAmount: lead.providerCommission,
+    closerId:       lead.closerId,
+    closerName:     S.team.find(m => m.id === lead.closerId)?.name || S.session?.userName || '',
+    closerRate:     closRate,
+    closerAmount:   lead.closerCommission,
+    status:         'pending',
     paidAt:'', paidBy:'', paymentRef:'',
-    createdAt:    lead.updatedAt,
+    createdAt:      lead.updatedAt,
   };
   S.commissions.push(commRec);
   saveLocal();

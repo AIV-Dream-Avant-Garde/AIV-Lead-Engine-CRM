@@ -17,6 +17,26 @@ function auditLog(action, targetId, detail) {
   try { localStorage.setItem('aiv-audit', JSON.stringify(S.auditLog.slice(0,50))); } catch(e) {}
 }
 
+// ── Admin PIN rotation (stored as override hash in S.config) ─
+async function changeAdminPin() {
+  if (S.session?.role !== 'admin') { toast('Solo el administrador puede cambiar el PIN.', 'error'); return; }
+  const cur = document.getElementById('apin-cur')?.value?.trim() || '';
+  const nw  = document.getElementById('apin-new')?.value?.trim() || '';
+  const nw2 = document.getElementById('apin-new2')?.value?.trim() || '';
+  if (!/^\d{4}$/.test(nw))           { toast('El nuevo PIN debe tener exactamente 4 dígitos.', 'error'); return; }
+  if (nw !== nw2)                    { toast('Los PINs nuevos no coinciden.', 'error'); return; }
+  if (nw === '0809')                 { toast('El PIN 0809 está reservado para Demo.', 'error'); return; }
+  const curHash = await sha256(cur);
+  if (curHash !== (S.config.adminHash || ADMIN_HASH)) { toast('El PIN actual es incorrecto.', 'error'); return; }
+  const newHash = await sha256(nw);
+  if (S.team.find(m => m.pinHash === newHash)) { toast('Ese PIN ya lo usa un miembro del equipo.', 'error'); return; }
+  S.config.adminHash = newHash;
+  saveLocal();
+  auditLog('changeAdminPin', 'admin', 'Admin PIN rotado');
+  ['apin-cur','apin-new','apin-new2'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+  toast('PIN de administrador actualizado.', 'success');
+}
+
 // ── Signal banner ──────────────────────────────────────────
 function showSignalBanner() {
   if (!S.session) return;
@@ -87,6 +107,7 @@ function openTeamModal(memberId) {
   document.getElementById('tm-pin').value     = '';
   document.getElementById('tm-pin2').value    = '';
   document.getElementById('tm-crate').value   = '10';
+  if (document.getElementById('tm-prate')) document.getElementById('tm-prate').value = '0';
   document.getElementById('tm-contact').value = '';
   document.getElementById('tm-role').value    = 'closer';
 
@@ -98,6 +119,7 @@ function openTeamModal(memberId) {
       document.getElementById('tm-name').value    = m.name    || '';
       document.getElementById('tm-role').value    = m.role    || 'closer';
       document.getElementById('tm-crate').value   = m.closerRate   || 10;
+      if (document.getElementById('tm-prate')) document.getElementById('tm-prate').value = m.providerRate || 0;
       document.getElementById('tm-contact').value = m.contact || '';
     }
   } else {
@@ -124,6 +146,7 @@ async function saveTeamMember() {
   const pin2       = document.getElementById('tm-pin2').value.trim();
   const contact    = document.getElementById('tm-contact')?.value?.trim() || '';
   const crate      = parseFloat(document.getElementById('tm-crate').value || 0);
+  const prate      = parseFloat(document.getElementById('tm-prate')?.value || 0);
 
   if (!name)                          { toast('El nombre es requerido.', 'error');             return; }
   const isNew = !existingId;
@@ -141,7 +164,7 @@ async function saveTeamMember() {
   }
 
   const id     = existingId || uid();
-  const member = {id, name, role, contact, closerRate:crate, active:true, createdAt:new Date().toISOString()};
+  const member = {id, name, role, contact, closerRate:crate, providerRate:prate, active:true, createdAt:new Date().toISOString()};
   if (pin) {
     member.pinHash  = await sha256(pin);
     member.pinPlain = pin;
@@ -508,6 +531,7 @@ function renderAdmin() {
             <div class="team-info">
               <div class="team-name">${esc(m.name)}</div>
               <div class="team-meta">${roleLabels[m.role]||m.role} · ${inactive?'Inactivo':'Activo'}${m.contact?' · '+esc(m.contact):''}</div>
+              <div class="team-meta" style="font-size:10px;opacity:.75">Closer ${esc(String(m.closerRate||0))}% · Proveedor ${esc(String(m.providerRate||0))}%</div>
               <div class="team-pin" style="font-size:11px;color:var(--sub);font-family:'DM Mono',monospace">
                 PIN: <span id="pin-${m.id}">••••</span>
                 ${m.pinPlain ? `<span onclick="togglePin('${m.id}','${m.pinPlain}')" style="cursor:pointer;margin-left:4px;opacity:.55;color:var(--accent)" title="Revelar PIN"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;vertical-align:middle"><path d="M1 8c1.5-3.5 3.8-5.5 7-5.5S13.5 4.5 15 8c-1.5 3.5-3.8 5.5-7 5.5S2.5 11.5 1 8z"/><circle cx="8" cy="8" r="2.5"/></svg></span>` : '<span style="opacity:.4;font-size:10px"> (reasignar)</span>'}

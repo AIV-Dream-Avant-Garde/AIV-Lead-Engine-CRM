@@ -61,7 +61,7 @@ function doExport() {
 function exportCommissions() {
   if (!S.commissions.length) { toast('Sin comisiones registradas.', 'error'); return; }
   const hdrs = ['leadName','dealValue','collectedAmount',
-                 'closerName','closerAmount','status','createdAt','paidAt','paidBy','paymentRef',
+                 'providerName','providerAmount','closerName','closerAmount','status','createdAt','paidAt','paidBy','paymentRef',
                  'refundReason','adjustedBy','adjustedAt'];
   const csv = [
     hdrs.join(','),
