@@ -1,5 +1,21 @@
 # AIV CRM — Lessons Learned
 
+## Session 2026-05-28
+
+### L9: Node syntax-checks and isolated mocks do NOT prove browser behavior
+**Mistake:** Claimed the country-tier feature "verified" after `node --check` + a hand-rolled DOM mock that loaded `scraper.js` in isolation. User reported the País dropdown was empty/non-functional.
+**Rule:** For this static app, "functional" means it runs in a real browser. Verify by loading the actual `index.html` in headless Chrome (`/Applications/Google Chrome.app/.../Google Chrome --headless=new --dump-dom`), ideally via a same-origin iframe harness that drives the real `init → renderAll → navigate` path and reads real DOM/option state. jsdom is unreliable against Python's `http.server` (spurious "Could not load script").
+**How to apply:** After any frontend change, run an iframe-harness Chrome check that asserts the actual rendered options, with `errs:[]`, before saying "verified."
+
+### L10: Stale browser cache masquerades as a code bug
+**Symptom→cause map:** new HTML element present but EMPTY = browser served the new `index.html` but **cached old JS** (old `main.js` never calls the new populate fn). Element entirely absent = cached old HTML.
+**Rule:** A plain `python -m http.server` sends no cache headers; browsers heuristically cache JS and won't re-request on a normal reload, so the no-cache header never applies. Fix at the root by **cache-busting asset URLs** (`?v=<stamp>` on every local `css/`+`js/` ref) — changing the URL forces a fresh fetch regardless of cache state. Also run the dev server with `Cache-Control: no-store` (see gitignored `.devserver.py`).
+**How to apply:** Bump the `?v=` stamp in `index.html` whenever JS/CSS changes during a session where the user already loaded the page.
+
+### L11: macOS has no `timeout` command
+**Mistake:** Wrapped headless-Chrome runs in `timeout 30 ...`; exited 127 ("command not found") and produced no output, briefly looking like the app failed.
+**Rule:** Don't use `timeout`/`gtimeout` on macOS. Chrome `--dump-dom` exits on its own; rely on `--virtual-time-budget`.
+
 ## Session 2026-03-19
 
 ### L1: Grep tool parameter name
