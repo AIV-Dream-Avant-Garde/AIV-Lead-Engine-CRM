@@ -563,7 +563,8 @@ function renderAdmin() {
     commWrap.innerHTML = filtered.length
       ? filtered.map(c => {
           const isClawback = c.status === 'clawback';
-          const totalAmt = parseFloat(c.closerAmount||0);
+          const provAmt  = parseFloat(c.providerAmount||0);
+          const totalAmt = parseFloat(c.closerAmount||0) + provAmt;
           const statusCls = {pending:'comm-pending', paid:'comm-paid', cancelled:'comm-cancelled', clawback:'comm-cancelled'}[c.status] || 'comm-pending';
           const statusLbl = {pending:'Pendiente', paid:'Pagado', cancelled:'Cancelado', clawback:'Reembolso'}[c.status] || c.status;
           const paidInfo  = c.status === 'paid' ? ` · ${esc(c.paidBy||'')} · ${esc(c.paymentRef||'')}` : '';
@@ -582,7 +583,7 @@ function renderAdmin() {
           return `<div class="admin-comm-row">
             <div class="admin-comm-info">
               <div class="admin-comm-lead">${esc(c.leadName||'--')}</div>
-              <div class="admin-comm-detail">Contratado: ${fmtCOP(c.dealValue)}${collInfo} · Closer: ${esc(c.closerName||'--')} ${fmtCOP(c.closerAmount)} · ${fmtD(c.createdAt)}${paidInfo}${refundInfo}</div>
+              <div class="admin-comm-detail">Contratado: ${fmtCOP(c.dealValue)}${collInfo} · Closer: ${esc(c.closerName||'--')} ${fmtCOP(c.closerAmount)}${provAmt ? ' · Proveedor: ' + esc(c.providerName||'--') + ' ' + fmtCOP(c.providerAmount) : ''} · ${fmtD(c.createdAt)}${paidInfo}${refundInfo}</div>
             </div>
             <span class="admin-comm-amount" style="${amtStyle}">${fmtCOP(totalAmt)}</span>
             <span class="comm-status-badge ${statusCls}">${statusLbl}</span>

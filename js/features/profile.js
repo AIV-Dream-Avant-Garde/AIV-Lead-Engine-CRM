@@ -26,12 +26,15 @@ function renderPerfil() {
   const isAdmin  = role === 'admin';
   const myLeads  = isAdmin ? S.leads : S.leads.filter(l => l.closerId === uid_ || l.lockedBy === uid_);
   const myClosed = myLeads.filter(l => l.status === 'Cerrado');
-  const myComm   = isAdmin ? S.commissions : S.commissions.filter(c => c.closerId === uid_);
+  const myComm   = isAdmin ? S.commissions : S.commissions.filter(c => c.closerId === uid_ || c.providerId === uid_);
+  // This user's share of a commission record: closer cut if they closed it, provider cut if they sourced it
+  const myShare  = c => (isAdmin ? parseFloat(c.closerAmount||0) + parseFloat(c.providerAmount||0)
+    : (c.closerId === uid_ ? parseFloat(c.closerAmount||0) : 0) + (c.providerId === uid_ ? parseFloat(c.providerAmount||0) : 0));
   // Include clawbacks (negative amounts) to accurately reduce totalPaid on refunds
   const totalPaid = myComm.filter(c => c.status === 'paid' || c.status === 'clawback').reduce((s,c) =>
-    s + parseFloat(c.closerAmount || 0), 0);
+    s + myShare(c), 0);
   const totalPending = myComm.filter(c => c.status === 'pending').reduce((s,c) =>
-    s + parseFloat(c.closerAmount || 0), 0);
+    s + myShare(c), 0);
   const setEl = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
   setEl('pst-leads',   myLeads.length);
   setEl('pst-closed',  myClosed.length);
@@ -96,7 +99,7 @@ function renderPerfil() {
   if (commList) {
     commList.innerHTML = myComm.length
       ? myComm.slice(0,20).map(c => {
-          const amt = parseFloat(c.closerAmount || 0);
+          const amt = myShare(c);
           const statusCls = {pending:'comm-pending', paid:'comm-paid', cancelled:'comm-cancelled', clawback:'comm-cancelled'}[c.status] || 'comm-pending';
           const statusLbl = {pending:'Pendiente', paid:'Pagado', cancelled:'Cancelado', clawback:'Reembolso'}[c.status] || c.status;
           return `<div class="comm-item">
