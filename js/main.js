@@ -107,6 +107,7 @@ function navigate(id) {
       setCfgEl('cfg-pitch',      cfg.pitchScript    || '');
       setCfgEl('cfg-objections', cfg.objectionsScript || '');
       setCfgEl('cfg-close',      cfg.closeScript    || '');
+      const hp = document.getElementById('cfg-hide-pinplain'); if (hp) hp.checked = !!cfg.hidePinPlain;
     }, 150);
   }
   if (id === 'leads') auditLog('viewLeads', '', '');
@@ -201,20 +202,6 @@ function showShortcutsModal() {
     renderScrapeHistory();
   }, 400);
 
-  // 8. Restore session (same tab, e.g. on refresh)
-  const saved = sessionStorage.getItem('aiv-session');
-  if (saved) {
-    try {
-      const sess = JSON.parse(saved);
-      if (sess.role === 'admin') {
-        startSession(sess);
-      } else {
-        const member = S.team.find(m => m.id === sess.userId && String(m.active) !== 'false');
-        if (member) startSession(sess);
-        else { sessionStorage.removeItem('aiv-session'); updatePinDots(); }
-      }
-    } catch(e) { updatePinDots(); }
-  } else {
-    updatePinDots();
-  }
+  // 8. Restore session (same tab, e.g. on refresh) — tamper-evident + role re-derived
+  restoreSession();
 })();

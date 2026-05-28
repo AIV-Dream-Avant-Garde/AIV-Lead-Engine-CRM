@@ -24,6 +24,7 @@ async function changeAdminPin() {
   const nw  = document.getElementById('apin-new')?.value?.trim() || '';
   const nw2 = document.getElementById('apin-new2')?.value?.trim() || '';
   if (!/^\d{4}$/.test(nw))           { toast('El nuevo PIN debe tener exactamente 4 dígitos.', 'error'); return; }
+  if (isWeakPin(nw))                 { toast('PIN demasiado débil (evita repetidos como 1111 o secuencias como 1234).', 'error'); return; }
   if (nw !== nw2)                    { toast('Los PINs nuevos no coinciden.', 'error'); return; }
   if (nw === '0809')                 { toast('El PIN 0809 está reservado para Demo.', 'error'); return; }
   const curHash = await sha256(cur);
@@ -35,6 +36,17 @@ async function changeAdminPin() {
   auditLog('changeAdminPin', 'admin', 'Admin PIN rotado');
   ['apin-cur','apin-new','apin-new2'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
   toast('PIN de administrador actualizado.', 'success');
+}
+
+// Opt-out of storing revealable plaintext team PINs in localStorage.
+function setHidePinPlain(on) {
+  if (S.session?.role !== 'admin') { toast('Solo el administrador puede cambiar esto.', 'error'); return; }
+  S.config.hidePinPlain = !!on;
+  if (on) (S.team || []).forEach(m => { delete m.pinPlain; });   // purge existing plaintext
+  saveLocal();
+  auditLog('setHidePinPlain', '', on ? 'on' : 'off');
+  if (document.getElementById('admin-team-list')) renderAdmin();
+  toast(on ? 'PINs en texto plano desactivados y purgados.' : 'Almacenamiento de PIN en texto plano reactivado.', 'success');
 }
 
 // ── Signal banner ──────────────────────────────────────────
@@ -153,6 +165,7 @@ async function saveTeamMember() {
   if (isNew && !pin)                  { toast('El PIN es requerido para nuevos miembros.', 'error'); return; }
   if (pin && pin.length !== 4)        { toast('El PIN debe tener exactamente 4 dígitos.', 'error'); return; }
   if (pin && !/^\d{4}$/.test(pin))    { toast('El PIN solo puede contener dígitos.', 'error'); return; }
+  if (pin && isWeakPin(pin))          { toast('PIN demasiado débil (evita repetidos como 1111 o secuencias como 1234).', 'error'); return; }
   if (pin && pin !== pin2)            { toast('Los PINs no coinciden.', 'error'); return; }
   if (pin === '2819')                 { toast('El PIN 2819 está reservado para Admin.', 'error'); return; }
   if (pin === '0000')                 { toast('El PIN 0000 está reservado para Demo.', 'error'); return; }
@@ -167,10 +180,10 @@ async function saveTeamMember() {
   const member = {id, name, role, contact, closerRate:crate, providerRate:prate, active:true, createdAt:new Date().toISOString()};
   if (pin) {
     member.pinHash  = await sha256(pin);
-    member.pinPlain = pin;
+    if (!S.config.hidePinPlain) member.pinPlain = pin;   // plaintext storage is opt-out
   } else {
     const existing = S.team.find(m => m.id === id);
-    if (existing) { member.pinHash = existing.pinHash; member.pinPlain = existing.pinPlain || ''; }
+    if (existing) { member.pinHash = existing.pinHash; if (!S.config.hidePinPlain) member.pinPlain = existing.pinPlain || ''; }
   }
 
   const idx = S.team.findIndex(m => m.id === id);

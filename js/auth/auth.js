@@ -95,9 +95,20 @@ async function tryLogin() {
 }
 
 // ── Session ────────────────────────────────────────────────
+// Tamper-evidence for the per-tab session token. Keyed by the per-install
+// crmSecret. This stops casual sessionStorage editing (e.g. a team member
+// trying to flip role:'admin' from DevTools). It is NOT a substitute for
+// server-side session validation: anyone who also reads crmSecret from
+// localStorage could forge a token. True fix = validate identity/role in
+// the Apps Script backend on every request.
+function sessionSig(user) {
+  return sha256(JSON.stringify(user) + '|' + (S.config.crmSecret || ''));
+}
+
 function startSession(user) {
   S.session = user;
   sessionStorage.setItem('aiv-session', JSON.stringify(user));
+  sessionSig(user).then(sig => { try { sessionStorage.setItem('aiv-session-sig', sig); } catch(e) {} });
   failedAttempts = 0;
   document.getElementById('login-overlay').classList.add('hidden');
   applySidebarForRole(user.role);
@@ -112,9 +123,49 @@ function startSession(user) {
   setTimeout(() => applyAdminNavVisibility(), 1200);
 }
 
+// Restore a same-tab session on refresh, with tamper-evidence + authoritative
+// role re-derivation. A stored token's role/rates are NOT trusted for team
+// members — they are re-read from the synced S.team record, so editing the
+// stored token cannot grant access the team data doesn't actually allow.
+async function restoreSession() {
+  const saved = sessionStorage.getItem('aiv-session');
+  const clear = () => { sessionStorage.removeItem('aiv-session'); sessionStorage.removeItem('aiv-session-sig'); updatePinDots(); };
+  if (!saved) { updatePinDots(); return; }
+  let sess;
+  try { sess = JSON.parse(saved); } catch(e) { clear(); return; }
+
+  // Reject tampered or legacy-unsigned tokens — force a fresh PIN login.
+  const expected = await sessionSig(sess);
+  if ((sessionStorage.getItem('aiv-session-sig') || '') !== expected) { clear(); return; }
+
+  if (sess.userId === 'admin' && sess.role === 'admin') { startSession(sess); return; }
+
+  // Team member: authoritative role/rates come from S.team, not the token.
+  const member = S.team.find(m => m.id === sess.userId && String(m.active) !== 'false');
+  if (member) {
+    startSession({
+      userId:       member.id,
+      userName:     member.name,
+      role:         member.role || 'closer',
+      closerRate:   parseFloat(member.closerRate   || 0),
+      providerRate: parseFloat(member.providerRate || 0),
+    });
+  } else { clear(); }
+}
+
+// Reject trivially guessable 4-digit PINs (all-same, simple sequences).
+function isWeakPin(pin) {
+  if (!/^\d{4}$/.test(pin)) return false; // length/format handled elsewhere
+  if (/^(\d)\1{3}$/.test(pin)) return true;                 // 0000, 1111, ...
+  const asc = '0123456789', desc = '9876543210';
+  if (asc.includes(pin) || desc.includes(pin)) return true; // 1234, 4321, ...
+  return false;
+}
+
 function logout() {
   S.session = null;
   sessionStorage.removeItem('aiv-session');
+  sessionStorage.removeItem('aiv-session-sig');
   if (sessionTimer)        clearTimeout(sessionTimer);
   if (sessionWarningTimer) clearTimeout(sessionWarningTimer);
   const wb = document.getElementById('session-warning-banner');
