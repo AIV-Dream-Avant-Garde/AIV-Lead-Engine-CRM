@@ -1,59 +1,81 @@
-# Website AI Chat — Brief & Integration Prompt (for the website project)
+# Website AI Chat ("AskAndrés") → AXIUS CRM — Brief & Integration
 
-This is a ready-to-use brief for the **other** Claude Code session building the AXIUS website AI chat. It does two jobs: (1) defines the chat's purpose + **voice**, and (2) wires it to the AXIUS CRM so every qualified visitor becomes a **warm lead** in the pool automatically.
+Grounded in the actual site (github.com/Axius-Tech/Axius.Tech-Website, Quiet 0.5 / `reference/axius-direction-E05.jsx`, Vercel). Use this in the website project's Claude Code session.
 
-> You don't need to share the live site for this to be useful — it's written from the CRM contract + our messaging voice. If you paste the public site URL, the CRM assistant can WebFetch it and tailor further.
+## What already exists (don't rebuild it)
+- **`AskAndres`** — a conversational AI chat with a **"Ring Andrés"** escalation button.
+- On Ring, `startRing()` POSTs to Telegram (`@AxiusDispatch_Bot`, topic-per-visitor) using `window.AxiusConfig.ringWebhookUrl` / `ringWebhookChatId`. It sends: `convoId`, full transcript, last 3 user messages, `lang`, timezone/locale, page URL, referrer. **It does not collect name/email/phone.**
+- **Vercel** hosting; serverless functions in `/api` (e.g. `api/stripe-webhook.js`) read secrets from Vercel **env vars** and post to Telegram server-side. Secrets template: `window.AxiusSecrets` (`telegramBotToken`, `telegramChatId`, `whatsappNumber`, `phoneNumber`, `checkoutUrls`).
 
----
+## The integration (small, on-pattern)
+**Add one Vercel function `api/crm-lead.js`** (mirrors `api/stripe-webhook.js`) that receives a lead from the chat and POSTs it server-side to the CRM inbound endpoint — so `CRM_SECRET` lives only in Vercel env, never in the browser. The chat calls `api/crm-lead.js` **on Ring** (and again if it later captures an email/phone). Map:
+- `externalId` ← `convoId` (always present → a warm lead is created even with no contact info; dedups per conversation).
+- `message` ← the transcript (or last user message + short transcript).
+- `country` ← from `lang` (`es`→`"Colombia"`, `en`→`"Estados Unidos"`).
+- `source` ← `"Web Chat"`; `sourceDetail` ← page URL + "chat opt-in".
+- `name`/`email`/`phone` ← only if the chat captured them (see voice goal #2).
 
-## Copy-paste prompt (drop into the website project's chat)
+The CRM contract (fields, dedup, responses): `docs/integrations/inbound-leads-api.md` in the CRM repo.
 
+### Drop-in `api/crm-lead.js` (Vercel Node serverless)
+```js
+// Vercel env vars (Settings → Environment Variables):
+//   CRM_INBOUND_URL = https://script.google.com/macros/s/XXXX/exec
+//   CRM_SECRET      = <same value as the CRM's Configuración → CRM Secret>
+module.exports = async (req, res) => {
+  if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }
+  try {
+    const b = typeof req.body === 'object' && req.body ? req.body : JSON.parse(req.body || '{}');
+    const langToCountry = l => (String(l || '').toLowerCase().startsWith('es') ? 'Colombia' : 'Estados Unidos');
+    const payload = {
+      _secret: process.env.CRM_SECRET,
+      source: 'Web Chat',
+      externalId: b.convoId ? 'web:' + b.convoId : undefined,
+      name: b.name || '',
+      email: b.email || '',
+      phone: b.phone || '',
+      country: b.country || langToCountry(b.lang),
+      sourceDetail: (b.pageUrl || 'axius.tech') + ' · chat opt-in',
+      message: b.message || b.transcript || '',
+    };
+    const r = await fetch(process.env.CRM_INBOUND_URL + '?action=inbound', {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload),
+    });
+    const data = await r.json().catch(() => ({}));
+    res.status(200).json({ ok: true, crm: data });   // 200 always; never block the chat UX
+  } catch (e) {
+    res.status(200).json({ ok: false, error: String(e && e.message || e) });
+  }
+};
 ```
-You are improving the AXIUS website's AI chat assistant. Goals, in priority order:
+The chat's `startRing()` (and any contact-capture step) then does:
+`fetch('/api/crm-lead', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ convoId, transcript, lang, pageUrl, name, email, phone }) })` — fire-and-forget alongside the existing Telegram post.
 
-1. VOICE — confident, capable, and genuinely in the visitor's best interest.
-   - Speak like a sharp, warm human expert who knows our offer is strong and worth its weight.
-   - Never pleading, never subservient, never apologetic for selling. No emoji crutches, no "🙏".
-   - Sincere and helpful, but assured. Make the visitor feel understood AND that we're the capable choice.
-   - Spanish by default for Colombian visitors, English for US; mirror the visitor's language.
+## Prompt to paste into the website project's chat
+```
+Integrate the AskAndres chat with the AXIUS CRM, and tighten its voice.
 
-2. QUALIFY + CAPTURE — turn a real conversation into a warm lead.
-   - Naturally learn: their name, their business name, what they do (category), city/country,
-     what they're trying to solve, and the best way to reach them (email, phone, or Telegram).
-   - Don't interrogate — collect it conversationally across the chat.
-   - The moment you have a usable identity (email OR phone OR a Telegram/web id) + intent,
-     create the lead in the CRM (see INTEGRATION). Capture their first/most important message verbatim.
+1) VOICE — confident, capable, genuinely in the visitor's best interest. Sharp, warm, human.
+   Never pleading or subservient, never apologizing for selling, no emoji crutches. The visitor
+   should finish feeling understood AND that AXIUS is clearly the strong, worth-it choice.
+   Spanish for es visitors, English for en; mirror their language.
 
-3. INTEGRATION — POST the lead to the AXIUS CRM inbound endpoint.
-   - Endpoint + payload are defined in the CRM repo: docs/integrations/inbound-leads-api.md
-   - POST {APPS_SCRIPT_WEB_APP_URL}?action=inbound  (Content-Type: text/plain, body = JSON)
-   - Required: "_secret" (CRM secret). At least ONE identity: phone | email | externalId.
-   - Send: source:"Web Chat", name, email/phone/externalId, country, city, keyword (their category),
-     sourceDetail (page/campaign + how consent was given), and message (their first real message).
-   - It's idempotent (deduped by phone/email/externalId) — safe to call once per captured lead.
-   - Handle the response: {success:true,added:true} (created), {duplicate:true} (already known) — both are fine.
+2) CAPTURE A CONTACT (lightly). During the conversation, naturally get the best way to reach
+   them — email, WhatsApp/phone — and their name + what they need. Don't interrogate. Even if
+   they give nothing, the convoId is enough to create a lead.
 
-4. HONESTY + BOUNDARIES
-   - Be accurate about what AXIUS does; never overpromise. If unsure, say a human will follow up.
-   - Make it effortless and respectful for someone to decline or just browse.
-   - Tell the visitor a real person from the team will follow up — and mean it (the lead is now in the CRM).
+3) CRM LEAD — add a Vercel function api/crm-lead.js (mirror api/stripe-webhook.js; secrets from
+   env CRM_INBOUND_URL + CRM_SECRET) that POSTs to the CRM inbound endpoint per
+   docs/integrations/inbound-leads-api.md. Call it on "Ring Andrés" AND when a contact is captured,
+   sending { convoId, transcript, lang, pageUrl, name, email, phone }. Fire-and-forget; never block
+   the chat. Keep the existing Telegram Ring flow as-is.
 
-Deliver: the updated chat system prompt + the lead-capture/POST logic. Keep the voice consistent
-with the rules above everywhere (greeting, qualifying, hand-off, and the "we'll follow up" close).
+4) HONESTY — accurate about what AXIUS does; if unsure, say a real person will follow up (true:
+   the lead is now in the CRM). Make declining effortless and respectful.
+
+Deliver: the api/crm-lead.js function, the startRing()/contact-capture wiring, and the updated
+chat system prompt embodying the voice above.
 ```
 
----
-
-## Integration requirements (reference for the website build)
-
-- **Auth:** include `"_secret": "<CRM_SECRET>"` in every POST body (value from CRM **Configuración → CRM Secret**).
-- **Identity:** at least one of `phone`, `email`, `externalId` (use a stable web session/user id or, for Telegram, the chat id like `tg:<id>`).
-- **Recommended fields:** `source:"Web Chat"` (or `"Telegram"`), `name`, `email`/`phone`/`externalId`, `country` (`"Colombia"`/`"Estados Unidos"`), `city`, `keyword` (their business category), `sourceDetail` (page + consent note), `message` (their first message → stored as the lead's first note).
-- **Idempotent:** deduped across phone (last-10) / email / externalId — re-POSTing the same person won't duplicate.
-- **Result:** the lead lands in the agent pool as `Nuevo`, claimable, with the visitor's message visible in the timeline — so whoever follows up already has context.
-
-## Voice — the same standard our outreach uses
-Confident, capable, client-first; sincere but never weak; respectful but never subservient. The visitor should finish the chat feeling **understood** and that **AXIUS is clearly the strong, worth-it choice** — and knowing a real person will follow up.
-
-## Telegram parity
-The Telegram bot should behave identically: same voice, same qualify-and-capture, POST with `source:"Telegram"` and `externalId:"tg:<chatId>"`. (Two-way Telegram replies + founder alerts are handled CRM-side in Project D.)
+## Security note
+Keep `CRM_SECRET` (and ideally the Telegram bot token) **server-side in Vercel env**, accessed only from `/api` functions — not in `window.AxiusConfig`/client JS. Route the CRM POST through `api/crm-lead.js` as above.
