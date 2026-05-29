@@ -2,6 +2,12 @@
 
 Grounded in the actual site (github.com/Axius-Tech/Axius.Tech-Website, Quiet 0.5 / `reference/axius-direction-E05.jsx`, Vercel). Use this in the website project's Claude Code session.
 
+## Founder decision (2026-05-29): remove the direct line to Andrés
+**Remove the "contact Andrés directly" option entirely** — no personal WhatsApp/phone-to-founder, and reframe so the chat never implies Andrés (or anyone) is **available immediately, always**. That promise can't be kept and it undersells the operation. Instead, the chat **captures the lead into the CRM** and sets an honest, confident expectation: *a capable member of our team will follow up.* Concretely:
+- Drop the direct-to-founder CTAs and the `whatsappNumber` / `phoneNumber` (personal) usage from the visitor-facing UI.
+- Keep the **Telegram dispatch** as an internal team notification (it routes work to the team, not "ring Andrés live").
+- The chat's close becomes: *"Con gusto te ayudo y dejo esto con nuestro equipo para darte seguimiento"* — never "te contacto ahora mismo / escríbeme directo."
+
 ## What already exists (don't rebuild it)
 - **`AskAndres`** — a conversational AI chat with a **"Ring Andrés"** escalation button.
 - On Ring, `startRing()` POSTs to Telegram (`@AxiusDispatch_Bot`, topic-per-visitor) using `window.AxiusConfig.ringWebhookUrl` / `ringWebhookChatId`. It sends: `convoId`, full transcript, last 3 user messages, `lang`, timezone/locale, page URL, referrer. **It does not collect name/email/phone.**
@@ -70,8 +76,10 @@ Integrate the AskAndres chat with the AXIUS CRM, and tighten its voice.
    sending { convoId, transcript, lang, pageUrl, name, email, phone }. Fire-and-forget; never block
    the chat. Keep the existing Telegram Ring flow as-is.
 
-4) HONESTY — accurate about what AXIUS does; if unsure, say a real person will follow up (true:
-   the lead is now in the CRM). Make declining effortless and respectful.
+4) HONESTY + NO FALSE AVAILABILITY — accurate about what AXIUS does. NEVER imply someone is
+   available right now or 24/7, and DO NOT offer a direct line to Andrés (no personal WhatsApp/phone).
+   Set the real expectation confidently: "a member of our team will follow up." The lead is in the
+   CRM, so that's true. Make declining effortless and respectful.
 
 Deliver: the api/crm-lead.js function, the startRing()/contact-capture wiring, and the updated
 chat system prompt embodying the voice above.
