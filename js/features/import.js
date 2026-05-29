@@ -79,9 +79,9 @@ function processCSV(file) {
       }).join('');
     }
 
-    const ex    = new Set(S.leads.map(l => l.phone).filter(Boolean));
+    const ex    = new Set(S.leads.map(l => phoneKey(l.phone)).filter(Boolean));
     const total = rows.length;
-    const dupes = rows.filter(r => r.phone && ex.has(r.phone)).length;
+    const dupes = rows.filter(r => r.phone && ex.has(phoneKey(r.phone))).length;
     S.pendingImport = rows;
     const sumEl = document.getElementById('imp-summary');
     if (sumEl) sumEl.textContent = total + ' filas — ' + (total - dupes) + ' nuevas, ' + dupes + ' duplicadas';
@@ -134,9 +134,9 @@ async function confirmImport() {
   const providerRate = S.session?.providerRate || 0;
 
   const mapped = applyMapping(S.pendingImport);
-  const ex = new Set(S.leads.map(l => l.phone).filter(Boolean));
+  const ex = new Set(S.leads.map(l => phoneKey(l.phone)).filter(Boolean));
   const toAdd = mapped
-    .filter(r => r.phone && r.phone !== 'N/A' && !ex.has(r.phone))
+    .filter(r => r.phone && r.phone !== 'N/A' && !ex.has(phoneKey(r.phone)))
     .map(r => ({
       id:uid(), name:r.name||'Sin nombre', phone:r.phone||'N/A',
       address:r.address||'N/A', website:r.website||'N/A',

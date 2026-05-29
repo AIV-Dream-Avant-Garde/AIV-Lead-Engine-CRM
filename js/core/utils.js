@@ -38,6 +38,14 @@ function lsUsed() {
   return t;
 }
 
+// Phone dedup key: last 10 digits of the numeric-only string (mirror of the
+// backend phoneKey in Code.gs). Collapses +57/+1/spacing/leading-zero so the
+// same number isn't added twice in a different format. '' when < 10 digits.
+function phoneKey(p) {
+  const d = String(p || '').replace(/\D/g, '');
+  return d.length >= 10 ? d.slice(-10) : '';
+}
+
 function toast(msg, type, duration) {
   type     = type     || 'info';
   duration = duration || 3500;

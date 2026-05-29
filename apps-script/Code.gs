@@ -65,14 +65,17 @@ function doGet(e) {
       const team    = toObjs(getSheet(SHEETS.team,TEAM_HDR));
       const comms   = toObjs(getSheet(SHEETS.commissions,COMM_HDR));
       const scripts = toObjs(getSheet(SHEETS.scripts,SCRIPT_HDR));
-      return ok({leads,calls,team,commissions:comms,scripts,serverTime:new Date().toISOString()});
+      let scheduledJobs=[]; try { const raw=cfgGet('scheduledJobs'); if(raw) scheduledJobs=JSON.parse(raw); } catch(e){}
+      return ok({leads,calls,team,commissions:comms,scripts,scheduledJobs,serverTime:new Date().toISOString()});
     }
     if (a === 'getToken') return ok({token:createToken(e.parameter.identity||'agent')});
     if (a === 'checkTriggers') {
       const triggers = ScriptApp.getProjectTriggers();
+      let lastScrapeRun = null; try { const raw = cfgGet('lastScrapeRun'); if (raw) lastScrapeRun = JSON.parse(raw); } catch(e) {}
       return ok({
         scrapeTrigger: triggers.some(t => t.getHandlerFunction() === 'runScheduledScrapes'),
         reportTrigger: triggers.some(t => t.getHandlerFunction() === 'sendWeeklyReport'),
+        lastScrapeRun,
       });
     }
     if (a === 'twiml') {
@@ -259,6 +262,10 @@ function doPost(e) {
       for(let i=1;i<rows.length;i++){if(rows[i][ki]==='scheduledJobs'){cfg.getRange(i+1,vi+1).setValue(JSON.stringify(b.jobs||[]));found=true;break;}}
       if(!found)cfg.appendRow(['scheduledJobs',JSON.stringify(b.jobs||[])]);
       return ok({saved:true});
+    }
+    if (a === 'runScrapesNow') {
+      const res = runScheduledScrapes();   // runs all active saved jobs immediately
+      return ok(res || {added:0, ranAt:new Date().toISOString()});
     }
     if (a === 'saveScript') {
       const s=getSheet(SHEETS.scripts,SCRIPT_HDR),rows=s.getDataRange().getValues(),h=rows[0]||SCRIPT_HDR,ic=h.indexOf('id');
@@ -461,7 +468,7 @@ function runScheduledScrapes() {
   const leadsSheet = getSheet(SHEETS.leads, LEAD_HDR);
   const lRows      = leadsSheet.getDataRange().getValues();
   const ph         = lRows[0] || LEAD_HDR, pc = ph.indexOf('phone');
-  const existing   = new Set(lRows.slice(1).map(r => String(r[pc]).trim()).filter(Boolean));
+  const existing   = new Set(lRows.slice(1).map(r => phoneKey(r[pc])).filter(Boolean));
 
   const url = 'https://places.googleapis.com/v1/places:searchText';
   const hdr = {'Content-Type':'application/json','X-Goog-Api-Key':PLACES_API_KEY,
@@ -492,7 +499,8 @@ function runScheduledScrapes() {
     }
     leads.forEach(l => {
       const phone = String(l.phone||'').trim();
-      if (phone && phone !== 'N/A' && !existing.has(phone)) {
+      const key   = phoneKey(phone);
+      if (phone && phone !== 'N/A' && key && !existing.has(key)) {
         const lead = {
           id:Utilities.getUuid(), name:l.name, phone, address:l.address, website:l.website,
           rating:l.rating, reviews:l.reviews, country:job.country||'', city:job.city||'', barrio:job.barrio||'',
@@ -504,13 +512,36 @@ function runScheduledScrapes() {
           importedAt:now, updatedAt:now
         };
         leadsSheet.appendRow(LEAD_HDR.map(h => lead[h] ?? ''));
-        existing.add(phone);
+        existing.add(key);
         totalAdded++;
       }
     });
   });
+  const ranAt = new Date().toISOString();
+  cfgSet('lastScrapeRun', JSON.stringify({ranAt, added: totalAdded}));
   Logger.log('Scheduled scrape complete. Added: ' + totalAdded + ' leads.');
+  return {added: totalAdded, ranAt};
 }
 
 function ok(d){return ContentService.createTextOutput(JSON.stringify({success:true,...d})).setMimeType(ContentService.MimeType.JSON)}
 function err_(m,code){return ContentService.createTextOutput(JSON.stringify({success:false,error:m,code:code||500,timestamp:new Date().toISOString()})).setMimeType(ContentService.MimeType.JSON)}
+
+// Phone dedup key: last 10 digits of the numeric-only string. Collapses
+// +57 / +1 / spacing / leading-zero formatting so the same number isn't
+// re-added in a different format. '' when fewer than 10 digits (e.g. 'N/A').
+function phoneKey(p){ const d=String(p||'').replace(/\D/g,''); return d.length>=10?d.slice(-10):''; }
+
+// Config sheet key/value helpers (single source for scheduledJobs, lastScrapeRun, etc.)
+function cfgGet(key){
+  const ss=SpreadsheetApp.openById(SHEET_ID), cfg=ss.getSheetByName('Config');
+  if(!cfg) return '';
+  const rows=cfg.getDataRange().getValues(), h=rows[0]||[], ki=h.indexOf('key'), vi=h.indexOf('value');
+  const r=rows.slice(1).find(r=>r[ki]===key); return r?r[vi]:'';
+}
+function cfgSet(key,val){
+  const ss=SpreadsheetApp.openById(SHEET_ID); let cfg=ss.getSheetByName('Config');
+  if(!cfg){cfg=ss.insertSheet('Config');cfg.appendRow(['key','value']);}
+  const rows=cfg.getDataRange().getValues(), h=rows[0]||['key','value'], ki=h.indexOf('key'), vi=h.indexOf('value');
+  for(let i=1;i<rows.length;i++){ if(rows[i][ki]===key){ cfg.getRange(i+1,vi+1).setValue(val); return; } }
+  cfg.appendRow([key,val]);
+}

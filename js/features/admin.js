@@ -337,9 +337,26 @@ async function checkTriggerStatus() {
   if (!S.config.scriptUrl) return;
   const res = await sheetsCall({action:'checkTriggers'});
   if (res?.success) {
-    S.triggerStatus = { scrape: !!res.scrapeTrigger, report: !!res.reportTrigger };
+    S.triggerStatus = { scrape: !!res.scrapeTrigger, report: !!res.reportTrigger, lastScrapeRun: res.lastScrapeRun || null };
     renderScheduledJobs();
     renderReportTrigger();
+  }
+}
+
+// Run all active saved scrape jobs immediately (on-demand), then pull the new leads.
+async function runScrapesNow() {
+  if (!S.config.scriptUrl) { toast('Configura el Apps Script URL primero.', 'error'); return; }
+  const btn = document.getElementById('run-scrapes-now-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Ejecutando...'; }
+  const res = await sheetsCall({action:'runScrapesNow'});
+  if (btn) { btn.disabled = false; btn.textContent = 'Ejecutar ahora'; }
+  if (res?.success) {
+    if (S.triggerStatus) S.triggerStatus.lastScrapeRun = {ranAt: res.ranAt, added: res.added};
+    toast('Scrape ejecutado: +' + (res.added || 0) + ' leads nuevos.', 'success', 5000);
+    await syncNow();          // bring the newly-appended leads into the pool now
+    renderScheduledJobs();
+  } else {
+    toast('Error al ejecutar el scrape. Verifica el Apps Script y la API key.', 'error', 5000);
   }
 }
 
@@ -379,8 +396,12 @@ function renderScheduledJobs() {
   const triggerWrap = document.getElementById('admin-scrape-trigger-status');
   if (triggerWrap) {
     const active = S.triggerStatus?.scrape;
+    const lr = S.triggerStatus?.lastScrapeRun;
+    const lastRunLine = lr && lr.ranAt
+      ? `<div style="font-size:11px;color:var(--sub);margin-bottom:10px">Última ejecución: ${fmtD(lr.ranAt)} ${fmtT(lr.ranAt)} · +${lr.added||0} leads</div>`
+      : `<div style="font-size:11px;color:var(--sub);margin-bottom:10px">Sin ejecuciones registradas aún.</div>`;
     triggerWrap.innerHTML = `
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
         <span style="font-size:13px;color:var(--body)">Trigger automático (diario 6am):</span>
         <span style="font-size:13px;font-weight:600;color:${active?'var(--green)':'var(--body)'}">
           ${active ? '● Activo' : '○ Inactivo'}
@@ -389,7 +410,11 @@ function renderScheduledJobs() {
           onclick="setTrigger('runScheduledScrapes',${!active})">
           ${active ? 'Desactivar' : 'Activar'}
         </button>
-      </div>`;
+        <button id="run-scrapes-now-btn" class="btn btn-primary" style="font-size:11px;padding:4px 10px" onclick="runScrapesNow()">
+          Ejecutar ahora
+        </button>
+      </div>
+      ${lastRunLine}`;
   }
 
   const wrap = document.getElementById('admin-jobs-list');

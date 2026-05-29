@@ -116,3 +116,24 @@ test('autoMapHeaders: detects Spanish + English aliases', () => {
 test('autoMapHeaders: unrecognized headers map to nothing', () => {
   eq(Object.keys(autoMapHeaders(['col_a','col_b'])).length, 0, 'no auto-map for unknown headers');
 });
+
+// ── Phone dedup key (scraper/import re-run must not re-add existing leads) ──
+test('phoneKey: collapses CO formatting variants to one key', () => {
+  eq(phoneKey('+57 320 123 4567'), '3201234567', 'last 10 digits');
+  // same Colombian number, different formats → same key:
+  eq(phoneKey('+57 320 123 4567'), phoneKey('573201234567'), 'spaced vs raw +57');
+  eq(phoneKey('+57 320 123 4567'), phoneKey('3201234567'),  'with vs without country code');
+  eq(phoneKey('+57 320 123 4567'), phoneKey('(320) 123-4567'), 'punctuation ignored');
+});
+
+test('phoneKey: US variants collapse; distinct numbers stay distinct', () => {
+  eq(phoneKey('+1 (305) 555-0199'), phoneKey('3055550199'), 'US +1 vs 10-digit');
+  assert(phoneKey('3201234567') !== phoneKey('3209999999'), 'different numbers → different keys');
+});
+
+test('phoneKey: too-short / junk → empty (never dedups spuriously)', () => {
+  eq(phoneKey('N/A'), '', 'N/A');
+  eq(phoneKey(''), '', 'empty');
+  eq(phoneKey('12345'), '', 'fewer than 10 digits');
+  eq(phoneKey(null), '', 'null');
+});

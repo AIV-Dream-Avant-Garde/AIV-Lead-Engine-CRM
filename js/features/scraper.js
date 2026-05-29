@@ -169,7 +169,7 @@ async function runScraper() {
     }
     const now      = new Date().toISOString();
     const source   = srcDetail ? src + ' · ' + srcDetail : src;
-    const existing = new Set(S.leads.map(l => l.phone).filter(Boolean));
+    const existing = new Set(S.leads.map(l => phoneKey(l.phone)).filter(Boolean));
 
     // Attribution: provider/solo operators get credited as source of scraped leads
     const sess       = S.session;
@@ -178,7 +178,8 @@ async function runScraper() {
 
     let added = 0;
     res.leads.forEach(r => {
-      if (r.phone && r.phone !== 'N/A' && !existing.has(r.phone)) {
+      const pk = phoneKey(r.phone);
+      if (r.phone && r.phone !== 'N/A' && pk && !existing.has(pk)) {
         const lead = {
           id:uid(), name:r.name||'Sin nombre', phone:r.phone, address:r.address||'N/A',
           website:r.website||'N/A', rating:r.rating||'N/A', reviews:r.reviews||'N/A',
@@ -194,7 +195,7 @@ async function runScraper() {
         };
         S.leads.push(lead);
         S.dirty.add(lead.id);
-        existing.add(r.phone);
+        existing.add(pk);
         added++;
       }
     });
