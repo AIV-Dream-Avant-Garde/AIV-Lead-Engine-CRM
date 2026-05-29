@@ -172,7 +172,7 @@ function renderTable() {
       return `<tr class="${sel} ${dnc}" onclick="rowClick(event,'${l.id}')">
         <td onclick="event.stopPropagation()"><input type="checkbox" ${S.selected.has(l.id)?'checked':''} onchange="toggleSel('${l.id}',this.checked)"></td>
         <td style="text-align:center;width:36px">${scoreDotHTML(l)}</td>
-        <td class="name-cell">${highlight(l.name, q)}</td>
+        <td class="name-cell">${highlight(l.name, q)}${l.lastReplyAt && (!l.lastTouchAt || new Date(l.lastReplyAt) > new Date(l.lastTouchAt)) ? ' <span class="sbadge" style="background:var(--pos);color:#04140d;font-size:9px;padding:1px 5px">Respondió</span>' : ''}</td>
         <td style="font-family:'DM Mono',monospace;font-size:11px">${highlight(l.phone || '', q)}</td>
         <td style="font-size:11px">${esc(l.city   || '--')}</td>
         <td style="font-size:11px">${esc(l.barrio || '--')}</td>
@@ -396,6 +396,7 @@ function openLead(id) {
   renderLeadCallHistory(id);
   renderModalNotes(l);
   renderLeadTimeline(l);
+  if (typeof renderComposer === 'function') renderComposer(l);
   switchModalTab('notes');
   const ni = document.getElementById('m-note-inp');
   if (ni) ni.value = '';
@@ -419,8 +420,10 @@ function renderModalNotes(l) {
 }
 
 function switchModalTab(tab) {
-  document.getElementById('tab-notes')?.style && (document.getElementById('tab-notes').style.display = tab === 'notes' ? '' : 'none');
-  document.getElementById('tab-timeline')?.style && (document.getElementById('tab-timeline').style.display = tab === 'timeline' ? '' : 'none');
+  ['notes','mensaje','timeline'].forEach(t => {
+    const el = document.getElementById('tab-' + t);
+    if (el) el.style.display = (t === tab) ? '' : 'none';
+  });
   document.querySelectorAll('.modal-tab').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-btn-' + tab)?.classList.add('active');
 }
@@ -435,6 +438,17 @@ function renderLeadTimeline(l) {
       date: c.calledAt,
       icon: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:13px;height:13px"><path d="M5 1.5H3.5A1.5 1.5 0 0 0 2 3C2 9.6 6.4 14 13 14a1.5 1.5 0 0 0 1.5-1.5V11l-3-1-1 1.5C9 10.7 5.3 7 4.5 5.5L6 4.5l-1-3z"/></svg>',
       text: 'Llamada: ' + (OUTCOME_LABELS[c.outcome] || c.outcome) + ' · ' + fmtSec(parseInt(c.duration || 0)) + (c.notes ? ' — ' + c.notes : ''),
+    });
+  });
+
+  (S.interactions || []).filter(i => i.leadId === l.id).forEach(i => {
+    const arrow = i.direction === 'in' ? '←' : '→';
+    const ch = (CHANNEL_LABELS && CHANNEL_LABELS[i.channel]) || i.channel || '';
+    const fail = i.status === 'failed' ? ' (falló)' : '';
+    events.push({
+      date: i.createdAt,
+      icon: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:13px;height:13px"><path d="M2 3.5h12v8H4l-2 2z"/></svg>',
+      text: arrow + ' ' + ch + fail + ': ' + (i.body || ''),
     });
   });
 

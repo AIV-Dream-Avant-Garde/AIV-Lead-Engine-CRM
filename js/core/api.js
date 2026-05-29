@@ -65,6 +65,11 @@ async function syncNow() {
     if (r && r.success) { S.dirty.delete(l.id); }
     else { failed++; if (r && /unauthorized/i.test(String(r.error||''))) authError = r.error; }
   }
+  // Push unsynced interactions (append-only; mark _synced on confirmed success)
+  for (const it of (S.interactions || []).filter(i => !i._synced)) {
+    const r = await sheetsCall({action:'saveInteraction', ...it});
+    if (r && r.success) it._synced = true;
+  }
   setProgress(40);
 
   // Pull from server
@@ -102,6 +107,11 @@ async function syncNow() {
     if (res.commissions) { S.commissions = res.commissions; localStorage.setItem('aiv-comm', JSON.stringify(S.commissions)); }
     if (res.scripts)     { S.scripts     = res.scripts;     localStorage.setItem('aiv-scripts', JSON.stringify(S.scripts)); }
     if (Array.isArray(res.scheduledJobs)) { S.scheduledJobs = res.scheduledJobs; localStorage.setItem('aiv-sched-jobs', JSON.stringify(S.scheduledJobs)); }
+    // Merge incoming interactions append-only, by id (never clobber; preserves local optimistic rows)
+    if (Array.isArray(res.interactions)) {
+      const seen = new Set(S.interactions.map(i => i.id));
+      res.interactions.forEach(i => { if (i.id && !seen.has(i.id)) { S.interactions.push({...i, _synced:true}); seen.add(i.id); } });
+    }
     S.lastSyncTimestamp = new Date().toISOString();
     saveLocal();
     if (failed > 0) {

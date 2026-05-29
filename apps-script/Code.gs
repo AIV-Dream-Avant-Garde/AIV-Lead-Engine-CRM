@@ -8,18 +8,30 @@ const TWILIO_API_KEY_SID = 'SKxxxx';
 const TWILIO_API_SECRET  = 'your_api_secret';
 const TWILIO_AUTH_TOKEN  = 'your_auth_token';
 const TWILIO_TWIML_APP   = 'APxxxx';
-const TWILIO_FROM_NUMBER = '+15551234567';
+const TWILIO_FROM_NUMBER = '+15551234567';     // voice (existing)
+const TWILIO_FROM_SMS_US = '+15551234567';     // US SMS sender (10DLC) — set in Project 0
+const TWILIO_FROM_WA     = '+14155238886';     // WhatsApp sender (whatsapp: prefix added at send) — set in Project 0
 const DRIVE_FOLDER_ID    = 'TU_DRIVE_FOLDER_ID';
-const SHEETS = { leads:'Leads', calls:'Llamadas', team:'Team', commissions:'Commissions', scripts:'Scripts' };
+const SHEETS = { leads:'Leads', calls:'Llamadas', team:'Team', commissions:'Commissions', scripts:'Scripts', interactions:'Interactions' };
 
 // CSRF protection — paste the value from your browser's Setup page
 const CRM_SECRET = 'PASTE_YOUR_CRM_SECRET_HERE'; // Setup → shows after first load
 
-const LEAD_HDR = ['id','name','phone','address','website','rating','reviews','city','barrio','keyword','source','sourceDetail','status','providerId','providerRate','closerId','closerRate','dealValue','collectedAmount','providerCommission','closerCommission','commissionStatus','lockedBy','lockedUntil','assignedAt','workHistory','dncReason','followUpDate','notes','importedAt','updatedAt','calendarEventId','refundAmount','refundReason','refundedAt','country','email','externalId'];
+const LEAD_HDR = ['id','name','phone','address','website','rating','reviews','city','barrio','keyword','source','sourceDetail','status','providerId','providerRate','closerId','closerRate','dealValue','collectedAmount','providerCommission','closerCommission','commissionStatus','lockedBy','lockedUntil','assignedAt','workHistory','dncReason','followUpDate','notes','importedAt','updatedAt','calendarEventId','refundAmount','refundReason','refundedAt','country','email','externalId','lastTouchAt','lastReplyAt','consentSms','consentWhatsapp','consentEmail'];
 const CALL_HDR = ['id','leadId','leadName','phone','callSid','outcome','duration','notes','recordingUrl','driveUrl','consentConfirmed','calledAt'];
 const TEAM_HDR = ['id','name','role','pinHash','providerRate','closerRate','contact','active','createdAt'];
 const COMM_HDR   = ['id','leadId','leadName','dealValue','collectedAmount','providerId','providerRate','providerAmount','closerId','closerRate','closerAmount','status','createdAt','paidAt','paidBy','paymentRef','refundReason','adjustedBy','adjustedAt','providerName','closerName'];
 const SCRIPT_HDR = ['id','name','stage','body','createdAt','updatedAt'];
+const INTERACTION_HDR = ['id','leadId','leadName','phone','channel','direction','body','stepTag','status','sid','error','createdAt','createdBy'];
+
+// Opt-out detection (mirror of js/data/constants.js + js/features/outreach.js — keep in sync)
+const OPT_OUT_KEYWORDS_GS = ['stop','stopall','unsubscribe','cancelar','baja','salir'];
+const OPT_OUT_PHRASES_GS = ['no me interesa','no me interesan','no escriban','no escribas','no me escriban','no me escribas','deja de escribir','dejen de escribir','no me contacten','no me contacte','no contactarme','quítame','quitame','quítenme','quitenme','bórrame','borrame','bórrenme','borrenme','déjame en paz','dejame en paz','déjenme en paz','dejenme en paz','not interested','remove me','take me off','leave me alone','stop messaging',"don't contact",'do not contact','unsubscribe me'];
+function isOptOutGs(body){
+  const t=String(body||'').trim().toLowerCase(); if(!t) return false;
+  if(OPT_OUT_KEYWORDS_GS.some(k=>t===k||t===k+'.'||t.indexOf(k+' ')===0)) return true;
+  return OPT_OUT_PHRASES_GS.some(p=>t.indexOf(p)!==-1);
+}
 
 function getSheet(name, hdr) {
   const ss = SpreadsheetApp.openById(SHEET_ID);
@@ -66,7 +78,9 @@ function doGet(e) {
       const comms   = toObjs(getSheet(SHEETS.commissions,COMM_HDR));
       const scripts = toObjs(getSheet(SHEETS.scripts,SCRIPT_HDR));
       let scheduledJobs=[]; try { const raw=cfgGet('scheduledJobs'); if(raw) scheduledJobs=JSON.parse(raw); } catch(e){}
-      return ok({leads,calls,team,commissions:comms,scripts,scheduledJobs,serverTime:new Date().toISOString()});
+      let interactions = toObjs(getSheet(SHEETS.interactions,INTERACTION_HDR));
+      if(since){const sd=new Date(since);interactions=interactions.filter(i=>!i.createdAt||new Date(i.createdAt)>=sd);}
+      return ok({leads,calls,team,commissions:comms,scripts,scheduledJobs,interactions,serverTime:new Date().toISOString()});
     }
     if (a === 'getToken') return ok({token:createToken(e.parameter.identity||'agent')});
     if (a === 'checkTriggers') {
@@ -91,6 +105,36 @@ function doGet(e) {
 function doPost(e) {
   try {
     const a = e.parameter.action;
+
+    // Twilio inbound messaging webhook (form-encoded; NOT our JSON+_secret shape).
+    // Configure the Twilio webhook URL as:  {execUrl}?action=inboundMsg&token={CRM_SECRET}
+    if (a === 'inboundMsg') {
+      if (e.parameter.token !== CRM_SECRET) return err_('Unauthorized');
+      const from = String(e.parameter.From || '').replace('whatsapp:', '');
+      const to   = String(e.parameter.To   || '');
+      const text = String(e.parameter.Body || '');
+      const channel = to.indexOf('whatsapp:') === 0 ? 'whatsapp' : 'sms';
+      const fromKey = phoneKey(from);
+      const ls = getSheet(SHEETS.leads, LEAD_HDR), lr = ls.getDataRange().getValues(), lh = lr[0] || LEAD_HDR;
+      const pc=lh.indexOf('phone'), ic=lh.indexOf('id'), nc=lh.indexOf('name'), stc=lh.indexOf('status'),
+            dc=lh.indexOf('dncReason'), rc=lh.indexOf('lastReplyAt'), csms=lh.indexOf('consentSms'), cwa=lh.indexOf('consentWhatsapp');
+      let row=-1, leadId='', leadName='';
+      for (let i=1;i<lr.length;i++){ if (fromKey && phoneKey(lr[i][pc])===fromKey) { row=i; leadId=lr[i][ic]; leadName=lr[i][nc]; } } // last match = most recent
+      const now = new Date().toISOString();
+      const rec = { id:Utilities.getUuid(), leadId, leadName, phone:from, channel, direction:'in', body:text, stepTag:'', status:'received', sid:String(e.parameter.MessageSid||''), error:'', createdAt:now, createdBy:'inbound' };
+      getSheet(SHEETS.interactions, INTERACTION_HDR).appendRow(INTERACTION_HDR.map(k => rec[k] ?? ''));
+      if (row >= 0) {
+        if (rc>=0) ls.getRange(row+1, rc+1).setValue(now);
+        if (isOptOutGs(text)) {
+          if (stc>=0) ls.getRange(row+1, stc+1).setValue('No llamar');
+          if (dc>=0)  ls.getRange(row+1, dc+1).setValue('opt-out ('+channel+')');
+          if (channel==='whatsapp' && cwa>=0) ls.getRange(row+1, cwa+1).setValue(false);
+          if (channel==='sms' && csms>=0)     ls.getRange(row+1, csms+1).setValue(false);
+        }
+      }
+      return ContentService.createTextOutput('<?xml version="1.0"?><Response></Response>').setMimeType(ContentService.MimeType.XML);
+    }
+
     const b = JSON.parse(e.postData.contents||'{}');
     if (b._secret !== CRM_SECRET) {
       return err_('Unauthorized — configura CRM_SECRET en Code.gs con el valor de Setup.');
@@ -242,6 +286,30 @@ function doPost(e) {
       const d = JSON.parse(res.getContentText());
       if (d.sid) return ok({sid:d.sid});
       return err_(d.message || 'SMS failed');
+    }
+    if (a === 'saveInteraction') {
+      // Idempotent upsert by id (optimistic row → confirmed status; pull dedups by id).
+      const s=getSheet(SHEETS.interactions, INTERACTION_HDR), rows=s.getDataRange().getValues();
+      const h=rows[0]||INTERACTION_HDR, ic=h.indexOf('id');
+      const vals=INTERACTION_HDR.map(k=> b[k] ?? '');
+      for (let i=1;i<rows.length;i++){ if(String(rows[i][ic])===String(b.id)){ s.getRange(i+1,1,1,INTERACTION_HDR.length).setValues([vals]); return ok({saved:true,updated:true}); } }
+      s.appendRow(vals);
+      return ok({saved:true,updated:false});
+    }
+    if (a === 'sendMessage') {
+      // Twilio send only (SMS or WhatsApp). Persistence is via saveInteraction rows.
+      const {phoneE164, channel, body:msgBody} = b;
+      if (!phoneE164 || !msgBody) return err_('phoneE164 and body required');
+      const auth = Utilities.base64Encode(TWILIO_ACCOUNT_SID + ':' + TWILIO_AUTH_TOKEN);
+      const from = channel === 'whatsapp' ? 'whatsapp:' + TWILIO_FROM_WA : TWILIO_FROM_SMS_US;
+      const to   = channel === 'whatsapp' ? 'whatsapp:' + phoneE164    : phoneE164;
+      const res  = UrlFetchApp.fetch(
+        'https://api.twilio.com/2010-04-01/Accounts/' + TWILIO_ACCOUNT_SID + '/Messages.json',
+        {method:'post', headers:{Authorization:'Basic '+auth}, payload:{From:from, To:to, Body:msgBody}, muteHttpExceptions:true}
+      );
+      const d = JSON.parse(res.getContentText());
+      if (d.sid) return ok({sid:d.sid, status:d.status || 'sent'});
+      return err_(d.message || 'send failed');
     }
     if (a === 'saveReportEmail') {
       const ss=SpreadsheetApp.openById(SHEET_ID);

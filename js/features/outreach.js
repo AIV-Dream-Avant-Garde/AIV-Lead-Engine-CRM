@@ -52,3 +52,122 @@ function isOptOut(body) {
   if (OPT_OUT_PHRASES.some(p => t.indexOf(p) !== -1)) return true;
   return false;
 }
+
+// ── Interactions (append-only log) + manual send ──────────────────────
+// Append a local interaction row and persist it (idempotent upsert by id on
+// the backend). Returns the row so the caller can update status/sid later.
+function addInteraction(rec) {
+  const it = {
+    id:        (rec && rec.id) || uid(),
+    leadId:    rec.leadId   || '',
+    leadName:  rec.leadName || '',
+    phone:     rec.phone    || '',
+    channel:   rec.channel  || '',
+    direction: rec.direction|| 'out',
+    body:      rec.body     || '',
+    stepTag:   rec.stepTag  || '',
+    status:    rec.status   || 'sent',
+    sid:       rec.sid      || '',
+    error:     rec.error    || '',
+    createdAt: new Date().toISOString(),
+    createdBy: (S.session && S.session.userId) || 'system',
+    _synced:   false,
+  };
+  if (!Array.isArray(S.interactions)) S.interactions = [];
+  S.interactions.push(it);
+  saveLocal();
+  if (S.config.scriptUrl) sheetsCall({action:'saveInteraction', ...it}).then(r => { if (r && r.success) { it._synced = true; saveLocal(); } });
+  return it;
+}
+
+// Persist an interaction's updated fields (status/sid/error) — idempotent upsert.
+function persistInteraction(it) {
+  it._synced = false;
+  saveLocal();
+  if (S.config.scriptUrl) sheetsCall({action:'saveInteraction', ...it}).then(r => { if (r && r.success) { it._synced = true; saveLocal(); } });
+}
+
+// Manual outbound send from an agent. Resolves channel by country, renders the
+// human template, blocks opted-out leads, logs an optimistic interaction, then
+// fires the backend send. The backend `sendMessage` only talks to Twilio;
+// persistence is via the (idempotent) interaction rows.
+async function sendMessage(lead, body, opts) {
+  opts = opts || {};
+  if (!lead) return null;
+  const channel = opts.channel || pickChannel(lead);
+  if (channel === 'email') { toast('Email aún no está disponible (Proyecto C).', 'error'); return null; }
+  if (lead.status === 'No llamar') { toast('Este lead está en "No llamar" / opt-out — no se envía.', 'error'); return null; }
+  const agent = ((S.session && S.session.userName) || '').split(' ')[0] || '';
+  const text  = renderTemplate(body, lead, agent);
+  if (!text.trim()) { toast('El mensaje está vacío.', 'error'); return null; }
+  const phoneE164 = toE164(lead.phone, lead.country);
+  if (!phoneE164) { toast('El número del lead no es válido para enviar.', 'error'); return null; }
+
+  const it = addInteraction({ leadId:lead.id, leadName:lead.name, phone:lead.phone, channel, direction:'out', stepTag:opts.stepTag||'', body:text, status:'queued' });
+  lead.lastTouchAt = new Date().toISOString();
+  if (typeof pushLead === 'function') pushLead(lead);
+
+  if (!S.config.scriptUrl) { it.status = 'failed'; it.error = 'sin conexión'; persistInteraction(it); toast('Sin Apps Script configurado: el mensaje quedó registrado pero no se envió.', 'error', 6000); return it; }
+
+  const res = await sheetsCall({ action:'sendMessage', id:it.id, leadId:lead.id, phoneE164, channel, body:text, stepTag:it.stepTag });
+  if (res && res.success) { it.status = 'sent'; it.sid = res.sid || ''; toast('Mensaje enviado por ' + (CHANNEL_LABELS[channel] || channel) + '.', 'success'); }
+  else { it.status = 'failed'; it.error = (res && res.error) || 'sin respuesta'; toast('No se pudo enviar el mensaje: ' + it.error, 'error', 6000); }
+  persistInteraction(it);
+  if (typeof renderAll === 'function') renderAll();
+  return it;
+}
+
+// ── Lead-modal composer (manual send) ─────────────────────────────────
+let _composerTpls = [];
+function _composerChannel() { return document.getElementById('msg-channel')?.value || 'sms'; }
+
+function renderComposer(lead) {
+  const csel = document.getElementById('msg-channel');
+  if (!csel || !lead) return;
+  const def = pickChannel(lead);
+  csel.innerHTML = ['sms','whatsapp','email'].map(c => `<option value="${c}"${c===def?' selected':''}>${CHANNEL_LABELS[c]||c}</option>`).join('');
+  csel.onchange = () => { _fillComposerTemplates(lead); renderMsgPreview(); };
+  const body = document.getElementById('msg-body'); if (body) body.value = '';
+  _fillComposerTemplates(lead);
+  renderMsgPreview();
+  const optedOut = lead.status === 'No llamar';
+  const note = document.getElementById('msg-optout-note');
+  const btn  = document.getElementById('msg-send-btn');
+  if (note) { note.style.display = optedOut ? 'block' : 'none'; note.textContent = optedOut ? 'Lead en "No llamar" / opt-out — no se puede enviar.' : ''; }
+  if (btn) btn.disabled = optedOut;
+}
+
+function _fillComposerTemplates(lead) {
+  const ch = _composerChannel();
+  const seeded = (typeof OUTREACH_TEMPLATES !== 'undefined' && OUTREACH_TEMPLATES[lead.country] && OUTREACH_TEMPLATES[lead.country][ch]) || [];
+  const custom = (S.smsTemplates || []).map(t => ({ name: t.name, body: t.body }));
+  _composerTpls = seeded.concat(custom);
+  const sel = document.getElementById('msg-template');
+  if (sel) sel.innerHTML = '<option value="">— plantilla —</option>' + _composerTpls.map((t,i) => `<option value="${i}">${esc(t.name)}</option>`).join('');
+}
+
+function applyMsgTemplate() {
+  const sel = document.getElementById('msg-template'), body = document.getElementById('msg-body');
+  if (!sel || !body) return;
+  const t = _composerTpls[parseInt(sel.value)];
+  if (t) { body.value = t.body; renderMsgPreview(); }
+}
+
+function renderMsgPreview() {
+  const lead = S.leads.find(l => l.id === S.curLeadId) || {};
+  const agent = ((S.session && S.session.userName) || '').split(' ')[0] || '';
+  const body = document.getElementById('msg-body')?.value || '';
+  const pv = document.getElementById('msg-preview');
+  if (pv) pv.textContent = body ? renderTemplate(body, lead, agent) : 'La vista previa del mensaje aparecerá aquí.';
+}
+
+async function sendComposer() {
+  const lead = S.leads.find(l => l.id === S.curLeadId);
+  if (!lead) return;
+  const body = document.getElementById('msg-body')?.value || '';
+  await sendMessage(lead, body, { channel: _composerChannel() });
+  const b = document.getElementById('msg-body'); if (b) b.value = '';
+  renderMsgPreview();
+  if (typeof renderLeadTimeline === 'function') renderLeadTimeline(lead);
+  switchModalTab('timeline');
+}

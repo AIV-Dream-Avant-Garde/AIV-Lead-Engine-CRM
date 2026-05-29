@@ -6,10 +6,10 @@
 <title>AXIUS — Lead Engine &amp; CRM</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@twilio/voice-sdk@2.9.0/dist/twilio.min.js"></script>
-<link rel="stylesheet" href="css/base.css?v=20260529b">
-<link rel="stylesheet" href="css/layout.css?v=20260529b">
-<link rel="stylesheet" href="css/components.css?v=20260529b">
-<link rel="stylesheet" href="css/widgets.css?v=20260529b">
+<link rel="stylesheet" href="css/base.css?v=20260529c">
+<link rel="stylesheet" href="css/layout.css?v=20260529c">
+<link rel="stylesheet" href="css/components.css?v=20260529c">
+<link rel="stylesheet" href="css/widgets.css?v=20260529c">
 </head>
 <body>
 
@@ -771,12 +771,23 @@ Content-Type: application/json
       <div class="divider"></div>
       <div class="modal-tab-bar">
         <button class="modal-tab active" id="tab-btn-notes" onclick="switchModalTab('notes')">Notas</button>
+        <button class="modal-tab" id="tab-btn-mensaje" onclick="switchModalTab('mensaje')">Mensaje</button>
         <button class="modal-tab" id="tab-btn-timeline" onclick="switchModalTab('timeline')">Cronología</button>
       </div>
       <div id="tab-notes">
         <div class="notes-list" id="m-notes"></div>
         <div class="field" style="margin-top:8px"><textarea id="m-note-inp" placeholder="Agregar nota o resultado..." rows="2"></textarea></div>
         <button class="btn btn-ghost" style="margin-top:8px;font-size:12px" onclick="addNote()">+ Agregar nota</button>
+      </div>
+      <div id="tab-mensaje" style="display:none">
+        <div class="form-grid" style="margin-bottom:8px">
+          <div class="field"><label>Canal</label><select id="msg-channel"></select></div>
+          <div class="field"><label>Plantilla</label><select id="msg-template" onchange="applyMsgTemplate()"></select></div>
+        </div>
+        <div class="field"><textarea id="msg-body" rows="4" placeholder="Escribe un mensaje humano y directo..." oninput="renderMsgPreview()"></textarea></div>
+        <div id="msg-preview" style="font-size:12px;color:var(--body);background:var(--surface-hi);border-radius:8px;padding:8px 10px;margin-top:6px;white-space:pre-wrap"></div>
+        <div id="msg-optout-note" style="display:none;font-size:11px;color:var(--red);margin-top:6px"></div>
+        <button class="btn btn-primary" id="msg-send-btn" style="margin-top:10px" onclick="sendComposer()">Enviar mensaje</button>
       </div>
       <div id="tab-timeline" style="display:none">
         <div class="timeline-wrap" id="m-timeline"></div>
@@ -959,28 +970,28 @@ Content-Type: application/json
 </div>
 
 <!-- JS: load order matters — data → core → auth → locks → commission → features → main -->
-<script src="js/data/keywords.js?v=20260529b"></script>
-<script src="js/data/locations.js?v=20260529b"></script>
-<script src="js/data/constants.js?v=20260529b"></script>
-<script src="js/data/demo-data.js?v=20260529b"></script>
-<script src="js/data/outreach-templates.js?v=20260529b"></script>
-<script src="js/core/state.js?v=20260529b"></script>
-<script src="js/core/utils.js?v=20260529b"></script>
-<script src="js/core/storage.js?v=20260529b"></script>
-<script src="js/core/api.js?v=20260529b"></script>
-<script src="js/auth/auth.js?v=20260529b"></script>
-<script src="js/locks.js?v=20260529b"></script>
-<script src="js/commission.js?v=20260529b"></script>
-<script src="js/features/scraper.js?v=20260529b"></script>
-<script src="js/features/outreach.js?v=20260529b"></script>
-<script src="js/features/import.js?v=20260529b"></script>
-<script src="js/features/leads.js?v=20260529b"></script>
-<script src="js/features/pipeline.js?v=20260529b"></script>
-<script src="js/features/calls.js?v=20260529b"></script>
-<script src="js/features/profile.js?v=20260529b"></script>
-<script src="js/features/admin.js?v=20260529b"></script>
-<script src="js/features/analytics.js?v=20260529b"></script>
-<script src="js/features/export.js?v=20260529b"></script>
-<script src="js/main.js?v=20260529b"></script>
+<script src="js/data/keywords.js?v=20260529c"></script>
+<script src="js/data/locations.js?v=20260529c"></script>
+<script src="js/data/constants.js?v=20260529c"></script>
+<script src="js/data/demo-data.js?v=20260529c"></script>
+<script src="js/data/outreach-templates.js?v=20260529c"></script>
+<script src="js/core/state.js?v=20260529c"></script>
+<script src="js/core/utils.js?v=20260529c"></script>
+<script src="js/core/storage.js?v=20260529c"></script>
+<script src="js/core/api.js?v=20260529c"></script>
+<script src="js/auth/auth.js?v=20260529c"></script>
+<script src="js/locks.js?v=20260529c"></script>
+<script src="js/commission.js?v=20260529c"></script>
+<script src="js/features/scraper.js?v=20260529c"></script>
+<script src="js/features/outreach.js?v=20260529c"></script>
+<script src="js/features/import.js?v=20260529c"></script>
+<script src="js/features/leads.js?v=20260529c"></script>
+<script src="js/features/pipeline.js?v=20260529c"></script>
+<script src="js/features/calls.js?v=20260529c"></script>
+<script src="js/features/profile.js?v=20260529c"></script>
+<script src="js/features/admin.js?v=20260529c"></script>
+<script src="js/features/analytics.js?v=20260529c"></script>
+<script src="js/features/export.js?v=20260529c"></script>
+<script src="js/main.js?v=20260529c"></script>
 </body>
 </html>

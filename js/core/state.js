@@ -8,6 +8,7 @@ const S = {
   },
   leads:       [],
   calls:       [],
+  interactions: [],   // append-only messages (sms/whatsapp/email, both directions) — Project A
   team:        [],
   commissions: [],
   dirty:       new Set(),
