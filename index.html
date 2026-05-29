@@ -6,19 +6,19 @@
 <title>AIV — Lead Engine &amp; CRM</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@twilio/voice-sdk@2.9.0/dist/twilio.min.js"></script>
-<link rel="stylesheet" href="css/base.css?v=20260528e">
-<link rel="stylesheet" href="css/layout.css?v=20260528e">
-<link rel="stylesheet" href="css/components.css?v=20260528e">
-<link rel="stylesheet" href="css/widgets.css?v=20260528e">
+<link rel="stylesheet" href="css/base.css?v=20260528f">
+<link rel="stylesheet" href="css/layout.css?v=20260528f">
+<link rel="stylesheet" href="css/components.css?v=20260528f">
+<link rel="stylesheet" href="css/widgets.css?v=20260528f">
 </head>
 <body>
 
 <!-- LOGIN OVERLAY -->
-<div class="login-overlay" id="login-overlay">
+<div class="login-overlay" id="login-overlay" role="dialog" aria-modal="true" aria-label="Inicio de sesión con PIN">
   <div class="login-card">
     <div class="login-logo"><div class="login-logo-dot"></div>AIV</div>
     <div class="login-sub">Lead Engine &amp; CRM</div>
-    <div class="pin-dots" id="pin-dots">
+    <div class="pin-dots" id="pin-dots" role="status" aria-label="Dígitos del PIN ingresados">
       <div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div>
       <div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div>
     </div>
@@ -33,7 +33,7 @@
       <button class="np-btn" onclick="pinKey('8')">8</button>
       <button class="np-btn" onclick="pinKey('9')">9</button>
       <button class="np-btn" onclick="pinKey('0')" style="grid-column:1">0</button>
-      <button class="np-btn np-del" onclick="pinDel()" style="grid-column:3">&#9003;</button>
+      <button class="np-btn np-del" onclick="pinDel()" style="grid-column:3" aria-label="Borrar último dígito">&#9003;</button>
     </div>
     <div class="login-hint" id="login-hint">Ingresa tu PIN para acceder</div>
     <div class="login-lockout" id="login-lockout"></div>
@@ -822,7 +822,7 @@ Content-Type: application/json
 </div>
 
 <!-- TEAM MEMBER MODAL -->
-<div class="tm-modal-overlay" id="tm-modal">
+<div class="tm-modal-overlay" id="tm-modal" role="dialog" aria-modal="true" aria-labelledby="tm-modal-title">
   <div class="tm-modal-card">
     <div class="tm-modal-title" id="tm-modal-title">Nuevo miembro del equipo</div>
     <input type="hidden" id="tm-id">
@@ -958,26 +958,26 @@ Content-Type: application/json
 </div>
 
 <!-- JS: load order matters — data → core → auth → locks → commission → features → main -->
-<script src="js/data/keywords.js?v=20260528e"></script>
-<script src="js/data/locations.js?v=20260528e"></script>
-<script src="js/data/constants.js?v=20260528e"></script>
-<script src="js/data/demo-data.js?v=20260528e"></script>
-<script src="js/core/state.js?v=20260528e"></script>
-<script src="js/core/utils.js?v=20260528e"></script>
-<script src="js/core/storage.js?v=20260528e"></script>
-<script src="js/core/api.js?v=20260528e"></script>
-<script src="js/auth/auth.js?v=20260528e"></script>
-<script src="js/locks.js?v=20260528e"></script>
-<script src="js/commission.js?v=20260528e"></script>
-<script src="js/features/scraper.js?v=20260528e"></script>
-<script src="js/features/import.js?v=20260528e"></script>
-<script src="js/features/leads.js?v=20260528e"></script>
-<script src="js/features/pipeline.js?v=20260528e"></script>
-<script src="js/features/calls.js?v=20260528e"></script>
-<script src="js/features/profile.js?v=20260528e"></script>
-<script src="js/features/admin.js?v=20260528e"></script>
-<script src="js/features/analytics.js?v=20260528e"></script>
-<script src="js/features/export.js?v=20260528e"></script>
-<script src="js/main.js?v=20260528e"></script>
+<script src="js/data/keywords.js?v=20260528f"></script>
+<script src="js/data/locations.js?v=20260528f"></script>
+<script src="js/data/constants.js?v=20260528f"></script>
+<script src="js/data/demo-data.js?v=20260528f"></script>
+<script src="js/core/state.js?v=20260528f"></script>
+<script src="js/core/utils.js?v=20260528f"></script>
+<script src="js/core/storage.js?v=20260528f"></script>
+<script src="js/core/api.js?v=20260528f"></script>
+<script src="js/auth/auth.js?v=20260528f"></script>
+<script src="js/locks.js?v=20260528f"></script>
+<script src="js/commission.js?v=20260528f"></script>
+<script src="js/features/scraper.js?v=20260528f"></script>
+<script src="js/features/import.js?v=20260528f"></script>
+<script src="js/features/leads.js?v=20260528f"></script>
+<script src="js/features/pipeline.js?v=20260528f"></script>
+<script src="js/features/calls.js?v=20260528f"></script>
+<script src="js/features/profile.js?v=20260528f"></script>
+<script src="js/features/admin.js?v=20260528f"></script>
+<script src="js/features/analytics.js?v=20260528f"></script>
+<script src="js/features/export.js?v=20260528f"></script>
+<script src="js/main.js?v=20260528f"></script>
 </body>
 </html>

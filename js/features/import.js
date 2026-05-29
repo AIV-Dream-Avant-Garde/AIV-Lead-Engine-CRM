@@ -21,29 +21,47 @@ function handleFile(e) {
 }
 
 // ── CSV mapper flow ────────────────────────────────────────
+// ── Pure CSV helpers (unit-tested in tests/cases.js) ───────────────────
+// Parse raw CSV text → { headers, rows }. Keeps any non-empty data row;
+// does NOT require a column literally named "name" (columns are mapped
+// afterward), so a 'nombre'/'Phone'/etc. header never yields a false "empty".
+function parseCSV(text) {
+  const lines = String(text || '').replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim().split('\n');
+  if (lines.length < 2) return { headers: [], rows: [] };
+  const headers = splitCSV(lines[0]).map(h => h.toLowerCase().trim());
+  const rows = lines.slice(1)
+    .map(line => { const vals = splitCSV(line); const obj = {}; headers.forEach((h,i) => obj[h] = (vals[i]||'').trim()); return obj; })
+    .filter(r => Object.values(r).some(v => v && v.trim() !== ''));
+  return { headers, rows };
+}
+
+// Auto-detect which CRM field each header maps to (Spanish + English aliases).
+function autoMapHeaders(headers) {
+  const autoMap = {};
+  (headers || []).forEach(h => {
+    const norm = h.replace(/[^a-z]/g,'');
+    if (norm === 'nombre' || norm === 'name')    autoMap[h] = 'name';
+    if (norm === 'telefono' || norm === 'phone' || norm === 'celular' || norm === 'movil' || norm === 'mobile') autoMap[h] = 'phone';
+    if (norm === 'direccion' || norm === 'address') autoMap[h] = 'address';
+    if (norm === 'website' || norm === 'web' || norm === 'sitioweb') autoMap[h] = 'website';
+    if (norm === 'rating' || norm === 'calificacion') autoMap[h] = 'rating';
+    if (norm === 'resenas' || norm === 'reviews' || norm === 'opiniones') autoMap[h] = 'reviews';
+  });
+  return autoMap;
+}
+
 function processCSV(file) {
   const reader = new FileReader();
   reader.onload = ev => {
-    const text = ev.target.result;
-    const lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim().split('\n');
-    if (lines.length < 2) { toast('CSV vacío o inválido.', 'error'); return; }
-    const headers = splitCSV(lines[0]).map(h => h.toLowerCase().trim());
-    const rows    = lines.slice(1)
-      .map(line => { const vals = splitCSV(line); const obj = {}; headers.forEach((h,i) => obj[h] = (vals[i]||'').trim()); return obj; })
-      .filter(r => r.name && r.name !== 'name');
-    if (!rows.length) { toast('CSV vacío o inválido.', 'error'); return; }
+    const { headers, rows } = parseCSV(ev.target.result);
+    if (!rows.length) { toast('CSV sin filas de datos.', 'error'); return; }
 
-    // Build mapper UI
-    const autoMap = {};
-    headers.forEach(h => {
-      const norm = h.replace(/[^a-z]/g,'');
-      if (norm === 'nombre' || norm === 'name')    autoMap[h] = 'name';
-      if (norm === 'telefono' || norm === 'phone') autoMap[h] = 'phone';
-      if (norm === 'direccion' || norm === 'address') autoMap[h] = 'address';
-      if (norm === 'website' || norm === 'web')    autoMap[h] = 'website';
-      if (norm === 'rating')                       autoMap[h] = 'rating';
-      if (norm === 'resenas' || norm === 'reviews') autoMap[h] = 'reviews';
-    });
+    const autoMap = autoMapHeaders(headers);
+    // Warn (non-blocking) if neither key field was auto-detected — guides manual mapping.
+    const detected = new Set(Object.values(autoMap));
+    if (!detected.has('name') && !detected.has('phone')) {
+      toast('No se detectaron columnas Nombre/Teléfono — asígnalas manualmente abajo antes de importar.', 'error', 7000);
+    }
 
     const mapperEl = document.getElementById('csv-mapper-rows');
     if (mapperEl) {
