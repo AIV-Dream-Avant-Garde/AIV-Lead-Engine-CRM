@@ -138,11 +138,16 @@ async function confirmImport() {
 
   if (S.config.scriptUrl) {
     setSyncUI('syncing','Guardando...');
-    for (let i = 0; i < toAdd.length; i += 20) await sheetsCall({action:'push', data:toAdd.slice(i,i+20)});
-    toAdd.forEach(l => l._synced = true);
+    let failed = 0;
+    for (let i = 0; i < toAdd.length; i += 20) {
+      const batch = toAdd.slice(i, i + 20);
+      const r = await sheetsCall({action:'push', data:batch});
+      if (r && r.success) batch.forEach(l => { l._synced = true; S.dirty.delete(l.id); });
+      else failed += batch.length;   // stays unsynced + dirty → retried by syncNow
+    }
     saveLocal();
-    setSyncUI('ok','Sincronizado');
-    setLastSynced();
+    if (failed > 0) { setSyncUI('error', failed + ' sin sincronizar'); toast(failed + ' lead(s) se guardaron localmente; se reintentarán al sincronizar.', 'error', 6000); }
+    else { setSyncUI('ok','Sincronizado'); setLastSynced(); }
   }
 
   toast(toAdd.length + ' leads importados.', 'success');

@@ -10,7 +10,10 @@ function saveLocal() {
     localStorage.setItem('aiv-scripts',    JSON.stringify(S.scripts     || []));
     localStorage.setItem('aiv-sms-tpl',   JSON.stringify(S.smsTemplates || []));
     localStorage.setItem('aiv-sched-jobs', JSON.stringify(S.scheduledJobs || []));
-    S.dirty.clear();
+    // Persist the dirty set so unsynced edits survive a reload. Cleared per-lead
+    // only on confirmed sync success (syncNow) — NOT on every local save, or
+    // failed edits would be silently dropped.
+    localStorage.setItem('aiv-dirty', JSON.stringify([...S.dirty]));
     checkStorage();
   } catch(e) {
     checkStorage();
@@ -27,6 +30,7 @@ function loadLocal() {
   try { S.scripts      = JSON.parse(localStorage.getItem('aiv-scripts') || '[]'); } catch(e) {}
   try { S.smsTemplates = JSON.parse(localStorage.getItem('aiv-sms-tpl') || '[]'); } catch(e) {}
   try { S.scheduledJobs = JSON.parse(localStorage.getItem('aiv-sched-jobs') || '[]'); } catch(e) {}
+  try { S.dirty = new Set(JSON.parse(localStorage.getItem('aiv-dirty') || '[]')); } catch(e) { S.dirty = new Set(); }
   purgeDemoData();
 }
 

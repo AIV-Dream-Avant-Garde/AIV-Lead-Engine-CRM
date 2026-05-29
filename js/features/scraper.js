@@ -224,11 +224,15 @@ async function runScraper() {
     try { localStorage.setItem('aiv-scrape-history', JSON.stringify(S.scrapeHistory)); } catch(e) {}
     renderScrapeHistory();
 
-    // Push new leads to Sheets
+    // Push new leads to Sheets — only mark synced on confirmed success;
+    // failures stay unsynced + dirty so syncNow retries them.
     if (S.config.scriptUrl) {
       const nl = S.leads.filter(l => !l._synced);
-      for (let i = 0; i < nl.length; i += 20) await sheetsCall({action:'push', data:nl.slice(i,i+20)});
-      nl.forEach(l => l._synced = true);
+      for (let i = 0; i < nl.length; i += 20) {
+        const batch = nl.slice(i, i + 20);
+        const r = await sheetsCall({action:'push', data:batch});
+        if (r && r.success) batch.forEach(l => { l._synced = true; S.dirty.delete(l.id); });
+      }
       saveLocal();
     }
     renderAll();

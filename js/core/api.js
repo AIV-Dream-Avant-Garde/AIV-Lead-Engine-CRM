@@ -46,15 +46,24 @@ async function syncNow() {
   setSyncUI('syncing','Sincronizando...');
   setProgress(5);
 
-  // Push dirty/unsynced leads in batches of 20
-  const toSync = S.leads.filter(l => S.dirty.has(l.id) || !l._synced);
-  for (let i = 0; i < toSync.length; i += 20) {
-    await sheetsCall({action:'push', data: toSync.slice(i, i + 20)});
-    setProgress(5 + Math.round((i + Math.min(20, toSync.length - i)) / Math.max(toSync.length, 1) * 30));
+  // Push new (never-synced) leads in batches; update edited synced leads.
+  // A lead's dirty flag / unsynced state is cleared ONLY on confirmed success,
+  // so anything that fails to reach the server stays queued for the next sync.
+  const toPush   = S.leads.filter(l => !l._synced);
+  const toUpdate = S.leads.filter(l => l._synced && S.dirty.has(l.id));
+  let failed = 0, authError = null;
+
+  for (let i = 0; i < toPush.length; i += 20) {
+    const batch = toPush.slice(i, i + 20);
+    const r = await sheetsCall({action:'push', data: batch});
+    if (r && r.success) { batch.forEach(l => { l._synced = true; S.dirty.delete(l.id); }); }
+    else { failed += batch.length; if (r && /unauthorized/i.test(String(r.error||''))) authError = r.error; }
+    setProgress(5 + Math.round((i + Math.min(20, toPush.length - i)) / Math.max(toPush.length, 1) * 30));
   }
-  // Update already-synced dirty leads individually
-  for (const l of S.leads.filter(x => S.dirty.has(x.id) && x._synced)) {
-    await sheetsCall({action:'update', ...l});
+  for (const l of toUpdate) {
+    const r = await sheetsCall({action:'update', ...l});
+    if (r && r.success) { S.dirty.delete(l.id); }
+    else { failed++; if (r && /unauthorized/i.test(String(r.error||''))) authError = r.error; }
   }
   setProgress(40);
 
@@ -64,10 +73,14 @@ async function syncNow() {
 
   if (res && res.success) {
     if (res.serverTime) S.serverTimeOffset = new Date(res.serverTime) - Date.now();
-    // Merge incoming leads
+    // Merge incoming leads — but never clobber a lead with pending local edits
+    // (still dirty / failed to push), so unsynced work isn't lost to an older
+    // server copy.
     const sm = {};
     (res.leads || []).forEach(l => { if (l.id) sm[l.id] = l; });
-    S.leads.forEach(l => { if (sm[l.id]) { Object.assign(l, sm[l.id]); l.country = l.country || DEFAULT_COUNTRY; l._synced = true; } });
+    S.leads.forEach(l => {
+      if (sm[l.id] && !S.dirty.has(l.id)) { Object.assign(l, sm[l.id]); l.country = l.country || DEFAULT_COUNTRY; l._synced = true; }
+    });
     (res.leads || []).forEach(l => {
       if (l.id && !S.leads.find(x => x.id === l.id)) {
         S.leads.push({...l, _synced:true,
@@ -90,11 +103,19 @@ async function syncNow() {
     if (res.scripts)     { S.scripts     = res.scripts;     localStorage.setItem('aiv-scripts', JSON.stringify(S.scripts)); }
     S.lastSyncTimestamp = new Date().toISOString();
     saveLocal();
-    setSyncUI('ok','Sincronizado');
-    setLastSynced();
-    setTimeout(showSignalBanner, 200);
+    if (failed > 0) {
+      setSyncUI('error', failed + ' sin sincronizar — reintentar');
+      toast(failed + ' registro(s) no se guardaron en el servidor' + (authError ? ' (autenticación: revisa CRM_SECRET)' : '') + '. Se reintentarán en el próximo sync.', 'error', 7000);
+    } else {
+      setSyncUI('ok','Sincronizado');
+      setLastSynced();
+      setTimeout(showSignalBanner, 200);
+    }
   } else {
-    setSyncUI('error', res?.error ? 'Error: ' + String(res.error).slice(0,30) : 'Error de conexion');
+    // Pull failed: keep all dirty/unsynced state for retry; persist push progress.
+    saveLocal();
+    const isAuth = (res && /unauthorized/i.test(String(res.error||''))) || authError;
+    setSyncUI('error', isAuth ? 'No autorizado — revisa CRM_SECRET' : (res?.error ? 'Error: ' + String(res.error).slice(0,30) : 'Sin conexión — se reintentará'));
   }
 
   setProgress(100);
@@ -145,5 +166,10 @@ function saveReportEmail() {
 async function pushLead(lead) {
   S.dirty.add(lead.id);
   saveLocal();
-  if (lead._synced && S.config.scriptUrl) sheetsCall({action:'update', ...lead});
+  // Immediate update for already-synced leads (latency). Clear dirty only on
+  // confirmed success; on failure it stays dirty and syncNow retries it.
+  if (lead._synced && S.config.scriptUrl) {
+    const r = await sheetsCall({action:'update', ...lead});
+    if (r && r.success) { S.dirty.delete(lead.id); saveLocal(); }
+  }
 }
