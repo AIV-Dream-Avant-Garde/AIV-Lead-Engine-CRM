@@ -60,16 +60,16 @@ Rationale (from the integration analysis): per-lead history must **not** live on
     createdAt, createdBy   // userId or 'system'/'inbound'
   }
   ```
-- **Sync strategy:** append-only, mirroring `S.calls`. New interactions fire an immediate `saveInteraction` call and are pulled with a `since` filter (so the collection scales without re-syncing leads). Pull merges by `id` (append; never edited/deleted).
+- **Sync strategy:** *optimistic local append + fire-and-forget save*, modeled on the proven calls flow ([calls.js:170-172](js/features/calls.js#L170-L172) pushes to `S.calls` then immediately calls `saveCall`). **Important correction:** calls today are *pulled wholesale* (`api.js`: `S.calls = res.calls`; `isIncremental`/`since` are **not** implemented for calls — the `since` cursor applies to leads only). Interactions deliberately improve on this: the pull merges incoming rows **by `id`** (append-only, never clobber) behind a **new `since` cursor**, so the collection scales without re-pulling the whole history. **This merge-by-id + `since` logic is net-new work on both client and server — NOT a copy of the calls code** — and it must avoid the calls flow's latency window where a locally-pushed row can momentarily disappear on a pull-that-precedes-the-server-write (the by-id append-merge prevents that).
 
 ### Lead object additions
 
 - `email` (string, default '') — captured on import/manual entry; used by Project C and the router's email branch.
 - `lastTouchAt` (ISO) — last outbound interaction time (drives Project B min-gap; updated on send).
 - `lastReplyAt` (ISO) — last inbound interaction time (drives Project B "replied" pause; updated on inbound).
-- `consent` (object, default `{}`) — per-channel consent flags, e.g. `{sms:false, whatsapp:false, email:false}`; reserved for compliance, populated by opt-in/opt-out events.
+- `consentSms`, `consentWhatsapp`, `consentEmail` (boolean, default `false`) — per-channel consent as **flat scalar columns, NOT a nested object**. Rationale: only `notes`/`workHistory` get `JSON.stringify`/`JSON.parse` special-casing in `Code.gs` (`push`/`update`/`appendRow` write paths + `toObjs`); a nested `consent` object would serialize to `[object Object]` and not round-trip. Flat booleans avoid that entirely. Set by opt-in/opt-out events.
 
-These are small scalars/flags on the lead (not growing history), so they sync wholesale safely like other lead fields. `LEAD_HDR` gains `email`, `lastTouchAt`, `lastReplyAt`, `consent` (appended; `getSheet` reconciliation already handles existing sheets).
+These are small scalars/flags on the lead (not growing history), so they sync wholesale safely like other lead fields. `LEAD_HDR` gains `email`, `lastTouchAt`, `lastReplyAt`, `consentSms`, `consentWhatsapp`, `consentEmail` (all scalar, appended; `getSheet` reconciliation already handles existing sheets — no JSON special-casing needed).
 
 ### Phone normalization (E.164)
 
@@ -99,7 +99,11 @@ Used to (a) stamp a normalized `phoneE164` when sending, and (b) match Twilio in
   - WhatsApp: `From = 'whatsapp:' + TWILIO_FROM_WA`, `To = 'whatsapp:' + phoneE164`. **Template note:** outside the WhatsApp 24-hour window only an approved template may be sent (enforced/owned in Project 0; the call shape supports a `contentSid`/template param for later).
   - Appends the outbound row to `Interactions`, returns `{success, sid, status}`.
 - **`saveInteraction` action** (POST): append an interaction row (used for client-originated optimistic records / reconciliation).
-- **`inboundMsg` action** (POST — Twilio inbound messaging webhook): params from Twilio `{From, To, Body, MessageSid}`. Normalize `From`; find the lead by E.164 (last-10 fallback); append an `in` interaction (`channel` inferred from `To`/`whatsapp:` prefix, `status:'received'`); set `lead.lastReplyAt`. If `isOptOut(Body)` → set lead `status='No llamar'`, `dncReason='opt-out (<channel>)'`, `consent.<channel>=false`, and (for Project B) mark any enrollment stopped. Returns a minimal 200 so Twilio is satisfied.
+- **`inboundMsg` action** (POST — Twilio inbound messaging webhook): params from Twilio `{From, To, Body, MessageSid}`. Normalize `From`; find the lead by E.164 (last-10 fallback); append an `in` interaction (`channel` inferred from `To`/`whatsapp:` prefix, `status:'received'`); set `lead.lastReplyAt`. If `isOptOut(Body)` → set lead `status='No llamar'`, `dncReason='opt-out (<channel>)'`, the matching `consent<Channel>=false`, and (for Project B) mark any enrollment stopped. Returns a minimal 200 so Twilio is satisfied.
+  - **Do NOT reuse the existing `inbound` action** (`Code.gs:322`) — that one *creates a new lead* from a scraper/form webhook (dedupes by phone, appends a lead row). `inboundMsg` is a distinct message-reply webhook; keep them separate.
+  - **Lead write path:** matching is by **phone (E.164)**, not `id`, so this needs an id-less *find-row-by-phone-then-`setValue`-per-column* path (the existing `update` action finds by `id` — `Code.gs:137-142` — and must be adapted, not reused as-is). If no lead matches, append the inbound interaction with `leadId:''` and log it (never throw).
+  - **Last-10 fallback collision guard:** if more than one lead shares the same last-10 digits, attribute to the **most recently updated** matching lead and log the ambiguity (never silently mis-attribute to an arbitrary lead).
+  - **Dirty-merge caveat (Tier-4):** a server-side write to `lastReplyAt`/`status`/`consent*` is applied to the client only on the next pull **and only if that lead isn't locally dirty** (`api.js:82` `!S.dirty.has(l.id)` guard). So an opt-out applied server-side can be *temporarily masked* by a pending local edit until that edit syncs and clears. Acceptable (it reconciles on next clean sync), but the planner must know it — and the opt-out interaction itself (append-only) always shows in the timeline regardless.
 - **`pull` extension:** include `interactions` (filtered by `since`) in the response; `INTERACTION_HDR` added; `getSheet` reconciliation covers it.
 - **Quiet-hours / consent helpers** present but only *enforced* by Project B's worker; Project A's manual send may warn but not hard-block (an agent acting in real time is different from automated bulk).
 
@@ -162,7 +166,7 @@ Sync:
 | `js/data/constants.js` | opt-out keywords, country dialing codes, channel labels |
 | `js/features/import.js` | capture `email`; normalize phone on import |
 | `index.html` | composer UI + cache-bust bump |
-| `apps-script/Code.gs` | `sendMessage`, `saveInteraction`, `inboundMsg` actions; `INTERACTION_HDR`; `LEAD_HDR` += email/lastTouchAt/lastReplyAt/consent; pull includes interactions |
+| `apps-script/Code.gs` | `sendMessage`, `saveInteraction`, `inboundMsg` (distinct from existing `inbound`) actions; `INTERACTION_HDR`; `LEAD_HDR` += email/lastTouchAt/lastReplyAt/consentSms/consentWhatsapp/consentEmail (scalars); id-less find-by-phone write path; pull includes interactions (merge-by-id + `since`) |
 | `tests/cases.js` | unit tests for the pure helpers |
 
 ---
@@ -182,7 +186,7 @@ Documented and sequenced; **build/technical items are done with the code, provis
 - **US SMS → 10DLC** brand/campaign registration (days–weeks).
 - **Colombia → WhatsApp Business API** sender + **template pre-approval** (days–weeks).
 - **Email → ESP + domain auth (SPF/DKIM/DMARC)** (Project C).
-- Per-country FROM numbers configured (`TWILIO_FROM_SMS_US`, `TWILIO_FROM_WA`).
+- Per-country FROM numbers configured as **new** constants `TWILIO_FROM_SMS_US` and `TWILIO_FROM_WA`, **distinct from the existing voice-only `TWILIO_FROM_NUMBER`** (`Code.gs:11`).
 
 ### 0.3 Compliance posture (designed-in now, enforced when provisioned)
 - Opt-out keyword handling (built in A), per-channel consent flags, quiet hours (config in A, enforced by B), low send-rate/warmup defaults (B), consent/audit logging.
