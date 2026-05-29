@@ -1,5 +1,23 @@
 /* ── DATA: App-wide constants ─────────────────────────────── */
 
+// ── Outreach: channel routing, dialing codes, opt-out detection ──
+const CHANNEL_BY_COUNTRY = { 'Estados Unidos': 'sms', 'Colombia': 'whatsapp' }; // else → email
+const COUNTRY_DIAL       = { 'Colombia': '57', 'Estados Unidos': '1' };
+const CHANNEL_LABELS     = { sms: 'SMS', whatsapp: 'WhatsApp', email: 'Email' };
+
+// Carrier-mandated opt-out keywords (always honored). Whole-message or leading token.
+const OPT_OUT_KEYWORDS = ['stop','stopall','unsubscribe','cancelar','baja','salir'];
+// Natural-language declines (ES/EN) — real people don't text "STOP". Matched as substrings.
+// Deliberately specific so neutral replies ("no tengo tiempo hoy", "¿cuánto cuesta?") are NOT opt-outs.
+const OPT_OUT_PHRASES = [
+  'no me interesa','no me interesan','no escriban','no escribas','no me escriban','no me escribas',
+  'deja de escribir','dejen de escribir','no me contacten','no me contacte','no contactarme',
+  'quítame','quitame','quítenme','quitenme','bórrame','borrame','bórrenme','borrenme',
+  'déjame en paz','dejame en paz','déjenme en paz','dejenme en paz',
+  'not interested','remove me','take me off','leave me alone','stop messaging',
+  "don't contact",'do not contact','unsubscribe me',
+];
+
 const SOURCES = [
   {val:'Google Maps',cls:'src-maps'},{val:'LinkedIn',cls:'src-linkedin'},
   {val:'Instagram',cls:'src-instagram'},{val:'Facebook',cls:'src-facebook'},

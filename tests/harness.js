@@ -27,6 +27,8 @@ const APP_FILES = [
   'js/commission.js',       // calcCommissions, fmtCOP
   'js/features/scraper.js', // barrioCoords, barrioHash
   'js/features/import.js',  // parseCSV, autoMapHeaders, splitCSV
+  'js/data/outreach-templates.js', // OUTREACH_TEMPLATES
+  'js/features/outreach.js',// pickChannel, toE164, renderTemplate, isOptOut
   'js/auth/auth.js',        // sha256, isWeakPin, sessionSig
 ];
 

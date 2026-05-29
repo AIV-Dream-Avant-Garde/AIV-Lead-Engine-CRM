@@ -137,3 +137,45 @@ test('phoneKey: too-short / junk → empty (never dedups spuriously)', () => {
   eq(phoneKey('12345'), '', 'fewer than 10 digits');
   eq(phoneKey(null), '', 'null');
 });
+
+// ── Outreach pure logic (Project A slice 1) ────────────────────────────
+test('pickChannel: US→sms, Colombia→whatsapp, else→email', () => {
+  eq(pickChannel({country:'Estados Unidos'}), 'sms');
+  eq(pickChannel({country:'Colombia'}), 'whatsapp');
+  eq(pickChannel({country:'Brasil'}), 'email', 'unknown country → email');
+  eq(pickChannel({}), 'email', 'no country → email');
+});
+
+test('toE164: formats CO/US, respects existing +/country code, junk→empty', () => {
+  eq(toE164('320 123 4567', 'Colombia'), '+573201234567', 'CO 10-digit gets +57');
+  eq(toE164('+57 320 123 4567', 'Colombia'), '+573201234567', 'already + kept');
+  eq(toE164('573201234567', 'Colombia'), '+573201234567', 'already has country code');
+  eq(toE164('(305) 555-0199', 'Estados Unidos'), '+13055550199', 'US 10-digit gets +1');
+  eq(toE164('', 'Colombia'), '', 'empty → empty');
+  eq(toE164('abc', 'Colombia'), '', 'junk → empty');
+});
+
+test('renderTemplate: rich tokens resolve; unknown/empty degrade gracefully', () => {
+  const lead = {name:'Café Aroma', city:'Medellín', keyword:'Cafetería'};
+  const out = renderTemplate('Hola, soy {agente} de {empresa}. Vi {negocio} en {ciudad}.', lead, 'Andrés');
+  assert(out.includes('Café Aroma') && out.includes('Medellín') && out.includes('Andrés'), 'tokens merged');
+  assert(out.indexOf('{') === -1, 'no literal tokens left');
+  // empty token collapses without leaving "{barrio}" or double spaces
+  const out2 = renderTemplate('{negocio} {barrio} cierra', {name:'X'}, '');
+  eq(out2, 'X cierra', 'empty token + whitespace tidied');
+});
+
+test('isOptOut: keywords + natural language YES; neutral replies NO', () => {
+  ['STOP','baja','Cancelar','salir','no me interesa','déjenme en paz','remove me','not interested','quítame','do not contact']
+    .forEach(s => assert(isOptOut(s), '"'+s+'" should opt out'));
+  ['no tengo tiempo hoy','¿cuánto cuesta?','no estoy seguro','me interesa','sí, llámame','quiero más información','interesante']
+    .forEach(s => assert(!isOptOut(s), '"'+s+'" must NOT opt out'));
+});
+
+test('OUTREACH_TEMPLATES: seeded per country×channel, on-voice (no emoji)', () => {
+  assert(OUTREACH_TEMPLATES['Colombia'].whatsapp.length >= 1, 'CO whatsapp seeded');
+  assert(OUTREACH_TEMPLATES['Estados Unidos'].sms.length >= 1, 'US sms seeded');
+  const all = JSON.stringify(OUTREACH_TEMPLATES);
+  assert(!/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(all), 'no emoji in seed templates');
+  assert(all.includes('{agente}') && all.includes('{negocio}'), 'templates use merge tokens');
+});
