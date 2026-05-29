@@ -2,12 +2,14 @@
 
 function getExportLeads() {
   const es   = document.getElementById('ex-st')?.value     || '';
+  const eco  = document.getElementById('ex-country')?.value || '';
   const ec   = document.getElementById('ex-city')?.value   || '';
   const eb   = document.getElementById('ex-barrio')?.value || '';
   const esrc = document.getElementById('ex-source')?.value || '';
   const noph = document.getElementById('ex-noph')?.value   || 'no';
   return S.leads.filter(l => {
     if (es   && l.status  !== es)               return false;
+    if (eco  && l.country !== eco)              return false;
     if (ec   && l.city    !== ec)               return false;
     if (eb   && l.barrio  !== eb)               return false;
     if (esrc && !l.source?.startsWith(esrc))    return false;
@@ -36,16 +38,18 @@ function doExport() {
   const leads = getExportLeads();
   const hdrs  = ['name','phone','address','website','rating','reviews','country','city','barrio','keyword',
                   'source','sourceDetail','status','dncReason','followUpDate','importedAt','updatedAt',
-                  'dealValue','collectedAmount','closerCommission','commissionStatus',
-                  'closerName','callCount',
+                  'dealValue','collectedAmount','providerCommission','closerCommission','commissionStatus',
+                  'providerName','closerName','callCount',
                   'refundAmount','refundReason','refundedAt'];
   const csv   = [
     hdrs.join(','),
     ...leads.map(l => {
-      const {closerAmount} = l.dealValue ? calcCommissions(l, parseFloat(l.dealValue)) : {closerAmount:0};
+      const {closerAmount, providerAmount} = l.dealValue ? calcCommissions(l, parseFloat(l.dealValue)) : {closerAmount:0, providerAmount:0};
       const enriched = {
         ...l,
+        providerCommission: providerAmount || '',
         closerCommission: closerAmount || '',
+        providerName: S.team.find(m => m.id === l.providerId)?.name || '',
         closerName:  S.team.find(m => m.id === l.closerId)?.name || '',
         callCount:   S.calls.filter(c => c.leadId === l.id).length,
       };

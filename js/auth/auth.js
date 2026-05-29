@@ -244,7 +244,8 @@ function startDemo() {
   S.commissions = DEMO_DATA.commissions.map(c => ({...c}));
   const user    = {userId:'demo-admin', userName:'Demo Usuario', role:'admin', closerRate:12};
   S.session     = user;
-  sessionStorage.setItem('aiv-session', JSON.stringify(user));
+  // Demo is in-memory only — don't persist a session token (a refresh returns
+  // cleanly to the PIN screen rather than restoring an empty, purged demo).
   failedAttempts = 0;
   document.getElementById('login-overlay').classList.add('hidden');
   resetSessionTimer();

@@ -168,7 +168,7 @@ async function saveTeamMember() {
   if (pin && isWeakPin(pin))          { toast('PIN demasiado débil (evita repetidos como 1111 o secuencias como 1234).', 'error'); return; }
   if (pin && pin !== pin2)            { toast('Los PINs no coinciden.', 'error'); return; }
   if (pin === '2819')                 { toast('El PIN 2819 está reservado para Admin.', 'error'); return; }
-  if (pin === '0000')                 { toast('El PIN 0000 está reservado para Demo.', 'error'); return; }
+  if (pin === '0809')                 { toast('El PIN 0809 está reservado para el modo Demo.', 'error'); return; }
 
   if (pin) {
     const newHash   = await sha256(pin);

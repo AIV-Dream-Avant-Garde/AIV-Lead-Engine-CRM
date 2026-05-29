@@ -18,13 +18,20 @@ const CRM_SECRET = 'PASTE_YOUR_CRM_SECRET_HERE'; // Setup → shows after first 
 const LEAD_HDR = ['id','name','phone','address','website','rating','reviews','city','barrio','keyword','source','sourceDetail','status','providerId','providerRate','closerId','closerRate','dealValue','collectedAmount','providerCommission','closerCommission','commissionStatus','lockedBy','lockedUntil','assignedAt','workHistory','dncReason','followUpDate','notes','importedAt','updatedAt','calendarEventId','refundAmount','refundReason','refundedAt','country'];
 const CALL_HDR = ['id','leadId','leadName','phone','callSid','outcome','duration','notes','recordingUrl','driveUrl','consentConfirmed','calledAt'];
 const TEAM_HDR = ['id','name','role','pinHash','providerRate','closerRate','contact','active','createdAt'];
-const COMM_HDR   = ['id','leadId','leadName','dealValue','collectedAmount','providerId','providerRate','providerAmount','closerId','closerRate','closerAmount','status','createdAt','paidAt','paidBy','paymentRef','refundReason','adjustedBy','adjustedAt'];
+const COMM_HDR   = ['id','leadId','leadName','dealValue','collectedAmount','providerId','providerRate','providerAmount','closerId','closerRate','closerAmount','status','createdAt','paidAt','paidBy','paymentRef','refundReason','adjustedBy','adjustedAt','providerName','closerName'];
 const SCRIPT_HDR = ['id','name','stage','body','createdAt','updatedAt'];
 
 function getSheet(name, hdr) {
   const ss = SpreadsheetApp.openById(SHEET_ID);
   let s = ss.getSheetByName(name);
-  if (!s) { s = ss.insertSheet(name); s.appendRow(hdr); }
+  if (!s) { s = ss.insertSheet(name); s.appendRow(hdr); return s; }
+  // Reconcile: if the sheet predates added columns (e.g. country, providerName),
+  // append the missing headers so new fields persist and round-trip on pull.
+  if (s.getLastRow() > 0) {
+    const head = s.getRange(1, 1, 1, s.getLastColumn()).getValues()[0].map(String);
+    const missing = hdr.filter(h => head.indexOf(h) === -1);
+    if (missing.length) s.getRange(1, head.length + 1, 1, missing.length).setValues([missing]);
+  }
   return s;
 }
 

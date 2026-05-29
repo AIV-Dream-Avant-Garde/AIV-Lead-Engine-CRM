@@ -189,19 +189,27 @@ function issueRefund(leadId, reason) {
         c.adjustedAt   = now;
         if (S.config.scriptUrl) sheetsCall({action:'cancelCommission', id: c.id, reason, adjustedBy: c.adjustedBy});
       } else if (c.status === 'paid') {
+        // Reverse BOTH the closer and provider payouts (negative amounts).
         const clawback = {
-          id:           uid(),
-          leadId:       c.leadId,
-          leadName:     c.leadName,
-          dealValue:    -(parseFloat(c.dealValue)    || 0),
-          closerId:     c.closerId,
-          closerName:   c.closerName,
-          closerAmount: -(parseFloat(c.closerAmount) || 0),
-          status:       'clawback',
-          refundReason: reason,
-          adjustedBy:   S.session?.userName || 'Admin',
+          id:             uid(),
+          leadId:         c.leadId,
+          leadName:       c.leadName,
+          dealValue:      -(parseFloat(c.dealValue)      || 0),
+          collectedAmount:-(parseFloat(c.collectedAmount)|| 0),
+          providerId:     c.providerId   || '',
+          providerName:   c.providerName  || '',
+          providerRate:   c.providerRate  || 0,
+          providerAmount: -(parseFloat(c.providerAmount) || 0),
+          closerId:       c.closerId,
+          closerName:     c.closerName,
+          closerRate:     c.closerRate    || 0,
+          closerAmount:   -(parseFloat(c.closerAmount)   || 0),
+          status:         'clawback',
+          refundReason:   reason,
+          adjustedBy:     S.session?.userName || 'Admin',
+          adjustedAt:     now,
           paidAt:'', paidBy:'', paymentRef:'',
-          createdAt:    now,
+          createdAt:      now,
         };
         S.commissions.push(clawback);
         if (S.config.scriptUrl) sheetsCall({action:'saveCommission', ...clawback, isClawback: true});

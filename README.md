@@ -8,10 +8,10 @@ A lightweight, offline-first CRM built for sales teams. Manage leads, make VoIP 
 
 | Module | Description |
 |---|---|
-| **Leads** | Full CRUD table with search, filters (city / status / source), lead scoring, and inline modal editing |
+| **Leads** | Full CRUD table with search, filters (country / city / barrio / status / source), lead scoring, and inline modal editing |
 | **Pipeline** | Kanban board across 7 status columns with drag-and-drop and monthly revenue metrics |
 | **Llamadas** | In-browser VoIP via Twilio — make and log calls, confirm consent, auto-dialer queue |
-| **Scraper** | Prospect Google Places by city, neighborhood, and category via Apps Script backend |
+| **Scraper** | Prospect Google Places by **country → city → neighborhood → category** via Apps Script backend (Colombia + Estados Unidos) |
 | **Import** | Drag-and-drop CSV uploader with auto field mapping (name, phone, address, website, rating, reviews) |
 | **Export** | Filtered CSV export enriched with call count and commission data |
 | **Analytics** | Monthly KPIs, conversion funnel, source ROI table, team leaderboard, call performance |
@@ -64,8 +64,8 @@ A lightweight, offline-first CRM built for sales teams. Manage leads, make VoIP 
 │   │
 │   ├── data/
 │   │   ├── constants.js        # Roles, statuses, scoring weights, admin PIN hash
-│   │   ├── keywords.js         # Scraper categories and business types
-│   │   ├── locations.js        # Colombian cities, neighborhoods, GPS coordinates
+│   │   ├── keywords.js         # Business categories by country (Spanish CO + English US) + DEFAULT_COUNTRY, COUNTRY_REGION
+│   │   ├── locations.js        # Country → city → neighborhood + GPS (Colombia + Estados Unidos: Miami/Orlando/Tampa/Jacksonville)
 │   │   └── demo-data.js        # Sample dataset for demo mode
 │   │
 │   ├── commission.js           # calcCommissions(), deal capture, refunds, clawbacks
@@ -161,16 +161,18 @@ Storage usage is shown in the topbar. Warning at 75%, critical at 92% of the ~5 
 When a lead is marked **Cerrado** (closed):
 
 1. Admin or closer enters the deal value
-2. `calcCommissions()` computes: `closerAmount = dealValue × closerRate / 100`
-3. A commission record is created with status `pending`
+2. `calcCommissions()` computes **both** cuts: `closerAmount = dealValue × closerRate / 100` and `providerAmount = dealValue × providerRate / 100` (rates come from the team member, falling back to the rate stamped on the lead)
+3. A commission record is created with status `pending`, persisting closer **and** provider id/name/rate/amount
 4. Admin marks as `paid` once transferred
-5. If the client cancels after payment, a clawback (negative entry) is issued via **Reembolso**
+5. If the client cancels after payment, a clawback (negative entry reversing **both** closer and provider amounts) is issued via **Reembolso**
+
+Provider/solo operators are credited as the source (`providerId`) of leads they scrape or import; their commissions and sourced leads appear in **Mi Perfil** and the commission ledger.
 
 ---
 
 ## Security Notes
 
-- Admin PIN hash is stored in `constants.js` — change it before deploying to production
+- Admin PIN: default hash ships in `constants.js`, but the admin can **rotate it from Configuración** (stored locally as `S.config.adminHash`, overriding the default). Sessions are HMAC-signed with the per-install `crmSecret` and team-member roles are re-derived from synced data on restore, so a stored session token can't be edited to escalate privileges. Weak PINs (repeats / sequences) are rejected.
 - All API calls include a per-installation CSRF secret (`crmSecret`) generated on first run
 - Sessions expire after 30 minutes of inactivity with a 2-minute warning
 - 5 failed PIN attempts trigger a 15-minute lockout

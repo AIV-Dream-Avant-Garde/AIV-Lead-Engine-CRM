@@ -18,13 +18,14 @@ function renderPerfil() {
         <div class="profile-role-label">${role}</div>
         <div class="profile-rates">
           ${user.closerRate > 0 ? `<span class="rate-badge rate-closer">Closer: ${user.closerRate}%</span>` : ''}
+          ${user.providerRate > 0 ? `<span class="rate-badge rate-provider">Proveedor: ${user.providerRate}%</span>` : ''}
         </div>
       </div>
     </div>`;
 
   // Lead stats
   const isAdmin  = role === 'admin';
-  const myLeads  = isAdmin ? S.leads : S.leads.filter(l => l.closerId === uid_ || l.lockedBy === uid_);
+  const myLeads  = isAdmin ? S.leads : S.leads.filter(l => l.closerId === uid_ || l.lockedBy === uid_ || l.providerId === uid_);
   const myClosed = myLeads.filter(l => l.status === 'Cerrado');
   const myComm   = isAdmin ? S.commissions : S.commissions.filter(c => c.closerId === uid_ || c.providerId === uid_);
   // This user's share of a commission record: closer cut if they closed it, provider cut if they sourced it
@@ -57,7 +58,7 @@ function renderPerfil() {
 
   // Follow-up queue (overdue)
   const myFU = S.leads
-    .filter(l => (l.closerId === uid_ || l.lockedBy === uid_) && isOverdue(l))
+    .filter(l => (l.closerId === uid_ || l.lockedBy === uid_ || l.providerId === uid_) && isOverdue(l))
     .sort((a,b) => new Date(a.followUpDate) - new Date(b.followUpDate));
   const fuList = document.getElementById('perfil-followup-list');
   if (fuList) {
@@ -118,7 +119,7 @@ function renderPerfil() {
 function updatePerfilBadge() {
   if (!S.session) return;
   const uid_    = S.session.userId;
-  const overdue = S.leads.filter(l => (l.closerId === uid_ || l.lockedBy === uid_) && isOverdue(l)).length;
+  const overdue = S.leads.filter(l => (l.closerId === uid_ || l.lockedBy === uid_ || l.providerId === uid_) && isOverdue(l)).length;
   const badge   = document.getElementById('nav-perfil-badge');
   if (badge) {
     badge.style.display = overdue > 0 ? '' : 'none';

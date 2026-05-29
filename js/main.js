@@ -26,6 +26,7 @@ function populateFilters() {
   fillSel('f-barrio',  barrios, 'Todos los barrios');
   fillSel('f-source',  sources, 'Todas las fuentes');
   fillSel('kb-city',   cities,  'Todas las ciudades');
+  fillSel('ex-country', countries, 'Todos');
   fillSel('ex-city',   cities,  'Todas');
   fillSel('ex-barrio', barrios, 'Todos');
   fillSel('ex-source', sources, 'Todas');
