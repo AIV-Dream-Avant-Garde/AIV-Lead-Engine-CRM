@@ -9,6 +9,7 @@ const S = {
   leads:       [],
   calls:       [],
   interactions: [],   // append-only messages (sms/whatsapp/email, both directions) — Project A
+  sequences:   [],    // cadence enrollment state per lead — managed by the Vercel engine (Project B)
   team:        [],
   commissions: [],
   dirty:       new Set(),

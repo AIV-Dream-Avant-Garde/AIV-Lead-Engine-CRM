@@ -6,6 +6,7 @@ function saveLocal() {
     localStorage.setItem('aiv-leads',      JSON.stringify(S.leads.map(l => ({...l, _synced: l._synced === true}))));
     localStorage.setItem('aiv-calls',      JSON.stringify(S.calls));
     localStorage.setItem('aiv-interactions', JSON.stringify(S.interactions || []));
+    localStorage.setItem('aiv-sequences',    JSON.stringify(S.sequences || []));
     localStorage.setItem('aiv-team',       JSON.stringify(S.team));
     localStorage.setItem('aiv-comm',       JSON.stringify(S.commissions));
     localStorage.setItem('aiv-scripts',    JSON.stringify(S.scripts     || []));
@@ -27,6 +28,7 @@ function loadLocal() {
   try { S.leads  = JSON.parse(localStorage.getItem('aiv-leads') || '[]').map(l => ({...l, country: l.country || DEFAULT_COUNTRY, _synced: l._synced === true})); } catch(e) {}
   try { S.calls  = JSON.parse(localStorage.getItem('aiv-calls') || '[]'); } catch(e) {}
   try { S.interactions = JSON.parse(localStorage.getItem('aiv-interactions') || '[]'); } catch(e) { S.interactions = []; }
+  try { S.sequences    = JSON.parse(localStorage.getItem('aiv-sequences')    || '[]'); } catch(e) { S.sequences = []; }
   try { S.team   = JSON.parse(localStorage.getItem('aiv-team')  || '[]'); } catch(e) {}
   try { S.commissions = JSON.parse(localStorage.getItem('aiv-comm')    || '[]'); } catch(e) {}
   try { S.scripts      = JSON.parse(localStorage.getItem('aiv-scripts') || '[]'); } catch(e) {}

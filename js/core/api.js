@@ -112,6 +112,8 @@ async function syncNow() {
       const seen = new Set(S.interactions.map(i => i.id));
       res.interactions.forEach(i => { if (i.id && !seen.has(i.id)) { S.interactions.push({...i, _synced:true}); seen.add(i.id); } });
     }
+    // Cadence enrollment state is owned by the Vercel engine → server is authoritative
+    if (Array.isArray(res.sequences)) { S.sequences = res.sequences; localStorage.setItem('aiv-sequences', JSON.stringify(S.sequences)); }
     S.lastSyncTimestamp = new Date().toISOString();
     saveLocal();
     if (failed > 0) {

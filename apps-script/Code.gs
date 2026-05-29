@@ -12,7 +12,7 @@ const TWILIO_FROM_NUMBER = '+15551234567';     // voice (existing)
 const TWILIO_FROM_SMS_US = '+15551234567';     // US SMS sender (10DLC) — set in Project 0
 const TWILIO_FROM_WA     = '+14155238886';     // WhatsApp sender (whatsapp: prefix added at send) — set in Project 0
 const DRIVE_FOLDER_ID    = 'TU_DRIVE_FOLDER_ID';
-const SHEETS = { leads:'Leads', calls:'Llamadas', team:'Team', commissions:'Commissions', scripts:'Scripts', interactions:'Interactions' };
+const SHEETS = { leads:'Leads', calls:'Llamadas', team:'Team', commissions:'Commissions', scripts:'Scripts', interactions:'Interactions', sequences:'Sequences' };
 
 // CSRF protection — paste the value from your browser's Setup page
 const CRM_SECRET = 'PASTE_YOUR_CRM_SECRET_HERE'; // Setup → shows after first load
@@ -23,6 +23,7 @@ const TEAM_HDR = ['id','name','role','pinHash','providerRate','closerRate','cont
 const COMM_HDR   = ['id','leadId','leadName','dealValue','collectedAmount','providerId','providerRate','providerAmount','closerId','closerRate','closerAmount','status','createdAt','paidAt','paidBy','paymentRef','refundReason','adjustedBy','adjustedAt','providerName','closerName'];
 const SCRIPT_HDR = ['id','name','stage','body','createdAt','updatedAt'];
 const INTERACTION_HDR = ['id','leadId','leadName','phone','channel','direction','body','stepTag','status','sid','error','createdAt','createdBy'];
+const SEQUENCE_HDR = ['leadId','state','stepIndex','nextRunAt','pausedReason','enrolledAt','updatedAt']; // cadence enrollment (Project B; written by the Vercel engine + manual CRM controls)
 
 // Opt-out detection (mirror of js/data/constants.js + js/features/outreach.js — keep in sync)
 const OPT_OUT_KEYWORDS_GS = ['stop','stopall','unsubscribe','cancelar','baja','salir'];
@@ -80,7 +81,8 @@ function doGet(e) {
       let scheduledJobs=[]; try { const raw=cfgGet('scheduledJobs'); if(raw) scheduledJobs=JSON.parse(raw); } catch(e){}
       let interactions = toObjs(getSheet(SHEETS.interactions,INTERACTION_HDR));
       if(since){const sd=new Date(since);interactions=interactions.filter(i=>!i.createdAt||new Date(i.createdAt)>=sd);}
-      return ok({leads,calls,team,commissions:comms,scripts,scheduledJobs,interactions,serverTime:new Date().toISOString()});
+      const sequences = toObjs(getSheet(SHEETS.sequences,SEQUENCE_HDR));
+      return ok({leads,calls,team,commissions:comms,scripts,scheduledJobs,interactions,sequences,serverTime:new Date().toISOString()});
     }
     if (a === 'getToken') return ok({token:createToken(e.parameter.identity||'agent')});
     if (a === 'checkTriggers') {
@@ -297,6 +299,19 @@ function doPost(e) {
         const h=rows[0]||INTERACTION_HDR, ic=h.indexOf('id');
         const vals=INTERACTION_HDR.map(k=> b[k] ?? '');
         for (let i=1;i<rows.length;i++){ if(String(rows[i][ic])===String(b.id)){ s.getRange(i+1,1,1,INTERACTION_HDR.length).setValues([vals]); return ok({saved:true,updated:true}); } }
+        s.appendRow(vals);
+        return ok({saved:true,updated:false});
+      } finally { lock.releaseLock(); }
+    }
+    if (a === 'saveSequence') {
+      // Cadence enrollment upsert by leadId (written by the Vercel engine + manual CRM pause/resume/unenroll).
+      const lock = LockService.getScriptLock();
+      try { lock.waitLock(10000); } catch(e) { return err_('busy'); }
+      try {
+        const s=getSheet(SHEETS.sequences, SEQUENCE_HDR), rows=s.getDataRange().getValues();
+        const h=rows[0]||SEQUENCE_HDR, lc=h.indexOf('leadId');
+        const vals=SEQUENCE_HDR.map(k=> b[k] ?? '');
+        for (let i=1;i<rows.length;i++){ if(String(rows[i][lc])===String(b.leadId)){ s.getRange(i+1,1,1,SEQUENCE_HDR.length).setValues([vals]); return ok({saved:true,updated:true}); } }
         s.appendRow(vals);
         return ok({saved:true,updated:false});
       } finally { lock.releaseLock(); }
