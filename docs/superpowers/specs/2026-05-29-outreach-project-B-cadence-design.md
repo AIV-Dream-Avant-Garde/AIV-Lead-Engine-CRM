@@ -80,8 +80,36 @@ On release (or any time the worker re-activates), before sending it:
 - **Backend worker**: syntax-checked + a **dry-run mode** (logs intended sends, no Twilio) against a staging Sheet + a written manual test plan. (Apps Script can't run locally.)
 - **Honest gate:** like Project A, nothing actually sends until the backend + messaging providers (Project 0) are live; the cadence brain is what we verify now.
 
-## Build slices
+## Build slices (deterministic foundation)
 1. `sequences` data model + pure decision logic (`cadenceEligible`, `nextCadenceState`, `resumeFromHistory`, quiet-hours, dueStep) + unit tests.
 2. Backend `runSequences` worker + trigger + dry-run + `lastSequenceRun`.
 3. Secuencias admin UI (status, manual pause/resume/unenroll, run-now) + cadence badge + sync.
 4. Verify each slice (node tests + Chrome) and commit.
+
+---
+
+## DESIGN EVOLUTION (2026-05-29) — event-driven + AI-conversational
+
+Founder direction reshaped the goal: **not a fixed time cadence, but an event-reactive, AI-assisted conversational engine** (an "AI SDR"). The next touch depends on **what actually happened**, not a calendar:
+- Call **no-answer** → send a message **right then** (not "wait to Day 5").
+- Call **had a conversation** → follow-up is **drafted from the transcript** (context-aware), timed to what was discussed.
+- Lead **replies** → the **AI engages the reply** (answers questions, handles objections) and **drives toward booking a discovery/sales call** — the call is always the objective. (This supersedes the earlier "any reply → pause for human": replies are an opportunity to converse, not just hand off — though a human can always take over, and a clear opt-out still hard-stops.)
+
+The earlier fixed Day-0/2/5/9 steps become the **fallback rhythm** when no event drives the next action; min-gap (**2 days**) applies to **proactive** touches only — **reactive** responses (answer a reply, message after a no-answer) are immediate.
+
+### What this newly requires (honest dependencies)
+1. **An AI brain + where it runs.** Apps Script time-triggers are a poor host for LLM calls, prompt management, and live reply handling (6-min limit, quotas, latency, secrets). The natural home is the **same Vercel + LLM stack already powering the website AI chat** — one shared brain/voice across web, Telegram, and outreach; Apps Script stays the Sheets/Twilio plumbing. **This reconsiders the "Apps Script worker" decision for the AI layer.**
+2. **Call transcription (STT).** "Follow-up based on what was said" needs call **transcripts**. Today recordings save to Drive (Project A/Code.gs) but are **not transcribed**. Need Twilio Voice Intelligence or Whisper. Until then, the engine can react to **call outcome** (answered / no-answer / voicemail) but not content.
+3. **Scheduling / booking.** If the objective is a discovery call, the AI needs a **booking action** (a scheduling link / availability) to convert a warm chat into a booked call.
+4. **Autonomy guardrails (critical).** An AI messaging real clients on real numbers carries brand, accuracy/hallucination, and compliance risk. Strongly recommend a **human-in-the-loop first**: AI **drafts**, agent **approves & sends**; graduate to bounded autonomy once trusted. Hard rules always: opt-out honored, quiet hours, no overpromising, escalate on uncertainty, never imply 24/7 availability.
+
+### Recommended phasing
+- **B1 — Deterministic event engine (build now, safe, reusable):** enrollment + state machine + claim/release + opt-out/quiet-hours/min-gap, with **event hooks** (call-outcome → next action; reply → next action) using **templated** messages and a fallback rhythm. No AI yet. This foundation is needed regardless of how smart the messages get.
+- **B2 — AI drafting, human-approved:** the AI (Vercel/LLM, shared with the website) proposes the next message/reply from the interaction history; an agent reviews + sends from the composer. High value, low risk.
+- **B3 — Transcription + progressive autonomy:** add call STT so follow-ups reflect what was said; expand AI autonomy within guardrails; AI books discovery calls via a scheduling link.
+
+### New decisions to confirm (supersede the fixed-cadence ones above)
+- AI host/brain: **Vercel + LLM shared with the website AI** (recommended) vs Apps Script calling an LLM vs decide later (start B1).
+- Starting autonomy: **AI drafts → human approves** (recommended) vs bounded autonomous vs templated-only.
+- Transcription: add STT now vs **react to call outcome only for now** (recommended) vs later.
+- Booking: **AI offers a scheduling link** (recommended) vs hand to human vs later.
