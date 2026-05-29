@@ -135,7 +135,7 @@ function doPost(e) {
       return ContentService.createTextOutput('<?xml version="1.0"?><Response></Response>').setMimeType(ContentService.MimeType.XML);
     }
 
-    const b = JSON.parse(e.postData.contents||'{}');
+    const b = JSON.parse((e.postData && e.postData.contents) || '{}');
     if (b._secret !== CRM_SECRET) {
       return err_('Unauthorized — configura CRM_SECRET en Code.gs con el valor de Setup.');
     }
@@ -288,13 +288,18 @@ function doPost(e) {
       return err_(d.message || 'SMS failed');
     }
     if (a === 'saveInteraction') {
-      // Idempotent upsert by id (optimistic row → confirmed status; pull dedups by id).
-      const s=getSheet(SHEETS.interactions, INTERACTION_HDR), rows=s.getDataRange().getValues();
-      const h=rows[0]||INTERACTION_HDR, ic=h.indexOf('id');
-      const vals=INTERACTION_HDR.map(k=> b[k] ?? '');
-      for (let i=1;i<rows.length;i++){ if(String(rows[i][ic])===String(b.id)){ s.getRange(i+1,1,1,INTERACTION_HDR.length).setValues([vals]); return ok({saved:true,updated:true}); } }
-      s.appendRow(vals);
-      return ok({saved:true,updated:false});
+      // Idempotent upsert by id, under a script lock so concurrent writes for the
+      // same id (optimistic → confirmed, or a parallel sync push) never duplicate a row.
+      const lock = LockService.getScriptLock();
+      try { lock.waitLock(10000); } catch(e) { return err_('busy'); }
+      try {
+        const s=getSheet(SHEETS.interactions, INTERACTION_HDR), rows=s.getDataRange().getValues();
+        const h=rows[0]||INTERACTION_HDR, ic=h.indexOf('id');
+        const vals=INTERACTION_HDR.map(k=> b[k] ?? '');
+        for (let i=1;i<rows.length;i++){ if(String(rows[i][ic])===String(b.id)){ s.getRange(i+1,1,1,INTERACTION_HDR.length).setValues([vals]); return ok({saved:true,updated:true}); } }
+        s.appendRow(vals);
+        return ok({saved:true,updated:false});
+      } finally { lock.releaseLock(); }
     }
     if (a === 'sendMessage') {
       // Twilio send only (SMS or WhatsApp). Persistence is via saveInteraction rows.

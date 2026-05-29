@@ -76,7 +76,8 @@ function addInteraction(rec) {
   if (!Array.isArray(S.interactions)) S.interactions = [];
   S.interactions.push(it);
   saveLocal();
-  if (S.config.scriptUrl) sheetsCall({action:'saveInteraction', ...it}).then(r => { if (r && r.success) { it._synced = true; saveLocal(); } });
+  // Persistence is explicit (persistInteraction) or via syncNow's unsynced push —
+  // NOT auto-fired here, to avoid a 3-path write race on the same id.
   return it;
 }
 
@@ -106,6 +107,9 @@ async function sendMessage(lead, body, opts) {
   const it = addInteraction({ leadId:lead.id, leadName:lead.name, phone:lead.phone, channel, direction:'out', stepTag:opts.stepTag||'', body:text, status:'queued' });
   lead.lastTouchAt = new Date().toISOString();
   if (typeof pushLead === 'function') pushLead(lead);
+
+  // Demo mode: local-only success (no backend), so the composer demos cleanly.
+  if (S.demoMode) { it.status = 'sent'; it.sid = 'demo'; it._synced = true; saveLocal(); toast('Mensaje enviado (demo).', 'success'); if (typeof renderAll === 'function') renderAll(); return it; }
 
   if (!S.config.scriptUrl) { it.status = 'failed'; it.error = 'sin conexión'; persistInteraction(it); toast('Sin Apps Script configurado: el mensaje quedó registrado pero no se envió.', 'error', 6000); return it; }
 
