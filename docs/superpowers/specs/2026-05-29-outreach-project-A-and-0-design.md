@@ -14,7 +14,10 @@ The full vision decomposes into:
 - **Project A** — unified interaction history + reply capture + country-aware channels (the data + comms backbone). **This spec.**
 - **Project B** — history-driven, claim-aware automated cadence engine (separate spec).
 - **Project C** — email channel via an ESP (separate spec).
+- **Project D** — **inbound channels: website AI chat + Telegram** (separate spec; see *Further considerations*). These produce **warm, consented** leads/conversations — the inverse of cold scraped leads — and slot into the same `interactions` timeline + channel router.
 - **Project 0** — go-live foundation (deploy, provisioning, compliance, measurement, safe-verification harness) that runs in parallel. **This spec.**
+
+**Related shipped work (2026-05-29):** the auto-scraper now supports on-demand "Ejecutar ahora", format-proof `phoneKey` dedup (no re-adding existing leads), last-run visibility, and multi-device job sync — providing the lead inflow this outreach platform acts on. Project A reuses `phoneKey` for cross-channel identity/dedup.
 
 **Why A first:** it is independently valuable today (agents see full multi-channel context before acting), it is the data foundation B depends on, and it de-risks the hardest parts (reply matching, channel routing, opt-out) before any scheduling automation is added.
 
@@ -71,15 +74,17 @@ Rationale (from the integration analysis): per-lead history must **not** live on
 
 These are small scalars/flags on the lead (not growing history), so they sync wholesale safely like other lead fields. `LEAD_HDR` gains `email`, `lastTouchAt`, `lastReplyAt`, `consentSms`, `consentWhatsapp`, `consentEmail` (all scalar, appended; `getSheet` reconciliation already handles existing sheets — no JSON special-casing needed).
 
-### Phone normalization (E.164)
+### Phone normalization & matching
 
-New pure helper `toE164(phone, country)`:
+**Already shipped** (auto-scraper work, 2026-05-29): `phoneKey(p)` — last-10-digits of the numeric-only string — exists in both `js/core/utils.js` and `apps-script/Code.gs` and is unit-tested. It collapses `+57`/`+1`/spacing/leading-zero so the same number is one identity. **Reuse it as the inbound-reply ↔ lead matcher and the cross-channel dedup key** (do not invent a second matcher).
+
+For *sending*, Twilio still needs a `+`-prefixed E.164 string, so a thin `toE164(phone, country)` formatter is also needed:
 - Strips spaces/dashes/parens.
 - If already `+`-prefixed, keep digits after `+`.
 - Else prefix the country dialing code: Colombia → `+57`, Estados Unidos → `+1`.
 - Returns canonical `+<digits>` or `''` if not a plausible number.
 
-Used to (a) stamp a normalized `phoneE164` when sending, and (b) match Twilio inbound `From` to a lead. Lead matching on inbound compares `toE164(lead.phone, lead.country)` against the normalized inbound number; a fallback compares last-10-digits to tolerate stored-format drift.
+Used only to format the `To`/`From` on send. **Inbound matching uses `phoneKey`** (last-10) on both sides — robust to stored-format drift without a separate fallback path.
 
 ---
 
@@ -88,9 +93,9 @@ Used to (a) stamp a normalized `phoneE164` when sending, and (b) match Twilio in
 ### 1. Channel router — `js/features/outreach.js` (new)
 
 - `pickChannel(lead)` → `'sms'` if `country === 'Estados Unidos'`, `'whatsapp'` if `country === 'Colombia'`, else `'email'` (Project C) — pure, unit-tested.
-- `renderTemplate(body, lead)` → merge `{nombre}`, `{empresa}` (reuses existing SMS merge convention) — pure, unit-tested.
+- `renderTemplate(body, lead, agent)` → merge **rich personalization tokens** from data we already capture: `{negocio}` (lead.name), `{ciudad}` (lead.city), `{barrio}`, `{categoria}` (lead.keyword), `{nombre}` (contact), `{empresa}` (our company), and `{agente}` (the sending agent's first name, for a human signature). Unresolved tokens fall back to a graceful neutral (never leave a literal `{ciudad}` in the text). Pure, unit-tested. See **Message humanity & voice** below.
 - `sendMessage(lead, body, opts)` → resolves channel, normalizes phone, calls backend `sendMessage` action, optimistically appends an `out` interaction (`status:'sent'`), updates `lead.lastTouchAt`, reconciles status from the response. Blocks if the lead is opted-out / `No llamar` for that channel.
-- `isOptOut(body)` → true for `STOP|STOPALL|UNSUBSCRIBE|CANCELAR|BAJA|NO` (case-insensitive, trimmed) — pure, unit-tested.
+- `isOptOut(body)` → recognizes opt-out **two ways**, because real people don't text "STOP": (1) the legally-required keywords `STOP|STOPALL|UNSUBSCRIBE|CANCELAR|BAJA|SALIR` (case-insensitive, trimmed — always honored, carrier-mandated); (2) **natural-language declines** in Spanish/English — e.g. "no me interesa", "no escriban/escribas más", "quítame/quítenme", "déjenme en paz", "remove me", "not interested", "stop messaging" — matched by a curated phrase/regex list. A natural-language opt-out is treated **exactly** as a keyword opt-out (honor it immediately) but never bounces a robotic auto-reply; see voice section. Pure, unit-tested (positive + negative cases, e.g. "no tengo tiempo hoy" is NOT an opt-out). Conservative bias: when ambiguous, do **not** auto-opt-out — flag for human review instead of risking either a missed opt-out or a wrongly-killed warm lead.
 
 ### 2. Backend — `apps-script/Code.gs`
 
@@ -99,7 +104,7 @@ Used to (a) stamp a normalized `phoneE164` when sending, and (b) match Twilio in
   - WhatsApp: `From = 'whatsapp:' + TWILIO_FROM_WA`, `To = 'whatsapp:' + phoneE164`. **Template note:** outside the WhatsApp 24-hour window only an approved template may be sent (enforced/owned in Project 0; the call shape supports a `contentSid`/template param for later).
   - Appends the outbound row to `Interactions`, returns `{success, sid, status}`.
 - **`saveInteraction` action** (POST): append an interaction row (used for client-originated optimistic records / reconciliation).
-- **`inboundMsg` action** (POST — Twilio inbound messaging webhook): params from Twilio `{From, To, Body, MessageSid}`. Normalize `From`; find the lead by E.164 (last-10 fallback); append an `in` interaction (`channel` inferred from `To`/`whatsapp:` prefix, `status:'received'`); set `lead.lastReplyAt`. If `isOptOut(Body)` → set lead `status='No llamar'`, `dncReason='opt-out (<channel>)'`, the matching `consent<Channel>=false`, and (for Project B) mark any enrollment stopped. Returns a minimal 200 so Twilio is satisfied.
+- **`inboundMsg` action** (POST — Twilio inbound messaging webhook): params from Twilio `{From, To, Body, MessageSid}`. Normalize `From`; find the lead by E.164 (last-10 fallback); append an `in` interaction (`channel` inferred from `To`/`whatsapp:` prefix, `status:'received'`); set `lead.lastReplyAt`. If `isOptOut(Body)` (keyword **or** natural-language decline) → set lead `status='No llamar'`, `dncReason='opt-out (<channel>)'`, the matching `consent<Channel>=false`, and (for Project B) mark any enrollment stopped. Any **other** inbound reply → leave a `paused:replied`/handoff signal for an agent (Project B) and surface the "Respondió" badge. If a carrier/policy ack is required, it is a **gracious human-voiced** confirmation (see voice section), never a robotic "unsubscribed". Returns a minimal 200 so Twilio is satisfied.
   - **Do NOT reuse the existing `inbound` action** (`Code.gs:322`) — that one *creates a new lead* from a scraper/form webhook (dedupes by phone, appends a lead row). `inboundMsg` is a distinct message-reply webhook; keep them separate.
   - **Lead write path:** matching is by **phone (E.164)**, not `id`, so this needs an id-less *find-row-by-phone-then-`setValue`-per-column* path (the existing `update` action finds by `id` — `Code.gs:137-142` — and must be adapted, not reused as-is). If no lead matches, append the inbound interaction with `leadId:''` and log it (never throw).
   - **Last-10 fallback collision guard:** if more than one lead shares the same last-10 digits, attribute to the **most recently updated** matching lead and log the ambiguity (never silently mis-attribute to an arbitrary lead).
@@ -120,6 +125,21 @@ Used to (a) stamp a normalized `phoneE164` when sending, and (b) match Twilio in
 
 ---
 
+## Message humanity & voice (Project A)
+
+The difference between a reply and a block is whether the message reads like a **real person who did their homework** — not a broadcast. This is a product requirement, not a nicety; it directly drives deliverability, reply rate, opt-out rate, and brand. Principles, baked into templates + tooling:
+
+1. **Targeted, not templated-looking.** Every message references *this* business with the data we already have — `{negocio}` in `{ciudad}`, their `{categoria}`. A florist in Chapinero and an auto shop in Miami should never receive the same sentence. Lead with a specific, genuine observation ("Vi que {negocio} tiene muy buenas reseñas en {ciudad}…"), then a concise, honest value offer.
+2. **Written by a human, signed by a human.** Messages are conversational and sign off with `{agente}` (a real agent's first name), never "AXIUS Bot" / "Equipo AXIUS". First-person, warm, plain language. Short for SMS; WhatsApp can be slightly longer and friendlier.
+3. **Channel-true voice.** SMS = brief, respectful, one ask. WhatsApp (Colombia) = conversational, can open with a greeting, light and personable. Email (Project C) = more room to give context. Same intent, different register per channel.
+4. **Value-first, low-pressure.** Offer something worth their time and make saying "no" easy and dignified — confidence without desperation.
+5. **The opt-out must be humane, not robotic.** Replace `"Responde STOP para no recibir más mensajes."` with something sincere woven into the agent's voice, e.g. *"Si prefieres que no te escriba, con una palabra lo dejo aquí y sin problema 🙏."* The system still honors `STOP/BAJA` keywords **and** natural-language declines (see `isOptOut`), but the *visible instruction* never reads like a compliance footer. When someone opts out, the (optional, where carrier rules require an ack) confirmation is gracious — "Listo, no te escribo más. Gracias por tu tiempo 🙏" — never a cold "You have been unsubscribed."
+6. **Restraint = respect.** Honor quiet hours, min-gap between touches, and the cadence's history-aware resume (Project B) so we never pester. One thoughtful message beats five generic ones. A lead who already declined is never re-pitched.
+
+**Where this lives in Project A:** a small **seed library of human, channel- and country-specific templates** (Spanish for CO/WhatsApp, English for US/SMS) shipped in `js/data/` and editable in the existing SMS-template admin UI; the rich `renderTemplate` tokens above; the humane `isOptOut`; and an agent-facing composer that shows a **live merge preview** so the agent sees the exact human message before sending. **Voice guidelines** are captured as a short doc/comment block beside the seed templates so future templates stay on-voice.
+
+**AI-assisted drafting (seam, not built here):** because messages should be tailored per lead, an AI drafting step ("write a warm first-touch for {negocio}, a {categoria} in {ciudad}, in {agente}'s voice") is a natural enhancement — and ties directly to the website's AI chat (see *Further considerations*). Project A leaves the composer/template layer clean so this can plug in later without rework.
+
 ## Data flow
 
 ```
@@ -132,7 +152,7 @@ Outbound (manual, Project A):
 Inbound (reply):
   Twilio webhook → Code.gs inboundMsg
     → normalize From → match lead → Interactions row (in) + lead.lastReplyAt
-    → if STOP-keyword → No llamar + dncReason + consent off
+    → if opt-out (keyword OR natural-language) → No llamar + dncReason + consent off (gracious ack)
   → next pull brings it to the client; timeline shows ←; "Respondió" badge
 
 Sync:
@@ -149,7 +169,7 @@ Sync:
 
 ## Testing & verification
 
-- **Node unit tests** (`tests/cases.js`) for all pure logic: `toE164` (CO/US/already-+/garbage), `pickChannel`, `renderTemplate`, `isOptOut`, last-10 fallback matcher.
+- **Node unit tests** (`tests/cases.js`) for all pure logic: `toE164` (CO/US/already-+/garbage), reuse of existing `phoneKey` matcher, `pickChannel`, `renderTemplate` (all rich tokens resolve; unknown tokens degrade gracefully, never leave `{ciudad}`), and `isOptOut` — **including natural-language cases**: positives ("no me interesa", "quítenme", "remove me", "déjame en paz") AND negatives that must NOT opt out ("no tengo tiempo hoy", "no estoy seguro", "¿cuánto cuesta?").
 - **Headless Chrome**: timeline renders merged interactions both directions; composer picks the right channel by country; opt-out disables the composer; "Respondió" badge appears when `lastReplyAt>lastTouchAt`.
 - **Backend (`Code.gs`)**: syntax-checked; logic exercised via **Project 0's staging Sheet + dry-run mode** (no real sends) and a written manual test plan (send SMS to a US test lead, send WhatsApp to a CO test lead, POST a simulated inbound to `inboundMsg`, verify rows + opt-out). The pure decision logic is mirrored from the tested JS helpers.
 - **Honest limitation:** real Twilio/WhatsApp sends + inbound webhooks cannot be exercised locally; they are validated against a deployed staging backend (Project 0).
@@ -158,12 +178,13 @@ Sync:
 
 | File | Change |
 |---|---|
-| `js/features/outreach.js` (new) | channel router, `sendMessage`, `renderTemplate`, `isOptOut`, `toE164` |
+| `js/features/outreach.js` (new) | channel router, `sendMessage`, `renderTemplate` (rich tokens + `{agente}`), humane `isOptOut`, `toE164` (reuses existing `phoneKey` for matching) |
+| `js/data/outreach-templates.js` (new) | seed human, on-voice templates per channel × country (ES/WhatsApp, EN/SMS) + a voice-guidelines comment block; editable via the existing SMS-template admin UI |
 | `js/core/state.js` | `S.interactions` |
 | `js/core/storage.js` | persist/load `aiv-interactions` |
 | `js/core/api.js` | push/pull interactions (append-only, `since`) |
 | `js/features/leads.js` | timeline merges interactions; composer; "Respondió" badge; show-by-default |
-| `js/data/constants.js` | opt-out keywords, country dialing codes, channel labels |
+| `js/data/constants.js` | opt-out keywords + natural-language decline phrases (ES/EN), country dialing codes, channel labels |
 | `js/features/import.js` | capture `email`; normalize phone on import |
 | `index.html` | composer UI + cache-bust bump |
 | `apps-script/Code.gs` | `sendMessage`, `saveInteraction`, `inboundMsg` (distinct from existing `inbound`) actions; `INTERACTION_HDR`; `LEAD_HDR` += email/lastTouchAt/lastReplyAt/consentSms/consentWhatsapp/consentEmail (scalars); id-less find-by-phone write path; pull includes interactions (merge-by-id + `since`) |
@@ -193,6 +214,23 @@ Documented and sequenced; **build/technical items are done with the code, provis
 - **Known risk (flagged, not resolved):** the leads are *cold/scraped*; lawful basis for messaging (US TCPA/CAN-SPAM, Colombia Ley 1581) and deliverability/warmup are owner responsibilities before go-live. The system is built to support compliant operation; it does not by itself make cold outreach lawful.
 
 ---
+
+## Further considerations (before officially proceeding)
+
+### Website AI chat + Telegram → the CRM (high value — recommend Project D)
+The launching website's **AI chat + Telegram** is worth integrating, and it fits this architecture cleanly:
+- **Warm inbound > cold outbound.** Someone who messages your site or Telegram has *opted in* — strong lawful basis, far better deliverability, higher intent. This is the opposite of scraped leads and should be treated as a **first-class, prioritized lead source**, not cold-cadenced. New source values (`'Web Chat'`, `'Telegram'`) + a distinct, lighter sequence (or immediate human handoff) in Project B.
+- **Reuse what exists.** The Apps Script `inbound` action *already* creates leads from external POSTs — the website/Telegram bot can call it to drop a lead straight into the pool. The AI-chat / Telegram **conversation** becomes `interactions` rows (new `channel: 'webchat' | 'telegram'`, both directions) in the same unified timeline, so an agent sees the whole AI conversation before they ever call.
+- **Telegram as a reply/outreach channel.** Telegram Bot API is another channel the router can pick (like WhatsApp) when a lead arrived via Telegram — reply where they reached you.
+- **The AI is also a drafting ally.** The same model powering site chat can draft the human, on-voice outreach messages (the `renderTemplate` / composer seam in *Message humanity & voice*), keeping tone consistent across web, Telegram, and outbound.
+- **Cross-channel identity (must design once it lands):** a web/Telegram lead may have **email or a Telegram handle but no phone**, so `phoneKey` dedup isn't enough. Project D needs an identity strategy (match on phone **or** email **or** telegram id; merge duplicates). Flag now so the lead model is ready.
+- **Recommendation:** scope **Project D** after A (it depends on A's `interactions` backbone + channel router), but **capture the inbound endpoint contract now** so the website/Telegram team can start sending leads into the CRM immediately (warm pipeline from day one of launch).
+
+### Other things to settle before go-live
+- **Warm vs cold lead handling** is a real branch in Project B (different/no cadence, faster human handoff for warm). Decide the policy.
+- **Identity & dedup across channels** (above) — phone-only is insufficient once email/Telegram leads exist.
+- **Per-source consent provenance** — record *how* consent was obtained (scraped vs web-opt-in vs Telegram) for compliance defensibility.
+- **Agent capacity / routing** — when replies + warm inbound arrive, who gets notified and how fast? (ties to the pool/claim model and Project B's `paused:replied`).
 
 ## Open items to confirm at Project B spec time
 - Worker host (Apps Script vs dedicated backend) — decided with real volume data.
