@@ -10,10 +10,10 @@ const DEMO_DATA = (() => {
   const DEMO_REC = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
 
   const team = [
-    {id:'demo-prov-1',name:'Juan García Restrepo',role:'provider',providerRate:3,closerRate:0,contact:'jgarcia@aivcorp.co',pinHash:'',active:true,createdAt:ts(60)},
-    {id:'demo-clsr-1',name:'María López Vélez',role:'closer',providerRate:0,closerRate:12,contact:'mlopez@aivcorp.co',pinHash:'',active:true,createdAt:ts(55)},
-    {id:'demo-solo-1',name:'Carlos Restrepo H.',role:'solo',providerRate:8,closerRate:15,contact:'crestrepo@aivcorp.co',pinHash:'',active:true,createdAt:ts(45)},
-    {id:'demo-inactive-1',name:'Pedro Ramírez V.',role:'closer',providerRate:0,closerRate:10,contact:'pramirez@aivcorp.co',pinHash:'',active:false,createdAt:ts(90)},
+    {id:'demo-prov-1',name:'Juan García Restrepo',role:'provider',providerRate:3,closerRate:0,contact:'jgarcia@axiuscorp.co',pinHash:'',active:true,createdAt:ts(60)},
+    {id:'demo-clsr-1',name:'María López Vélez',role:'closer',providerRate:0,closerRate:12,contact:'mlopez@axiuscorp.co',pinHash:'',active:true,createdAt:ts(55)},
+    {id:'demo-solo-1',name:'Carlos Restrepo H.',role:'solo',providerRate:8,closerRate:15,contact:'crestrepo@axiuscorp.co',pinHash:'',active:true,createdAt:ts(45)},
+    {id:'demo-inactive-1',name:'Pedro Ramírez V.',role:'closer',providerRate:0,closerRate:10,contact:'pramirez@axiuscorp.co',pinHash:'',active:false,createdAt:ts(90)},
   ];
 
   const leads = [

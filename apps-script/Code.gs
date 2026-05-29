@@ -1,4 +1,4 @@
-// AIV CRM — Apps Script v4
+// AXIUS CRM — Apps Script v4
 // Rellena TODAS las constantes antes de deployar
 
 const SHEET_ID           = 'TU_SPREADSHEET_ID';
@@ -397,7 +397,7 @@ function sendWeeklyReport() {
   const html = `
 <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#1a1a2e">
   <div style="background:linear-gradient(135deg,#0f0f23,#1a1a2e);padding:28px 32px;border-radius:12px 12px 0 0">
-    <h2 style="color:#fff;margin:0;font-size:20px">AIV CRM — Reporte Semanal</h2>
+    <h2 style="color:#fff;margin:0;font-size:20px">AXIUS CRM — Reporte Semanal</h2>
     <p style="color:rgba(255,255,255,.6);margin:6px 0 0;font-size:13px">${now.toLocaleDateString('es-CO',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
   </div>
   <div style="background:#f9f9fb;padding:24px 32px;border-radius:0 0 12px 12px">
@@ -424,12 +424,12 @@ function sendWeeklyReport() {
       <tr><td style="padding:8px 12px">No llamar</td><td style="padding:8px 12px;text-align:right;color:#888">${dncAll}</td></tr>
     </table>
   </div>
-  <p style="font-size:11px;color:#aaa;text-align:center;margin-top:16px">Generado automaticamente por AIV CRM</p>
+  <p style="font-size:11px;color:#aaa;text-align:center;margin-top:16px">Generado automaticamente por AXIUS CRM</p>
 </div>`;
 
   MailApp.sendEmail({
     to: recipientEmail,
-    subject: 'AIV CRM — Reporte semanal ' + now.toLocaleDateString('es-CO'),
+    subject: 'AXIUS CRM — Reporte semanal ' + now.toLocaleDateString('es-CO'),
     htmlBody: html,
   });
   Logger.log('Weekly report sent to ' + recipientEmail);

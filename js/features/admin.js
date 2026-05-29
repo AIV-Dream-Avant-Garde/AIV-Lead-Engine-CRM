@@ -729,7 +729,7 @@ function exportAuditLog() {
   ].join('\n');
   const el = document.createElement('a');
   el.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'}));
-  el.download = 'aiv_auditlog_' + new Date().toISOString().slice(0,10) + '.csv';
+  el.download = 'axius_auditlog_' + new Date().toISOString().slice(0,10) + '.csv';
   el.click();
 }
 

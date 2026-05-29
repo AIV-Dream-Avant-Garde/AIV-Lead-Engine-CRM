@@ -1,4 +1,4 @@
-# AIV Lead Engine — CRM
+# AXIUS Lead Engine — CRM
 
 A lightweight, offline-first CRM built for sales teams. Manage leads, make VoIP calls, track commissions, and scrape prospects — all from a single HTML file with no dependencies.
 
