@@ -738,6 +738,7 @@ function renderAdmin() {
 
   updateAdminBadge();
   renderScripts();
+  if (typeof renderSequences === 'function') renderSequences();
   renderScheduledJobs();
   renderReportTrigger();
   renderSmsTemplates();

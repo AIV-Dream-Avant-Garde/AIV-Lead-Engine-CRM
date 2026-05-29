@@ -175,3 +175,70 @@ async function sendComposer() {
   if (typeof renderLeadTimeline === 'function') renderLeadTimeline(lead);
   switchModalTab('timeline');
 }
+
+// ── Cadence (Secuencias) — CRM control surface for the Vercel engine ──────
+// Pure: tally enrollment states (unit-tested).
+function sequenceCounts(seqs) {
+  const c = { active:0, paused:0, replied:0, stopped:0, done:0, total:0 };
+  (seqs || []).forEach(s => {
+    c.total++;
+    const st = String(s.state || '');
+    if (st === 'active') c.active++;
+    else if (st === 'paused:replied') c.replied++;
+    else if (st.indexOf('paused:') === 0) c.paused++;
+    else if (st.indexOf('stopped:') === 0) c.stopped++;
+    else if (st === 'done') c.done++;
+  });
+  return c;
+}
+
+function seqStateLabel(st) {
+  return ({
+    'active':'Activa', 'paused:claimed':'Pausada (reclamada)', 'paused:replied':'Respondió — handoff',
+    'paused:manual':'Pausada (manual)', 'stopped:closed':'Cerrada', 'stopped:optout':'Opt-out',
+    'stopped:rejected':'Rechazada', 'stopped:manual':'Retirada', 'done':'Completada',
+  })[st] || st || '—';
+}
+
+function getSequence(leadId) { return (S.sequences || []).find(s => s.leadId === leadId) || null; }
+function _seqLeadName(leadId) { const l = S.leads.find(x => x.id === leadId); return l ? l.name : leadId; }
+
+function renderSequences() {
+  const wrap = document.getElementById('admin-seq-list'); if (!wrap) return;
+  const seqs = S.sequences || [];
+  const c = sequenceCounts(seqs);
+  const cEl = document.getElementById('admin-seq-counts');
+  if (cEl) cEl.textContent = `${c.active} activas · ${c.paused} pausadas · ${c.replied} respondieron · ${c.stopped} detenidas · ${c.done} completadas`;
+  if (!seqs.length) { wrap.innerHTML = '<div class="notes-empty">Sin leads en secuencia.</div>'; return; }
+  wrap.innerHTML = seqs.slice(0, 100).map(s => {
+    const st = String(s.state || '');
+    const stopped = st.indexOf('stopped:') === 0 || st === 'done';
+    const paused  = st.indexOf('paused:') === 0;
+    const next = s.nextRunAt ? '· Próx: ' + fmtD(s.nextRunAt) : '';
+    return `<div class="team-row" style="margin-bottom:6px">
+      <div class="team-info">
+        <div class="team-name">${esc(_seqLeadName(s.leadId))}</div>
+        <div class="team-meta">${esc(seqStateLabel(st))} · Paso ${esc(String(s.stepIndex ?? 0))} ${esc(next)}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        ${paused ? `<button class="btn btn-success" style="font-size:11px;padding:4px 9px" onclick="resumeSequence('${esc(s.leadId)}')">Reanudar</button>`
+                 : (!stopped ? `<button class="btn btn-ghost" style="font-size:11px;padding:4px 9px" onclick="pauseSequence('${esc(s.leadId)}')">Pausar</button>` : '')}
+        ${!stopped ? `<button class="btn btn-danger" style="font-size:11px;padding:4px 9px" onclick="unenrollSequence('${esc(s.leadId)}')">Sacar</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Manual controls — update local state + persist via saveSequence (the engine respects it).
+function _updateSequence(leadId, patch) {
+  if (!Array.isArray(S.sequences)) S.sequences = [];
+  let s = S.sequences.find(x => x.leadId === leadId);
+  if (!s) { s = { leadId, stepIndex: 0, enrolledAt: new Date().toISOString() }; S.sequences.push(s); }
+  Object.assign(s, patch, { updatedAt: new Date().toISOString() });
+  saveLocal();
+  if (S.config.scriptUrl) sheetsCall({ action:'saveSequence', ...s });
+  renderSequences();
+}
+function pauseSequence(leadId)   { _updateSequence(leadId, { state:'paused:manual', pausedReason:'manual' }); toast('Secuencia pausada.', 'success'); }
+function resumeSequence(leadId)  { _updateSequence(leadId, { state:'active', pausedReason:'' }); toast('Secuencia reanudada.', 'success'); }
+function unenrollSequence(leadId){ if (!confirm('¿Sacar este lead de la secuencia?')) return; _updateSequence(leadId, { state:'stopped:manual', pausedReason:'manual' }); toast('Lead retirado de la secuencia.', 'success'); }

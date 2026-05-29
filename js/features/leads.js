@@ -325,8 +325,10 @@ function openLead(id) {
     titleEl.style.borderBottom = '1px dashed var(--border-hi)';
     titleEl.title           = 'Click para editar';
   }
+  const _seq = (typeof getSequence === 'function') ? getSequence(l.id) : null;
   document.getElementById('m-meta').textContent =
-    [l.country, l.city, l.barrio, l.keyword].filter(Boolean).join(' · ');
+    [l.country, l.city, l.barrio, l.keyword].filter(Boolean).join(' · ')
+    + (_seq ? ' · Secuencia: ' + seqStateLabel(_seq.state) : '');
   document.getElementById('m-status').value    = l.status     || 'Nuevo';
   document.getElementById('m-followup').value  = l.followUpDate || '';
 

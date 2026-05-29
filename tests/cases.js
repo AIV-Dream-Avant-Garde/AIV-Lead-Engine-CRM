@@ -172,6 +172,23 @@ test('isOptOut: keywords + natural language YES; neutral replies NO', () => {
     .forEach(s => assert(!isOptOut(s), '"'+s+'" must NOT opt out'));
 });
 
+test('sequenceCounts: tallies cadence states correctly', () => {
+  const c = sequenceCounts([
+    {state:'active'},{state:'active'},{state:'paused:claimed'},{state:'paused:replied'},
+    {state:'stopped:optout'},{state:'stopped:manual'},{state:'done'},{state:''},
+  ]);
+  eq(c.active, 2, 'active'); eq(c.paused, 1, 'paused (non-replied)'); eq(c.replied, 1, 'replied');
+  eq(c.stopped, 2, 'stopped:*'); eq(c.done, 1, 'done'); eq(c.total, 8, 'total');
+  const z = sequenceCounts([]); eq(z.total, 0, 'empty');
+});
+
+test('seqStateLabel: maps states to human labels, falls back', () => {
+  eq(seqStateLabel('active'), 'Activa');
+  eq(seqStateLabel('paused:replied'), 'Respondió — handoff');
+  eq(seqStateLabel('stopped:optout'), 'Opt-out');
+  eq(seqStateLabel('weird'), 'weird', 'unknown → passthrough');
+});
+
 test('OUTREACH_TEMPLATES: seeded per country×channel, on-voice (no emoji)', () => {
   assert(OUTREACH_TEMPLATES['Colombia'].whatsapp.length >= 1, 'CO whatsapp seeded');
   assert(OUTREACH_TEMPLATES['Estados Unidos'].sms.length >= 1, 'US sms seeded');
