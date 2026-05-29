@@ -136,7 +136,7 @@ Inbound (reply):
   → next pull brings it to the client; timeline shows ←; "Respondió" badge
 
 Sync:
-  interactions: append-only push + since-filtered pull (mirrors S.calls)
+  interactions: optimistic append push + merge-by-id pull behind a new `since` cursor (improves on the wholesale S.calls pull)
   leads: unchanged (Tier-4 dirty/merge); new scalar fields ride along
 ```
 
