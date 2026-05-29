@@ -15,7 +15,7 @@ const SHEETS = { leads:'Leads', calls:'Llamadas', team:'Team', commissions:'Comm
 // CSRF protection — paste the value from your browser's Setup page
 const CRM_SECRET = 'PASTE_YOUR_CRM_SECRET_HERE'; // Setup → shows after first load
 
-const LEAD_HDR = ['id','name','phone','address','website','rating','reviews','city','barrio','keyword','source','sourceDetail','status','providerId','providerRate','closerId','closerRate','dealValue','collectedAmount','providerCommission','closerCommission','commissionStatus','lockedBy','lockedUntil','assignedAt','workHistory','dncReason','followUpDate','notes','importedAt','updatedAt','calendarEventId','refundAmount','refundReason','refundedAt','country'];
+const LEAD_HDR = ['id','name','phone','address','website','rating','reviews','city','barrio','keyword','source','sourceDetail','status','providerId','providerRate','closerId','closerRate','dealValue','collectedAmount','providerCommission','closerCommission','commissionStatus','lockedBy','lockedUntil','assignedAt','workHistory','dncReason','followUpDate','notes','importedAt','updatedAt','calendarEventId','refundAmount','refundReason','refundedAt','country','email','externalId'];
 const CALL_HDR = ['id','leadId','leadName','phone','callSid','outcome','duration','notes','recordingUrl','driveUrl','consentConfirmed','calledAt'];
 const TEAM_HDR = ['id','name','role','pinHash','providerRate','closerRate','contact','active','createdAt'];
 const COMM_HDR   = ['id','leadId','leadName','dealValue','collectedAmount','providerId','providerRate','providerAmount','closerId','closerRate','closerAmount','status','createdAt','paidAt','paidBy','paymentRef','refundReason','adjustedBy','adjustedAt','providerName','closerName'];
@@ -327,22 +327,35 @@ function doPost(e) {
       return ok({set: b.enabled, fn});
     }
     if (a === 'inbound') {
+      // Warm inbound lead (website AI chat / Telegram / forms). Identity may be a
+      // phone OR an email OR an externalId (e.g. Telegram chat id) — phone is NOT
+      // required, unlike cold scraped leads. Dedupe across any matching identity.
       const s=getSheet(SHEETS.leads,LEAD_HDR),rows=s.getDataRange().getValues();
-      const ph=rows[0]||LEAD_HDR, pc=ph.indexOf('phone');
+      const hh=rows[0]||LEAD_HDR, pc=hh.indexOf('phone'), ec=hh.indexOf('email'), xc=hh.indexOf('externalId');
       const phone=String(b.phone||'').trim();
-      if(!phone||phone==='N/A') return err_('phone required');
-      const duplicate=rows.slice(1).some(r=>String(r[pc]).trim()===phone);
+      const email=String(b.email||'').trim().toLowerCase();
+      const extId=String(b.externalId||'').trim();
+      const pk=phoneKey(phone);
+      if(!pk && !email && !extId) return err_('identity required: phone, email or externalId');
+      const duplicate=rows.slice(1).some(r=>{
+        const rpk=phoneKey(r[pc]);
+        const rem=ec>=0?String(r[ec]||'').trim().toLowerCase():'';
+        const rx =xc>=0?String(r[xc]||'').trim():'';
+        return (pk&&rpk===pk)||(email&&rem===email)||(extId&&rx===extId);
+      });
       if(duplicate) return ok({added:false,duplicate:true});
       const now=new Date().toISOString();
+      const firstMsg=String(b.message||'').trim();
+      const notes=firstMsg?[{date:now,text:'Mensaje inicial ('+(b.source||'Inbound')+'): '+firstMsg}]:[];
       const lead={
         id:b.id||Utilities.getUuid(),
-        name:b.name||'Sin nombre',phone,
+        name:b.name||'Sin nombre',phone:phone||'N/A',email,externalId:extId,
         address:b.address||'N/A',website:b.website||'N/A',
         rating:'N/A',reviews:'N/A',
         country:b.country||'',city:b.city||'',barrio:b.barrio||'',keyword:b.keyword||'',
         source:b.source||'Inbound',sourceDetail:b.sourceDetail||'',
         status:b.status||'Nuevo',dncReason:'',followUpDate:'',
-        notes:JSON.stringify([]),
+        notes:JSON.stringify(notes),
         providerId:b.providerId||'',providerRate:b.providerRate||0,
         closerId:b.closerId||'',closerRate:b.closerRate||0,
         dealValue:'',providerCommission:'',closerCommission:'',commissionStatus:'',
@@ -351,7 +364,7 @@ function doPost(e) {
         importedAt:now,updatedAt:now,
       };
       s.appendRow(LEAD_HDR.map(h=>lead[h]??''));
-      return ok({added:true,duplicate:false});
+      return ok({added:true,duplicate:false,id:lead.id});
     }
     return ok({received:true});
   } catch(err) { return err_(err.message) }
