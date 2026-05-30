@@ -25,7 +25,7 @@ These gate *real* messaging; nothing else can compensate for them.
 
 ## 3. Wire the webhooks & channels — ~30 min
 - [ ] **Twilio inbound messaging webhook** (so replies + opt-outs land in the CRM): set the SMS/WhatsApp inbound URL to `{execUrl}?action=inboundMsg&token={CRM_SECRET}`.
-- [ ] **Telegram bot** (founder alerts + Telegram lead channel): create a bot via @BotFather → give me the **bot token** + your **chat id** (and I'll wire the alerts in Project D).
+- [ ] **Telegram founder alerts** (BUILT — just fill creds): create a bot via @BotFather, get your chat id, and set `TELEGRAM_ALERT_BOT_TOKEN` + `TELEGRAM_ALERT_CHAT_ID` in `Code.gs`. You'll then get a Telegram ping on every **new warm lead**, **inbound reply**, and **opt-out** (server-side, no browser needed). Inert until the constants are filled.
 - [ ] Enable the **scraper daily trigger** (Admin → Scrapes programados → Activar) and/or "Ejecutar ahora".
 
 ## 4. Vercel side (your other repo / Claude Code chat) — parallel

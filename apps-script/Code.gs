@@ -14,6 +14,8 @@ const TWILIO_FROM_WA     = '+14155238886';     // WhatsApp sender (whatsapp: pre
 const DRIVE_FOLDER_ID    = 'TU_DRIVE_FOLDER_ID';
 const RESEND_API_KEY     = 'TU_RESEND_API_KEY';            // Project C — Resend (https://resend.com)
 const RESEND_FROM        = 'AXIUS <hola@axius.tech>';      // verified sending domain (SPF/DKIM/DMARC)
+const TELEGRAM_ALERT_BOT_TOKEN = 'TU_TELEGRAM_BOT_TOKEN';  // founder alerts — @BotFather token
+const TELEGRAM_ALERT_CHAT_ID   = 'TU_TELEGRAM_CHAT_ID';    // your personal chat id (from getUpdates)
 const SHEETS = { leads:'Leads', calls:'Llamadas', team:'Team', commissions:'Commissions', scripts:'Scripts', interactions:'Interactions', sequences:'Sequences' };
 
 // CSRF protection — paste the value from your browser's Setup page
@@ -35,6 +37,18 @@ function isOptOutGs(body){
   if(OPT_OUT_KEYWORDS_GS.some(k=>t===k||t===k+'.'||t.indexOf(k+' ')===0)) return true;
   return OPT_OUT_PHRASES_GS.some(p=>t.indexOf(p)!==-1);
 }
+// Founder/admin alert to Telegram (fire-and-forget; inert until token+chat id set).
+function notifyTelegram(text){
+  if(!TELEGRAM_ALERT_BOT_TOKEN || TELEGRAM_ALERT_BOT_TOKEN.indexOf('TU_')===0 || !TELEGRAM_ALERT_CHAT_ID || TELEGRAM_ALERT_CHAT_ID.indexOf('TU_')===0) return;
+  try {
+    UrlFetchApp.fetch('https://api.telegram.org/bot'+TELEGRAM_ALERT_BOT_TOKEN+'/sendMessage', {
+      method:'post', contentType:'application/json',
+      payload: JSON.stringify({ chat_id: TELEGRAM_ALERT_CHAT_ID, text: String(text||'').slice(0,3500), disable_web_page_preview:true }),
+      muteHttpExceptions:true,
+    });
+  } catch(e) {}
+}
+
 // Server-side safety net: is this lead opted out / No-llamar? (defense-in-depth for sends)
 function leadOptedOut(leadId){
   if(!leadId) return false;
@@ -147,6 +161,9 @@ function doPost(e) {
           if (channel==='sms' && csms>=0)     ls.getRange(row+1, csms+1).setValue(false);
         }
       }
+      const who = leadName || from;
+      if (isOptOutGs(text)) notifyTelegram('Opt-out — ' + who + ' (' + channel + ') pidió no recibir más mensajes.');
+      else notifyTelegram('Respuesta de ' + who + ' (' + channel + '): ' + text);
       return ContentService.createTextOutput('<?xml version="1.0"?><Response></Response>').setMimeType(ContentService.MimeType.XML);
     }
 
@@ -483,6 +500,7 @@ function doPost(e) {
         importedAt:now,updatedAt:now,
       };
       s.appendRow(LEAD_HDR.map(h=>lead[h]??''));
+      notifyTelegram('Nuevo lead — ' + (lead.name||'Sin nombre') + ' · ' + (lead.source||'Inbound') + (lead.city?(' · '+lead.city):'') + (firstMsg?('\n"'+firstMsg.slice(0,200)+'"'):''));
       return ok({added:true,duplicate:false,id:lead.id});
     }
     return ok({received:true});
