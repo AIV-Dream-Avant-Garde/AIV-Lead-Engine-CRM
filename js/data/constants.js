@@ -49,8 +49,8 @@ const LS_LIMIT           = 5 * 1024 * 1024;     // ~5 MB localStorage budget
 const GET_ACTIONS = new Set(['ping','pull','getToken','twiml','checkTriggers']);
 
 // Fields from scraped/imported lead data used for CSV mapping
-const CRM_FIELDS      = ['name','phone','address','website','rating','reviews','calendarEventId'];
-const CRM_FIELD_LABELS = {name:'Nombre',phone:'Telefono',address:'Direccion',website:'Website',rating:'Rating',reviews:'Resenas'};
+const CRM_FIELDS      = ['name','phone','email','address','website','rating','reviews','calendarEventId'];
+const CRM_FIELD_LABELS = {name:'Nombre',phone:'Telefono',email:'Email',address:'Direccion',website:'Website',rating:'Rating',reviews:'Resenas'};
 
 const SCRIPT_STAGES = {
   opening:    'Apertura',

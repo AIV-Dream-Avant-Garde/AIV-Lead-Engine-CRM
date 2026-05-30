@@ -12,6 +12,8 @@ const TWILIO_FROM_NUMBER = '+15551234567';     // voice (existing)
 const TWILIO_FROM_SMS_US = '+15551234567';     // US SMS sender (10DLC) — set in Project 0
 const TWILIO_FROM_WA     = '+14155238886';     // WhatsApp sender (whatsapp: prefix added at send) — set in Project 0
 const DRIVE_FOLDER_ID    = 'TU_DRIVE_FOLDER_ID';
+const RESEND_API_KEY     = 'TU_RESEND_API_KEY';            // Project C — Resend (https://resend.com)
+const RESEND_FROM        = 'AXIUS <hola@axius.tech>';      // verified sending domain (SPF/DKIM/DMARC)
 const SHEETS = { leads:'Leads', calls:'Llamadas', team:'Team', commissions:'Commissions', scripts:'Scripts', interactions:'Interactions', sequences:'Sequences' };
 
 // CSRF protection — paste the value from your browser's Setup page
@@ -330,6 +332,22 @@ function doPost(e) {
       const d = JSON.parse(res.getContentText());
       if (d.sid) return ok({sid:d.sid, status:d.status || 'sent'});
       return err_(d.message || 'send failed');
+    }
+    if (a === 'sendEmail') {
+      // Project C — outbound email via Resend. NOTE before real go-live: append a
+      // CAN-SPAM unsubscribe link + physical address, and add a bounce/complaint
+      // webhook + suppression list (documented in GO-LIVE / Project 0).
+      const {email, subject, body:msgBody} = b;
+      if (!email || !msgBody) return err_('email and body required');
+      const res = UrlFetchApp.fetch('https://api.resend.com/emails', {
+        method:'post', contentType:'application/json',
+        headers:{ Authorization:'Bearer ' + RESEND_API_KEY },
+        payload: JSON.stringify({ from: RESEND_FROM, to: [email], subject: subject || 'AXIUS', text: msgBody }),
+        muteHttpExceptions:true,
+      });
+      const d = JSON.parse(res.getContentText() || '{}');
+      if (d.id) return ok({sid:d.id, status:'sent'});
+      return err_((d.message || (d.error && d.error.message)) || 'email failed');
     }
     if (a === 'saveReportEmail') {
       const ss=SpreadsheetApp.openById(SHEET_ID);

@@ -42,6 +42,7 @@ function autoMapHeaders(headers) {
     const norm = h.replace(/[^a-z]/g,'');
     if (norm === 'nombre' || norm === 'name')    autoMap[h] = 'name';
     if (norm === 'telefono' || norm === 'phone' || norm === 'celular' || norm === 'movil' || norm === 'mobile') autoMap[h] = 'phone';
+    if (norm === 'email' || norm === 'correo' || norm === 'emailaddress' || norm === 'mail') autoMap[h] = 'email';
     if (norm === 'direccion' || norm === 'address') autoMap[h] = 'address';
     if (norm === 'website' || norm === 'web' || norm === 'sitioweb') autoMap[h] = 'website';
     if (norm === 'rating' || norm === 'calificacion') autoMap[h] = 'rating';
@@ -134,11 +135,20 @@ async function confirmImport() {
   const providerRate = S.session?.providerRate || 0;
 
   const mapped = applyMapping(S.pendingImport);
-  const ex = new Set(S.leads.map(l => phoneKey(l.phone)).filter(Boolean));
+  // Dedup by phone (last-10) OR email; a lead needs at least one usable identity.
+  const exPhone = new Set(S.leads.map(l => phoneKey(l.phone)).filter(Boolean));
+  const exEmail = new Set(S.leads.map(l => (l.email||'').trim().toLowerCase()).filter(Boolean));
   const toAdd = mapped
-    .filter(r => r.phone && r.phone !== 'N/A' && !ex.has(phoneKey(r.phone)))
+    .filter(r => {
+      const pk = phoneKey(r.phone), em = (r.email||'').trim().toLowerCase();
+      if (!pk && !em) return false;                          // no identity → skip
+      if (pk && exPhone.has(pk)) return false;               // dup phone
+      if (em && exEmail.has(em)) return false;               // dup email
+      if (pk) exPhone.add(pk); if (em) exEmail.add(em);      // guard against in-file dups
+      return true;
+    })
     .map(r => ({
-      id:uid(), name:r.name||'Sin nombre', phone:r.phone||'N/A',
+      id:uid(), name:r.name||'Sin nombre', phone:r.phone||'N/A', email:(r.email||'').trim(),
       address:r.address||'N/A', website:r.website||'N/A',
       rating:r.rating||'N/A', reviews:r.reviews||'N/A',
       country, city, barrio, keyword:kw, source, sourceDetail:srcDetail,

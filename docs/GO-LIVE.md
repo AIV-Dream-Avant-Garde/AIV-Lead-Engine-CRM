@@ -9,7 +9,7 @@ These gate *real* messaging; nothing else can compensate for them.
 
 - [ ] **US SMS → 10DLC registration** (Twilio): register a Brand + Campaign, get an A2P-approved sending number. Until approved, US SMS is filtered/blocked.
 - [ ] **Colombia → WhatsApp Business API** (Twilio): provision a WhatsApp sender + **submit message templates for approval** (cold/out-of-24h sends require approved templates). 
-- [ ] **(Project C, later) Email → ESP + domain auth**: pick an ESP and set SPF/DKIM/DMARC on the sending domain. *Decision needed from you — see §5.*
+- [ ] **Email → Resend** (chosen): create a Resend account, verify the sending domain (SPF/DKIM/DMARC), put the API key in `RESEND_API_KEY` + set `RESEND_FROM` in `Code.gs`. **Before real email go-live:** add a CAN-SPAM **unsubscribe link** + physical address to email bodies, and a Resend **bounce/complaint webhook → suppression list** (built behavior is outbound-only today).
 - [ ] **Lawful-basis / consent posture** for cold scraped leads (US TCPA/CAN-SPAM, Colombia Ley 1581). Decide how you'll evidence consent + warm-up sending. (The system honors opt-out and quiet hours; it doesn't make cold outreach lawful by itself.)
 
 ## 2. Deploy the backend (Apps Script) — ~1 hour
@@ -36,7 +36,7 @@ Hand these briefs to the website project's chat:
 - [ ] Provide to Vercel env: `CRM_INBOUND_URL`, `CRM_SECRET`, an **LLM API key** (Claude/OpenAI), and a **booking link** (Cal.com/Calendly) for the discovery-call CTA.
 
 ## 5. Decisions I need from you (to keep building here)
-- [ ] **Email ESP** for Project C: SendGrid / Postmark / Amazon SES / other? (Determines the `sendEmail` backend + domain-auth steps.)
+- [x] **Email ESP** → **Resend** (chosen; Project C email channel built — see §1 for setup + the unsubscribe/bounce follow-ups).
 - [ ] **Daily send cap** (default 200/run) and **quiet hours** (default 08:00–20:00 local) — confirm or adjust.
 - [ ] **Message copy**: review/replace the seed templates in `js/data/outreach-templates.js` with your exact wording (I drafted them in the confident, no-emoji voice).
 - [ ] **Company facts / pitch** for the AI brain (what AXIUS does, offers, pricing tiers) — so the Vercel engine + website chat speak accurately.

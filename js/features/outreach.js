@@ -96,15 +96,24 @@ async function sendMessage(lead, body, opts) {
   opts = opts || {};
   if (!lead) return null;
   const channel = opts.channel || pickChannel(lead);
-  if (channel === 'email') { toast('Email aún no está disponible (Proyecto C).', 'error'); return null; }
   if (lead.status === 'No llamar') { toast('Este lead está en "No llamar" / opt-out — no se envía.', 'error'); return null; }
   const agent = ((S.session && S.session.userName) || '').split(' ')[0] || '';
   const text  = renderTemplate(body, lead, agent);
   if (!text.trim()) { toast('El mensaje está vacío.', 'error'); return null; }
-  const phoneE164 = toE164(lead.phone, lead.country);
-  if (!phoneE164) { toast('El número del lead no es válido para enviar.', 'error'); return null; }
 
-  const it = addInteraction({ leadId:lead.id, leadName:lead.name, phone:lead.phone, channel, direction:'out', stepTag:opts.stepTag||'', body:text, status:'queued' });
+  // Resolve recipient by channel: email → lead.email; sms/whatsapp → E.164 phone.
+  let phoneE164 = '', email = '', subject = '';
+  if (channel === 'email') {
+    email = (lead.email || '').trim();
+    if (!email) { toast('El lead no tiene email.', 'error'); return null; }
+    subject = renderTemplate(opts.subject || 'AXIUS', lead, agent) || 'AXIUS';
+  } else {
+    phoneE164 = toE164(lead.phone, lead.country);
+    if (!phoneE164) { toast('El número del lead no es válido para enviar.', 'error'); return null; }
+  }
+
+  const logBody = channel === 'email' ? ('[Asunto: ' + subject + '] ' + text) : text;
+  const it = addInteraction({ leadId:lead.id, leadName:lead.name, phone:lead.phone, channel, direction:'out', stepTag:opts.stepTag||'', body:logBody, status:'queued' });
   lead.lastTouchAt = new Date().toISOString();
   if (typeof pushLead === 'function') pushLead(lead);
 
@@ -113,9 +122,12 @@ async function sendMessage(lead, body, opts) {
 
   if (!S.config.scriptUrl) { it.status = 'failed'; it.error = 'sin conexión'; persistInteraction(it); toast('Sin Apps Script configurado: el mensaje quedó registrado pero no se envió.', 'error', 6000); return it; }
 
-  const res = await sheetsCall({ action:'sendMessage', id:it.id, leadId:lead.id, phoneE164, channel, body:text, stepTag:it.stepTag });
-  if (res && res.success) { it.status = 'sent'; it.sid = res.sid || ''; toast('Mensaje enviado por ' + (CHANNEL_LABELS[channel] || channel) + '.', 'success'); }
-  else { it.status = 'failed'; it.error = (res && res.error) || 'sin respuesta'; toast('No se pudo enviar el mensaje: ' + it.error, 'error', 6000); }
+  const req = channel === 'email'
+    ? { action:'sendEmail', id:it.id, leadId:lead.id, email, subject, body:text, stepTag:it.stepTag }
+    : { action:'sendMessage', id:it.id, leadId:lead.id, phoneE164, channel, body:text, stepTag:it.stepTag };
+  const res = await sheetsCall(req);
+  if (res && res.success) { it.status = 'sent'; it.sid = res.sid || res.id || ''; toast('Enviado por ' + (CHANNEL_LABELS[channel] || channel) + '.', 'success'); }
+  else { it.status = 'failed'; it.error = (res && res.error) || 'sin respuesta'; toast('No se pudo enviar: ' + it.error, 'error', 6000); }
   persistInteraction(it);
   if (typeof renderAll === 'function') renderAll();
   return it;
@@ -124,14 +136,17 @@ async function sendMessage(lead, body, opts) {
 // ── Lead-modal composer (manual send) ─────────────────────────────────
 let _composerTpls = [];
 function _composerChannel() { return document.getElementById('msg-channel')?.value || 'sms'; }
+function _toggleSubject() { const w = document.getElementById('msg-subject-wrap'); if (w) w.style.display = (_composerChannel() === 'email') ? '' : 'none'; }
 
 function renderComposer(lead) {
   const csel = document.getElementById('msg-channel');
   if (!csel || !lead) return;
   const def = pickChannel(lead);
   csel.innerHTML = ['sms','whatsapp','email'].map(c => `<option value="${c}"${c===def?' selected':''}>${CHANNEL_LABELS[c]||c}</option>`).join('');
-  csel.onchange = () => { _fillComposerTemplates(lead); renderMsgPreview(); };
+  csel.onchange = () => { _toggleSubject(); _fillComposerTemplates(lead); renderMsgPreview(); };
   const body = document.getElementById('msg-body'); if (body) body.value = '';
+  const subj = document.getElementById('msg-subject'); if (subj) subj.value = '';
+  _toggleSubject();
   _fillComposerTemplates(lead);
   renderMsgPreview();
   const optedOut = lead.status === 'No llamar';
@@ -169,7 +184,8 @@ async function sendComposer() {
   const lead = S.leads.find(l => l.id === S.curLeadId);
   if (!lead) return;
   const body = document.getElementById('msg-body')?.value || '';
-  await sendMessage(lead, body, { channel: _composerChannel() });
+  const subject = document.getElementById('msg-subject')?.value || '';
+  await sendMessage(lead, body, { channel: _composerChannel(), subject });
   const b = document.getElementById('msg-body'); if (b) b.value = '';
   renderMsgPreview();
   if (typeof renderLeadTimeline === 'function') renderLeadTimeline(lead);
