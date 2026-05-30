@@ -343,6 +343,7 @@ function openLead(id) {
   // Detail grid with editable phone + address
   const detailRows = [
     {lb:'Telefono', v:`<input value="${esc(l.phone||'')}" id="edit-phone" placeholder="Sin telefono">`},
+    {lb:'Email',    v:`<input value="${esc(l.email||'')}" id="edit-email" placeholder="Sin email">`},
     {lb:'Rating',   v: l.rating && l.rating !== 'N/A' ? `★ ${l.rating} (${l.reviews} reseñas)` : '--'},
     {lb:'Direccion',v:`<input value="${esc(l.address||'')}" id="edit-address" placeholder="Sin direccion">`},
     {lb:'Website',  v: l.website && l.website !== 'N/A'
@@ -519,7 +520,9 @@ function saveLead() {
   // Capture editable field changes
   const np = document.getElementById('edit-phone')?.value?.trim();
   const na = document.getElementById('edit-address')?.value?.trim();
+  const ne = document.getElementById('edit-email');
   const nn = document.getElementById('m-name')?.textContent?.trim();
+  if (ne && (ne.value.trim() !== (l.email || ''))) l.email = ne.value.trim();
   if (np) {
     const normPhone = normalizePhone(np);
     if (normPhone !== normalizePhone(l.phone || '')) {

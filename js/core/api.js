@@ -112,8 +112,24 @@ async function syncNow() {
       const seen = new Set(S.interactions.map(i => i.id));
       res.interactions.forEach(i => { if (i.id && !seen.has(i.id)) { S.interactions.push({...i, _synced:true}); seen.add(i.id); } });
     }
-    // Cadence enrollment state is owned by the Vercel engine → server is authoritative
-    if (Array.isArray(res.sequences)) { S.sequences = res.sequences; localStorage.setItem('aiv-sequences', JSON.stringify(S.sequences)); }
+    // Reflect inbound replies onto the lead so the "Respondió" badge works frontend-side
+    // regardless of whether the backend stamped lastReplyAt.
+    (S.interactions || []).filter(i => i.direction === 'in' && i.leadId).forEach(i => {
+      const l = S.leads.find(x => x.id === i.leadId);
+      if (l && i.createdAt && (!l.lastReplyAt || new Date(i.createdAt) > new Date(l.lastReplyAt))) l.lastReplyAt = i.createdAt;
+    });
+    // Cadence enrollment: engine-authoritative, BUT keep a local copy that was changed
+    // more recently (a manual pause/resume the engine hasn't processed yet) so it isn't clobbered.
+    if (Array.isArray(res.sequences)) {
+      const localByLead = {}; (S.sequences || []).forEach(s => { localByLead[s.leadId] = s; });
+      const merged = res.sequences.map(srv => {
+        const loc = localByLead[srv.leadId];
+        return (loc && loc.updatedAt && (!srv.updatedAt || new Date(loc.updatedAt) > new Date(srv.updatedAt))) ? loc : srv;
+      });
+      (S.sequences || []).forEach(loc => { if (!res.sequences.find(srv => srv.leadId === loc.leadId)) merged.push(loc); });
+      S.sequences = merged;
+      localStorage.setItem('aiv-sequences', JSON.stringify(S.sequences));
+    }
     S.lastSyncTimestamp = new Date().toISOString();
     saveLocal();
     if (failed > 0) {

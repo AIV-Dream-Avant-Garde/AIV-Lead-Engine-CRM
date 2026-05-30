@@ -34,6 +34,7 @@ function renderTemplate(body, lead, agent) {
     nombre:    lead.contactName || lead.name || '',
     empresa:   company,
     agente:    agent || '',
+    seguimiento: lead.followUpDate ? (typeof fmtD === 'function' ? fmtD(lead.followUpDate) : String(lead.followUpDate)) : '',
   };
   return String(body || '')
     .replace(/\{(\w+)\}/g, (m, k) => (k in map ? map[k] : ''))

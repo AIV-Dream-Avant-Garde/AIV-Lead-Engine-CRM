@@ -35,6 +35,15 @@ function isOptOutGs(body){
   if(OPT_OUT_KEYWORDS_GS.some(k=>t===k||t===k+'.'||t.indexOf(k+' ')===0)) return true;
   return OPT_OUT_PHRASES_GS.some(p=>t.indexOf(p)!==-1);
 }
+// Server-side safety net: is this lead opted out / No-llamar? (defense-in-depth for sends)
+function leadOptedOut(leadId){
+  if(!leadId) return false;
+  const ss=SpreadsheetApp.openById(SHEET_ID), s=ss.getSheetByName(SHEETS.leads);
+  if(!s) return false;
+  const rows=s.getDataRange().getValues(), h=rows[0]||LEAD_HDR, ic=h.indexOf('id'), stc=h.indexOf('status');
+  for(let i=1;i<rows.length;i++){ if(String(rows[i][ic])===String(leadId)) return String(rows[i][stc])==='No llamar'; }
+  return false;
+}
 
 function getSheet(name, hdr) {
   const ss = SpreadsheetApp.openById(SHEET_ID);
@@ -121,7 +130,8 @@ function doPost(e) {
       const fromKey = phoneKey(from);
       const ls = getSheet(SHEETS.leads, LEAD_HDR), lr = ls.getDataRange().getValues(), lh = lr[0] || LEAD_HDR;
       const pc=lh.indexOf('phone'), ic=lh.indexOf('id'), nc=lh.indexOf('name'), stc=lh.indexOf('status'),
-            dc=lh.indexOf('dncReason'), rc=lh.indexOf('lastReplyAt'), csms=lh.indexOf('consentSms'), cwa=lh.indexOf('consentWhatsapp');
+            dc=lh.indexOf('dncReason'), rc=lh.indexOf('lastReplyAt'), uc=lh.indexOf('updatedAt'),
+            csms=lh.indexOf('consentSms'), cwa=lh.indexOf('consentWhatsapp');
       let row=-1, leadId='', leadName='';
       for (let i=1;i<lr.length;i++){ if (fromKey && phoneKey(lr[i][pc])===fromKey) { row=i; leadId=lr[i][ic]; leadName=lr[i][nc]; } } // last match = most recent
       const now = new Date().toISOString();
@@ -129,6 +139,7 @@ function doPost(e) {
       getSheet(SHEETS.interactions, INTERACTION_HDR).appendRow(INTERACTION_HDR.map(k => rec[k] ?? ''));
       if (row >= 0) {
         if (rc>=0) ls.getRange(row+1, rc+1).setValue(now);
+        if (uc>=0) ls.getRange(row+1, uc+1).setValue(now); // bump updatedAt so the reply/opt-out surfaces in since-filtered pulls
         if (isOptOutGs(text)) {
           if (stc>=0) ls.getRange(row+1, stc+1).setValue('No llamar');
           if (dc>=0)  ls.getRange(row+1, dc+1).setValue('opt-out ('+channel+')');
@@ -322,6 +333,7 @@ function doPost(e) {
       // Twilio send only (SMS or WhatsApp). Persistence is via saveInteraction rows.
       const {phoneE164, channel, body:msgBody} = b;
       if (!phoneE164 || !msgBody) return err_('phoneE164 and body required');
+      if (leadOptedOut(b.leadId)) return err_('lead opted out');   // server-side safety net
       const auth = Utilities.base64Encode(TWILIO_ACCOUNT_SID + ':' + TWILIO_AUTH_TOKEN);
       const from = channel === 'whatsapp' ? 'whatsapp:' + TWILIO_FROM_WA : TWILIO_FROM_SMS_US;
       const to   = channel === 'whatsapp' ? 'whatsapp:' + phoneE164    : phoneE164;
@@ -339,6 +351,7 @@ function doPost(e) {
       // webhook + suppression list (documented in GO-LIVE / Project 0).
       const {email, subject, body:msgBody} = b;
       if (!email || !msgBody) return err_('email and body required');
+      if (leadOptedOut(b.leadId)) return err_('lead opted out');   // server-side safety net
       const res = UrlFetchApp.fetch('https://api.resend.com/emails', {
         method:'post', contentType:'application/json',
         headers:{ Authorization:'Bearer ' + RESEND_API_KEY },

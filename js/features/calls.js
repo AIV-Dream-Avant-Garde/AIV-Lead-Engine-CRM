@@ -398,27 +398,15 @@ function populateSmsTemplates() {
 }
 
 async function sendPostCallSms() {
-  if (!S.config.scriptUrl) { toast('Configura el Apps Script URL primero.', 'error'); return; }
   const idx = document.getElementById('cw-sms-tpl')?.value;
   if (idx === '' || idx === undefined) { toast('Selecciona una plantilla.', 'error'); return; }
   const tpl  = (S.smsTemplates||[])[parseInt(idx)];
   if (!tpl)  { toast('Plantilla no encontrada.', 'error'); return; }
   const l    = S.leads.find(x => x.id === CALL.curLeadId);
-  if (!l || !l.phone || l.phone === 'N/A') { toast('Sin número de teléfono para este lead.', 'error'); return; }
-  const body = tpl.body
-    .replace(/\{nombre\}/gi,      l.name || '')
-    .replace(/\{empresa\}/gi,     S.config.companyName || '')
-    .replace(/\{seguimiento\}/gi, l.followUpDate || '');
-  const res = await sheetsCall({action:'sendSMS', to:l.phone, body});
-  if (res?.success) {
-    if (!Array.isArray(l.notes)) l.notes = [];
-    l.notes.push({date:new Date().toISOString(), text:'SMS enviado: ' + tpl.name});
-    l.updatedAt = new Date().toISOString();
-    pushLead(l);
-    toast('SMS enviado correctamente.', 'success');
-  } else {
-    toast('Error al enviar SMS: ' + (res?.error || 'Sin respuesta'), 'error');
-  }
+  if (!l) { toast('Lead no encontrado.', 'error'); return; }
+  // Route through the unified sender: channel-aware (Colombia→WhatsApp, US→SMS),
+  // logged as an interaction in the timeline, and opt-out / "No llamar" gated.
+  await sendMessage(l, tpl.body, {});
 }
 
 // ── Demo-mode simulated call flow ──────────────────────────

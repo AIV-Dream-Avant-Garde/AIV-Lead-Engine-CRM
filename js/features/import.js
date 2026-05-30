@@ -80,9 +80,10 @@ function processCSV(file) {
       }).join('');
     }
 
-    const ex    = new Set(S.leads.map(l => phoneKey(l.phone)).filter(Boolean));
+    const exP   = new Set(S.leads.map(l => phoneKey(l.phone)).filter(Boolean));
+    const exE   = new Set(S.leads.map(l => (l.email||'').trim().toLowerCase()).filter(Boolean));
     const total = rows.length;
-    const dupes = rows.filter(r => r.phone && ex.has(phoneKey(r.phone))).length;
+    const dupes = rows.filter(r => (r.phone && exP.has(phoneKey(r.phone))) || (r.email && exE.has(String(r.email).trim().toLowerCase()))).length;
     S.pendingImport = rows;
     const sumEl = document.getElementById('imp-summary');
     if (sumEl) sumEl.textContent = total + ' filas — ' + (total - dupes) + ' nuevas, ' + dupes + ' duplicadas';
