@@ -16,6 +16,22 @@ const RESEND_API_KEY     = 'TU_RESEND_API_KEY';            // Project C — Rese
 const RESEND_FROM        = 'AXIUS <hola@axius.tech>';      // verified sending domain (SPF/DKIM/DMARC)
 const TELEGRAM_ALERT_BOT_TOKEN = 'TU_TELEGRAM_BOT_TOKEN';  // founder alerts — @BotFather token
 const TELEGRAM_ALERT_CHAT_ID   = 'TU_TELEGRAM_CHAT_ID';    // your personal chat id (from getUpdates)
+
+// ── CADENCE ENGINE config (Motor de Secuencias) ────────────────────────────
+// Autonomous templated outreach (deterministic; no LLM). SAFETY: inert until
+// CADENCE_ENABLED = true. While false the engine DRY-RUNS — it logs what it
+// WOULD enroll/send (Logger + Config 'lastCadenceRun') but writes NO sequence
+// rows and sends NOTHING. Go live AFTER provisioning (10DLC / WhatsApp
+// templates): set CADENCE_ENABLED = true AND enable the hourly trigger for
+// runCadence (CRM Admin → Secuencias automáticas, or Triggers → runCadence).
+const CADENCE_ENABLED          = false;   // master switch (false = dry-run, sends nothing)
+const CADENCE_COMPANY          = 'AXIUS'; // {empresa} token
+const CADENCE_AGENT_NAME       = 'Andrés';// {agente} token — the sending persona name
+const CADENCE_DAILY_CAP        = 200;     // max sends per day
+const CADENCE_STEP_GAP_DAYS    = 2;       // min days between proactive touches
+const CADENCE_FIRST_SPREAD_MIN = 360;     // spread first touches over N minutes (anti-burst)
+const CADENCE_GAP_MS           = CADENCE_STEP_GAP_DAYS * 24 * 3600 * 1000;
+
 const SHEETS = { leads:'Leads', calls:'Llamadas', team:'Team', commissions:'Commissions', scripts:'Scripts', interactions:'Interactions', sequences:'Sequences' };
 
 // CSRF protection — paste the value from your browser's Setup page
@@ -113,10 +129,13 @@ function doGet(e) {
     if (a === 'checkTriggers') {
       const triggers = ScriptApp.getProjectTriggers();
       let lastScrapeRun = null; try { const raw = cfgGet('lastScrapeRun'); if (raw) lastScrapeRun = JSON.parse(raw); } catch(e) {}
+      let lastCadenceRun = null; try { const raw = cfgGet('lastCadenceRun'); if (raw) lastCadenceRun = JSON.parse(raw); } catch(e) {}
       return ok({
         scrapeTrigger: triggers.some(t => t.getHandlerFunction() === 'runScheduledScrapes'),
         reportTrigger: triggers.some(t => t.getHandlerFunction() === 'sendWeeklyReport'),
-        lastScrapeRun,
+        cadenceTrigger: triggers.some(t => t.getHandlerFunction() === 'runCadence'),
+        cadenceEnabled: CADENCE_ENABLED === true,
+        lastScrapeRun, lastCadenceRun,
       });
     }
     if (a === 'twiml') {
@@ -351,16 +370,8 @@ function doPost(e) {
       const {phoneE164, channel, body:msgBody} = b;
       if (!phoneE164 || !msgBody) return err_('phoneE164 and body required');
       if (leadOptedOut(b.leadId)) return err_('lead opted out');   // server-side safety net
-      const auth = Utilities.base64Encode(TWILIO_ACCOUNT_SID + ':' + TWILIO_AUTH_TOKEN);
-      const from = channel === 'whatsapp' ? 'whatsapp:' + TWILIO_FROM_WA : TWILIO_FROM_SMS_US;
-      const to   = channel === 'whatsapp' ? 'whatsapp:' + phoneE164    : phoneE164;
-      const res  = UrlFetchApp.fetch(
-        'https://api.twilio.com/2010-04-01/Accounts/' + TWILIO_ACCOUNT_SID + '/Messages.json',
-        {method:'post', headers:{Authorization:'Basic '+auth}, payload:{From:from, To:to, Body:msgBody}, muteHttpExceptions:true}
-      );
-      const d = JSON.parse(res.getContentText());
-      if (d.sid) return ok({sid:d.sid, status:d.status || 'sent'});
-      return err_(d.message || 'send failed');
+      const r = twilioSend_(phoneE164, channel, msgBody);
+      return r.sid ? ok({sid:r.sid, status:r.status}) : err_(r.error || 'send failed');
     }
     if (a === 'sendEmail') {
       // Project C — outbound email via Resend. NOTE before real go-live: append a
@@ -369,15 +380,14 @@ function doPost(e) {
       const {email, subject, body:msgBody} = b;
       if (!email || !msgBody) return err_('email and body required');
       if (leadOptedOut(b.leadId)) return err_('lead opted out');   // server-side safety net
-      const res = UrlFetchApp.fetch('https://api.resend.com/emails', {
-        method:'post', contentType:'application/json',
-        headers:{ Authorization:'Bearer ' + RESEND_API_KEY },
-        payload: JSON.stringify({ from: RESEND_FROM, to: [email], subject: subject || 'AXIUS', text: msgBody }),
-        muteHttpExceptions:true,
-      });
-      const d = JSON.parse(res.getContentText() || '{}');
-      if (d.id) return ok({sid:d.id, status:'sent'});
-      return err_((d.message || (d.error && d.error.message)) || 'email failed');
+      const r = resendSend_(email, subject, msgBody);
+      return r.sid ? ok({sid:r.sid, status:r.status}) : err_(r.error || 'email failed');
+    }
+    if (a === 'runCadenceNow') {
+      // On-demand cadence pass (dry-run while CADENCE_ENABLED=false). Lets the
+      // CRM admin preview/verify enrollment + intended sends without waiting for
+      // the hourly trigger.
+      return ok(runCadence() || {});
     }
     if (a === 'saveReportEmail') {
       const ss=SpreadsheetApp.openById(SHEET_ID);
@@ -449,7 +459,7 @@ function doPost(e) {
     }
     if (a === 'setTrigger') {
       const fn = b.fn;
-      if (fn !== 'runScheduledScrapes' && fn !== 'sendWeeklyReport') return err_('Invalid fn');
+      if (fn !== 'runScheduledScrapes' && fn !== 'sendWeeklyReport' && fn !== 'runCadence') return err_('Invalid fn');
       ScriptApp.getProjectTriggers()
         .filter(t => t.getHandlerFunction() === fn)
         .forEach(t => ScriptApp.deleteTrigger(t));
@@ -458,6 +468,8 @@ function doPost(e) {
           ScriptApp.newTrigger(fn).timeBased().everyDays(1).atHour(6).inTimezone('America/Bogota').create();
         } else if (fn === 'sendWeeklyReport') {
           ScriptApp.newTrigger(fn).timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(8).inTimezone('America/Bogota').create();
+        } else if (fn === 'runCadence') {
+          ScriptApp.newTrigger(fn).timeBased().everyHours(1).create();
         }
       }
       return ok({set: b.enabled, fn});
@@ -671,6 +683,328 @@ function runScheduledScrapes() {
   cfgSet('lastScrapeRun', JSON.stringify({ranAt, added: totalAdded}));
   Logger.log('Scheduled scrape complete. Added: ' + totalAdded + ' leads.');
   return {added: totalAdded, ranAt};
+}
+
+// ── Low-level send helpers (shared by the message handlers + the cadence engine) ──
+// Twilio SMS/WhatsApp. Returns {sid,status} on success, {error} on failure.
+function twilioSend_(phoneE164, channel, body) {
+  const auth = Utilities.base64Encode(TWILIO_ACCOUNT_SID + ':' + TWILIO_AUTH_TOKEN);
+  const from = channel === 'whatsapp' ? 'whatsapp:' + TWILIO_FROM_WA : TWILIO_FROM_SMS_US;
+  const to   = channel === 'whatsapp' ? 'whatsapp:' + phoneE164    : phoneE164;
+  const res  = UrlFetchApp.fetch(
+    'https://api.twilio.com/2010-04-01/Accounts/' + TWILIO_ACCOUNT_SID + '/Messages.json',
+    {method:'post', headers:{Authorization:'Basic '+auth}, payload:{From:from, To:to, Body:body}, muteHttpExceptions:true}
+  );
+  const d = JSON.parse(res.getContentText());
+  return d.sid ? {sid:d.sid, status:d.status || 'sent'} : {error: d.message || 'send failed'};
+}
+// Resend email. Returns {sid,status} on success, {error} on failure.
+function resendSend_(email, subject, body) {
+  const res = UrlFetchApp.fetch('https://api.resend.com/emails', {
+    method:'post', contentType:'application/json',
+    headers:{ Authorization:'Bearer ' + RESEND_API_KEY },
+    payload: JSON.stringify({ from: RESEND_FROM, to: [email], subject: subject || 'AXIUS', text: body }),
+    muteHttpExceptions:true,
+  });
+  const d = JSON.parse(res.getContentText() || '{}');
+  return d.id ? {sid:d.id, status:'sent'} : {error: (d.message || (d.error && d.error.message)) || 'email failed'};
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CADENCE ENGINE — "Motor de Secuencias" (time-triggered, deterministic)
+   Autonomous templated outreach. Enrolls eligible leads, advances each through
+   the multi-step cadence, honoring opt-out / quiet hours / claim / reply /
+   daily cap. Inert until CADENCE_ENABLED = true (dry-runs otherwise).
+
+   The block below (CADENCE_STEPS + the pure helpers) is a VERBATIM MIRROR of
+   js/features/cadence-core.js — unit-tested there. Keep the two in sync, like
+   isOptOut (js) ↔ isOptOutGs (Code.gs).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+const CADENCE_STEPS = {
+  'Colombia': {
+    whatsapp: [
+      { variants: [
+        'Hola, soy {agente} de {empresa}. Vi {negocio} en {ciudad} y me parece que están haciendo las cosas bien. Trabajamos con negocios como el suyo para conseguir más clientes de forma constante, y creo que les podemos aportar. ¿Tiene un minuto para que le cuente cómo?',
+        'Hola, le escribe {agente} de {empresa}. Conocí {negocio} en {ciudad} y me gustó lo que vi. Ayudamos a negocios como el suyo a atraer clientes de manera más constante, y creo que hay una buena oportunidad aquí. ¿Le viene bien que le explique en corto?',
+        'Buenas, soy {agente} de {empresa}. Me encontré con {negocio} en {ciudad} y quería escribirle directo: lo que hacemos encaja muy bien con un {categoria} como el suyo para traer más clientes. ¿Tiene un momento para que le muestre cómo?',
+      ] },
+      { variants: [
+        'Hola de nuevo, soy {agente} de {empresa}. Le escribo porque lo que hacemos encaja muy bien con un {categoria} como {negocio}. Si le interesa, le muestro en concreto qué resultados podríamos lograr. Si por ahora no es el momento, lo entiendo perfectamente.',
+        'Hola, {agente} de {empresa} otra vez. No quería dejar pasar lo de {negocio}: tengo claro qué podríamos lograr juntos y me gustaría mostrárselo en concreto. Si prefiere que hablemos más adelante, sin problema, usted me dice.',
+      ] },
+    ],
+    email: [
+      { variants: [
+        'Hola, soy {agente} de {empresa}. Vi el trabajo de {negocio} en {ciudad} y creo que podemos ayudarles a atraer clientes de forma más constante. Me encantaría mostrarles, en concreto, qué resultados podríamos lograr juntos. ¿Tienen 15 minutos esta semana para una llamada corta?\n\nUn saludo,\n{agente} — {empresa}',
+        'Hola, le escribe {agente} de {empresa}. Conocí {negocio} en {ciudad} y veo una oportunidad clara para que lleguen a más clientes de manera constante. Con gusto les muestro en una llamada corta qué podríamos lograr juntos. ¿Les viene bien esta semana?\n\nUn saludo,\n{agente} — {empresa}',
+      ] },
+    ],
+  },
+  'Estados Unidos': {
+    sms: [
+      { variants: [
+        "Hi, this is {agente} with {empresa}. I came across {negocio} in {ciudad} — impressive work. We help businesses like yours bring in customers consistently, and I think we'd add real value. Open to a quick chat?",
+        "Hi, {agente} from {empresa} here. {negocio} in {ciudad} caught my eye — you're clearly doing things right. We help businesses like yours win customers more consistently, and I think there's a real fit. Worth a quick chat?",
+        "Hello, this is {agente} with {empresa}. I noticed {negocio} in {ciudad} and wanted to reach out directly: what we do fits a {categoria} like yours well for bringing in more customers. Open to a short conversation?",
+      ] },
+      { variants: [
+        "Hi, {agente} from {empresa} again. What we do fits a {categoria} like {negocio} well — happy to show you exactly what results we could drive. If now isn't the time, no problem at all.",
+        "Hi, this is {agente} with {empresa}. Following up on {negocio} — I can show you concretely what results we'd aim for together. If the timing's off, just say the word and I'll step back.",
+      ] },
+    ],
+    email: [
+      { variants: [
+        "Hi, I'm {agente} with {empresa}. I came across {negocio} in {ciudad} and think we can help you bring in customers more consistently. I'd love to show you exactly what results we could drive together — do you have 15 minutes this week for a quick call?\n\nBest,\n{agente} — {empresa}",
+        "Hi, this is {agente} with {empresa}. {negocio} in {ciudad} stood out to me, and I see a clear way to help you reach more customers consistently. Could I show you what we'd aim for on a short call this week?\n\nBest,\n{agente} — {empresa}",
+      ] },
+    ],
+  },
+};
+
+function cadencePhoneKey(p) { const d = String(p || '').replace(/\D/g, ''); return d.length >= 10 ? d.slice(-10) : ''; }
+function cadenceChannel(country) {
+  const c = String(country || '').trim().toLowerCase();
+  if (c === 'colombia') return 'whatsapp';
+  if (c === 'estados unidos' || c === 'estados unidos de america' || c === 'estados unidos de américa' || c === 'usa' || c === 'united states') return 'sms';
+  return '';
+}
+function cadenceResolveChannel(lead) {
+  lead = lead || {};
+  const phoneCh = cadenceChannel(lead.country);
+  if (phoneCh && cadencePhoneKey(lead.phone)) return phoneCh;
+  if (String(lead.email || '').trim()) return 'email';
+  return '';
+}
+function cadenceEligible(lead, hasSeq) {
+  if (!lead || hasSeq) return false;
+  if (String(lead.status || 'Nuevo') !== 'Nuevo') return false;
+  if (cadenceResolveChannel(lead) === '') return false;
+  return true;
+}
+function cadenceGuard(lead, seq) {
+  if (!lead) return 'stopped:rejected';
+  const status = String(lead.status || 'Nuevo');
+  if (status === 'No llamar')        return 'stopped:optout';
+  if (status === 'Cerrado')          return 'stopped:closed';
+  if (status === 'No interesado' || status === 'Negociacion fallida' || status === 'Negociación fallida') return 'stopped:rejected';
+  if (String(lead.lockedBy || ''))   return 'paused:claimed';
+  if (replyShouldPause(lead, seq))   return 'paused:replied';
+  if (status !== 'Nuevo')            return 'paused:claimed';
+  return '';
+}
+function replyShouldPause(lead, seq) {
+  if (!lead || !seq) return false;
+  const reply    = lead.lastReplyAt ? new Date(lead.lastReplyAt).getTime() : 0;
+  const enrolled = seq.enrolledAt   ? new Date(seq.enrolledAt).getTime()   : 0;
+  return reply > 0 && reply > enrolled;
+}
+function withinQuietHours(localHour) { return localHour >= 8 && localHour < 20; }
+function pickVariant(leadId, stepIndex, variantCount) {
+  if (!variantCount || variantCount <= 1) return 0;
+  const s = String(leadId || '') + ':' + String(stepIndex || 0);
+  let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h % variantCount;
+}
+function cadenceJitterMinutes(leadId, maxMinutes) {
+  const m = maxMinutes || 1;
+  const s = 'jit:' + String(leadId || '');
+  let h = 0; for (let i = 0; i < s.length; i++) h = (h * 33 + s.charCodeAt(i)) >>> 0;
+  return h % m;
+}
+function cadenceSteps(lead) {
+  const ch = cadenceResolveChannel(lead);
+  if (!ch) return [];
+  const country = (lead && CADENCE_STEPS[lead.country]) ? lead.country : (ch === 'sms' ? 'Estados Unidos' : 'Colombia');
+  return (CADENCE_STEPS[country] || {})[ch] || [];
+}
+function cadenceRender(body, lead, company, agent) {
+  lead = lead || {};
+  const map = {
+    negocio: lead.name || '', ciudad: lead.city || '', barrio: lead.barrio || '',
+    categoria: lead.keyword || '', nombre: lead.contactName || lead.name || '',
+    empresa: company || 'AXIUS', agente: agent || '',
+  };
+  return String(body || '')
+    .replace(/\{(\w+)\}/g, function(m, k) { return (k in map ? map[k] : ''); })
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/ +([,.!?])/g, '$1')
+    .trim();
+}
+function cadenceMessage(lead, stepIndex, company, agent) {
+  const steps = cadenceSteps(lead);
+  const step  = steps[stepIndex];
+  if (!step) return '';
+  const variants = step.variants || [];
+  return cadenceRender(variants[pickVariant(lead && lead.id, stepIndex, variants.length)] || '', lead, company, agent);
+}
+function advanceSequence(seq, stepsLen, nowMs, gapMs, jitterMs) {
+  const cur  = (seq && seq.stepIndex != null) ? Number(seq.stepIndex) : 0;
+  const next = cur + 1;
+  if (next >= stepsLen) return { stepIndex: next, nextRunAt: '', state: 'done' };
+  return { stepIndex: next, nextRunAt: new Date(nowMs + (gapMs || 0) + (jitterMs || 0)).toISOString(), state: 'active' };
+}
+function alreadySent(interactions, leadId, stepTag) {
+  return (interactions || []).some(function(it) {
+    return it && String(it.leadId) === String(leadId) &&
+      String(it.direction) === 'out' && String(it.stepTag) === String(stepTag) &&
+      String(it.status) !== 'error' && String(it.status) !== 'dryrun';
+  });
+}
+function dailyRemaining(counter, cap, todayKey) {
+  const c = (counter && counter.date === todayKey) ? Number(counter.count || 0) : 0;
+  return Math.max(0, Number(cap || 0) - c);
+}
+
+// ── Apps-Script glue (I/O the pure core can't do) ──────────────────────────
+function cadenceTz_(country) {
+  const c = String(country || '').trim().toLowerCase();
+  if (c === 'estados unidos' || c === 'usa' || c === 'united states') return 'America/New_York';
+  return 'America/Bogota';
+}
+function cadenceToE164_(phone, country) {
+  const raw = String(phone || '').replace(/[^\d+]/g, ''); if (!raw) return '';
+  if (raw[0] === '+') { const d = raw.slice(1).replace(/\D/g, ''); return d.length >= 8 ? '+' + d : ''; }
+  const digits = raw.replace(/\D/g, ''); if (!digits) return '';
+  const dial = { 'Colombia':'57', 'Estados Unidos':'1' }[country] || '';
+  if (dial && digits.indexOf(dial) === 0 && digits.length >= 11) return '+' + digits;
+  return dial ? '+' + dial + digits : '+' + digits;
+}
+function writeSeqRow_(sheet, rowNum, seq) {
+  if (!rowNum) return;
+  sheet.getRange(rowNum, 1, 1, SEQUENCE_HDR.length).setValues([SEQUENCE_HDR.map(function(k){ return seq[k] != null ? seq[k] : ''; })]);
+}
+function appendInteraction_(rec) {
+  getSheet(SHEETS.interactions, INTERACTION_HDR).appendRow(INTERACTION_HDR.map(function(k){ return rec[k] != null ? rec[k] : ''; }));
+}
+
+// The engine. Hourly trigger. Pass 1 enroll, Pass 2 advance. Dry-runs (writes
+// nothing, sends nothing) until CADENCE_ENABLED = true.
+function runCadence() {
+  try {
+    const live = CADENCE_ENABLED === true;
+    const now = new Date(), nowMs = now.getTime();
+
+    // Read leads once (with row indices for in-place stamps).
+    const leadsSheet = getSheet(SHEETS.leads, LEAD_HDR);
+    const leadVals = leadsSheet.getDataRange().getValues();
+    const lh = leadVals[0] || LEAD_HDR, touchCol = lh.indexOf('lastTouchAt');
+    const leads = [], leadRowOf = {}, leadById = {};
+    for (let i = 1; i < leadVals.length; i++) {
+      const o = {}; lh.forEach(function(k, j){ o[k] = leadVals[i][j]; });
+      leads.push(o); leadRowOf[String(o.id)] = i + 1; leadById[String(o.id)] = o;
+    }
+
+    // Read sequences once (with row indices).
+    const seqsSheet = getSheet(SHEETS.sequences, SEQUENCE_HDR);
+    const seqVals = seqsSheet.getDataRange().getValues();
+    const sh = seqVals[0] || SEQUENCE_HDR;
+    const seqs = [], rowOf = {}, enrolledSet = {};
+    for (let i = 1; i < seqVals.length; i++) {
+      const o = {}; sh.forEach(function(k, j){ o[k] = seqVals[i][j]; });
+      seqs.push(o); rowOf[String(o.leadId)] = i + 1; enrolledSet[String(o.leadId)] = true;
+    }
+
+    const interactions = toObjs(getSheet(SHEETS.interactions, INTERACTION_HDR));
+
+    let counter = {}; try { counter = JSON.parse(cfgGet('cadenceSentToday') || '{}'); } catch (e) {}
+    const todayKey = Utilities.formatDate(now, 'America/Bogota', 'yyyy-MM-dd');
+    let remaining = dailyRemaining(counter, CADENCE_DAILY_CAP, todayKey);
+
+    // ── Pass 1: enroll eligible, not-yet-enrolled leads (batched append) ──
+    const newRows = []; let enrolled = 0, wouldEnroll = 0;
+    leads.forEach(function(lead) {
+      if (enrolledSet[String(lead.id)]) return;
+      if (!cadenceEligible(lead, false)) return;
+      const jitterMs = cadenceJitterMinutes(lead.id, CADENCE_FIRST_SPREAD_MIN) * 60000;
+      const seq = { leadId:lead.id, state:'active', stepIndex:0,
+        nextRunAt:new Date(nowMs + jitterMs).toISOString(),
+        pausedReason:'', enrolledAt:now.toISOString(), updatedAt:now.toISOString() };
+      enrolledSet[String(lead.id)] = true;
+      if (live) { newRows.push(SEQUENCE_HDR.map(function(k){ return seq[k] != null ? seq[k] : ''; })); enrolled++; }
+      else wouldEnroll++;
+    });
+    if (live && newRows.length) {
+      seqsSheet.getRange(seqsSheet.getLastRow() + 1, 1, newRows.length, SEQUENCE_HDR.length).setValues(newRows);
+    }
+
+    // ── Pass 2: advance pre-existing active sequences that are due ──
+    let sent = 0, wouldSend = 0; const preview = [];
+    seqs.forEach(function(seq) {
+      if (remaining <= 0) return;
+      if (String(seq.state) !== 'active') return;
+      if (seq.nextRunAt && new Date(seq.nextRunAt).getTime() > nowMs) return;   // not due yet
+      const lead = leadById[String(seq.leadId)];
+      if (!lead) return;
+
+      const guard = cadenceGuard(lead, seq);
+      if (guard) {
+        if (live) { seq.state = guard; seq.pausedReason = guard; seq.updatedAt = now.toISOString(); writeSeqRow_(seqsSheet, rowOf[String(seq.leadId)], seq); }
+        return;
+      }
+
+      const tz = cadenceTz_(lead.country);
+      const localHour = parseInt(Utilities.formatDate(now, tz, 'H'), 10);
+      if (!withinQuietHours(localHour)) return;   // outside 08–20: skip; re-checked next hourly run
+
+      const steps = cadenceSteps(lead);
+      const stepIndex = Number(seq.stepIndex || 0);
+      if (stepIndex >= steps.length) {
+        if (live) { seq.state = 'done'; seq.updatedAt = now.toISOString(); writeSeqRow_(seqsSheet, rowOf[String(seq.leadId)], seq); }
+        return;
+      }
+      const stepTag = 'seq:' + stepIndex;
+      const channel = cadenceResolveChannel(lead);
+      const body = cadenceMessage(lead, stepIndex, CADENCE_COMPANY, CADENCE_AGENT_NAME);
+      if (!body) return;
+
+      // Idempotency: already really sent this step → just advance.
+      if (alreadySent(interactions, lead.id, stepTag)) {
+        if (live) {
+          const adv = advanceSequence(seq, steps.length, nowMs, CADENCE_GAP_MS, cadenceJitterMinutes(lead.id, 120) * 60000);
+          seq.stepIndex = adv.stepIndex; seq.nextRunAt = adv.nextRunAt; seq.state = adv.state; seq.updatedAt = now.toISOString();
+          writeSeqRow_(seqsSheet, rowOf[String(seq.leadId)], seq);
+        }
+        return;
+      }
+
+      if (!live) {
+        wouldSend++;
+        if (preview.length < 10) preview.push({ lead:lead.name, channel:channel, step:stepIndex, body:body.slice(0, 140) });
+        return;
+      }
+
+      // ── LIVE send ──
+      let result;
+      if (channel === 'email') { result = lead.email ? resendSend_(lead.email, 'AXIUS', body) : {error:'no email'}; }
+      else { const e164 = cadenceToE164_(lead.phone, lead.country); result = e164 ? twilioSend_(e164, channel, body) : {error:'no phone'}; }
+
+      appendInteraction_({ id:Utilities.getUuid(), leadId:lead.id, leadName:lead.name, phone:lead.phone || '',
+        channel:channel, direction:'out', body:body, stepTag:stepTag,
+        status: result.sid ? (result.status || 'sent') : 'error', sid:result.sid || '', error:result.error || '',
+        createdAt:now.toISOString(), createdBy:'cadence' });
+      if (touchCol >= 0 && leadRowOf[String(lead.id)]) leadsSheet.getRange(leadRowOf[String(lead.id)], touchCol + 1).setValue(now.toISOString());
+
+      if (result.sid) {
+        sent++; remaining--;
+        const adv = advanceSequence(seq, steps.length, nowMs, CADENCE_GAP_MS, cadenceJitterMinutes(lead.id, 120) * 60000);
+        seq.stepIndex = adv.stepIndex; seq.nextRunAt = adv.nextRunAt; seq.state = adv.state; seq.updatedAt = now.toISOString();
+        writeSeqRow_(seqsSheet, rowOf[String(seq.leadId)], seq);
+      }
+      // send error → sequence stays on this step, retried next run
+    });
+
+    if (live && sent > 0) {
+      const base = (counter && counter.date === todayKey) ? Number(counter.count || 0) : 0;
+      cfgSet('cadenceSentToday', JSON.stringify({ date:todayKey, count:base + sent }));
+    }
+    const summary = { ranAt:now.toISOString(), mode: live ? 'live' : 'dryrun',
+      enrolled: live ? enrolled : wouldEnroll, sent: live ? sent : wouldSend };
+    if (!live) summary.preview = preview;
+    cfgSet('lastCadenceRun', JSON.stringify(summary));
+    Logger.log('Cadence ' + (live ? 'LIVE' : 'DRY-RUN') + ': enrolled ' + summary.enrolled + ', ' + (live ? 'sent ' : 'would-send ') + summary.sent);
+    return summary;
+  } catch (err) { Logger.log('runCadence error: ' + err.message); return { error: err.message }; }
 }
 
 function ok(d){return ContentService.createTextOutput(JSON.stringify({success:true,...d})).setMimeType(ContentService.MimeType.JSON)}

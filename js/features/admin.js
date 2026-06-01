@@ -337,9 +337,14 @@ async function checkTriggerStatus() {
   if (!S.config.scriptUrl) return;
   const res = await sheetsCall({action:'checkTriggers'});
   if (res?.success) {
-    S.triggerStatus = { scrape: !!res.scrapeTrigger, report: !!res.reportTrigger, lastScrapeRun: res.lastScrapeRun || null };
+    S.triggerStatus = {
+      scrape: !!res.scrapeTrigger, report: !!res.reportTrigger,
+      cadence: !!res.cadenceTrigger, cadenceEnabled: !!res.cadenceEnabled,
+      lastScrapeRun: res.lastScrapeRun || null, lastCadenceRun: res.lastCadenceRun || null,
+    };
     renderScheduledJobs();
     renderReportTrigger();
+    if (typeof renderCadenceEngine === 'function') renderCadenceEngine();
   }
 }
 
@@ -366,8 +371,10 @@ async function setTrigger(fn, enabled) {
   if (res?.success) {
     if (fn === 'runScheduledScrapes') S.triggerStatus.scrape = enabled;
     if (fn === 'sendWeeklyReport')    S.triggerStatus.report = enabled;
+    if (fn === 'runCadence')          S.triggerStatus.cadence = enabled;
     renderScheduledJobs();
     renderReportTrigger();
+    if (typeof renderCadenceEngine === 'function') renderCadenceEngine();
   } else {
     toast('Error al actualizar el trigger. Verifica que el script esté desplegado con los permisos correctos.', 'error', 5000);
   }

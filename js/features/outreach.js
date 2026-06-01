@@ -193,7 +193,7 @@ async function sendComposer() {
   switchModalTab('timeline');
 }
 
-// ── Cadence (Secuencias) — CRM control surface for the Vercel engine ──────
+// ── Cadence (Secuencias) — control surface for the CRM-native engine ──────
 // Pure: tally enrollment states (unit-tested).
 function sequenceCounts(seqs) {
   const c = { active:0, paused:0, replied:0, stopped:0, done:0, total:0 };
@@ -221,6 +221,7 @@ function getSequence(leadId) { return (S.sequences || []).find(s => s.leadId ===
 function _seqLeadName(leadId) { const l = S.leads.find(x => x.id === leadId); return l ? l.name : leadId; }
 
 function renderSequences() {
+  if (typeof renderCadenceEngine === 'function') renderCadenceEngine();
   const wrap = document.getElementById('admin-seq-list'); if (!wrap) return;
   const seqs = S.sequences || [];
   const c = sequenceCounts(seqs);
@@ -259,3 +260,56 @@ function _updateSequence(leadId, patch) {
 function pauseSequence(leadId)   { _updateSequence(leadId, { state:'paused:manual', pausedReason:'manual' }); toast('Secuencia pausada.', 'success'); }
 function resumeSequence(leadId)  { _updateSequence(leadId, { state:'active', pausedReason:'' }); toast('Secuencia reanudada.', 'success'); }
 function unenrollSequence(leadId){ if (!confirm('¿Sacar este lead de la secuencia?')) return; _updateSequence(leadId, { state:'stopped:manual', pausedReason:'manual' }); toast('Lead retirado de la secuencia.', 'success'); }
+
+// ── Cadence engine status + controls (the deterministic backend engine) ──────
+// Reads trigger/live state from S.triggerStatus (set by checkTriggerStatus).
+function renderCadenceEngine() {
+  const wrap = document.getElementById('admin-seq-engine'); if (!wrap) return;
+  const ts = S.triggerStatus || {};
+  const active = !!ts.cadence;          // hourly runCadence trigger installed?
+  const live   = !!ts.cadenceEnabled;   // CADENCE_ENABLED in Code.gs
+  const lr = ts.lastCadenceRun;
+  const modeBadge = live
+    ? `<span style="font-size:11px;font-weight:600;color:var(--pos)">● EN VIVO</span>`
+    : `<span style="font-size:11px;font-weight:600;color:var(--amber)">○ SIMULACIÓN (dry-run)</span>`;
+  const lastLine = lr && lr.ranAt
+    ? `<div style="font-size:11px;color:var(--sub);margin-top:8px">Última corrida: ${fmtD(lr.ranAt)} ${fmtT(lr.ranAt)} · ${lr.mode==='live'?'inscritos':'inscribiría'} ${lr.enrolled||0} · ${lr.mode==='live'?'enviados':'enviaría'} ${lr.sent||0}</div>`
+    : `<div style="font-size:11px;color:var(--sub);margin-top:8px">Sin corridas registradas aún.</div>`;
+  const liveNote = live ? '' : `<div style="font-size:11px;color:var(--amber);margin-top:6px">Modo simulación: registra lo que enviaría, sin enviar nada. Para activar envíos reales, pon <code>CADENCE_ENABLED = true</code> en Code.gs (tras aprovisionar Twilio/WhatsApp).</div>`;
+  wrap.innerHTML = `
+    <div class="card" style="background:var(--surface-hi);padding:12px 14px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:13px;font-weight:600;color:var(--hl)">Motor de cadencia</span>
+        ${modeBadge}
+        <span style="font-size:13px;color:var(--body)">· Trigger horario:</span>
+        <span style="font-size:13px;font-weight:600;color:${active?'var(--pos)':'var(--body)'}">${active?'● Activo':'○ Inactivo'}</span>
+        <button class="btn ${active?'btn-danger':'btn-success'}" style="font-size:11px;padding:4px 10px" onclick="setTrigger('runCadence',${!active})">${active?'Desactivar':'Activar'}</button>
+        <button id="run-cadence-now-btn" class="btn btn-primary" style="font-size:11px;padding:4px 10px" onclick="runCadenceNow()">Ejecutar ahora</button>
+      </div>
+      ${lastLine}
+      ${liveNote}
+    </div>`;
+}
+
+// On-demand cadence pass (dry-run while CADENCE_ENABLED=false). Previews/verifies
+// enrollment + intended sends without waiting for the hourly trigger.
+async function runCadenceNow() {
+  if (!S.config.scriptUrl) { toast('Configura el Apps Script URL primero.', 'error'); return; }
+  const btn = document.getElementById('run-cadence-now-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Ejecutando...'; }
+  const res = await sheetsCall({ action:'runCadenceNow' });
+  if (btn) { btn.disabled = false; btn.textContent = 'Ejecutar ahora'; }
+  if (res?.success) {
+    if (!S.triggerStatus) S.triggerStatus = {};
+    S.triggerStatus.lastCadenceRun = { ranAt: res.ranAt, mode: res.mode, enrolled: res.enrolled, sent: res.sent };
+    const verb = res.mode === 'live'
+      ? `inscritos ${res.enrolled||0}, enviados ${res.sent||0}`
+      : `simulación: inscribiría ${res.enrolled||0}, enviaría ${res.sent||0}`;
+    toast('Motor de cadencia ejecutado — ' + verb + '.', 'success', 5000);
+    if (res.mode === 'live') await syncNow();   // bring newly-enrolled sequences into view
+    renderCadenceEngine();
+    renderSequences();
+  } else {
+    toast('Error al ejecutar el motor de cadencia. Verifica el Apps Script.', 'error', 5000);
+  }
+}

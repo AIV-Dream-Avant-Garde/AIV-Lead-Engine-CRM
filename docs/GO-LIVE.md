@@ -27,6 +27,7 @@ These gate *real* messaging; nothing else can compensate for them.
 - [ ] **Twilio inbound messaging webhook** (so replies + opt-outs land in the CRM): set the SMS/WhatsApp inbound URL to `{execUrl}?action=inboundMsg&token={CRM_SECRET}`.
 - [ ] **Telegram founder alerts** (BUILT — just fill creds): create a bot via @BotFather, get your chat id, and set `TELEGRAM_ALERT_BOT_TOKEN` + `TELEGRAM_ALERT_CHAT_ID` in `Code.gs`. You'll then get a Telegram ping on every **new warm lead**, **inbound reply**, and **opt-out** (server-side, no browser needed). Inert until the constants are filled.
 - [ ] Enable the **scraper daily trigger** (Admin → Scrapes programados → Activar) and/or "Ejecutar ahora".
+- [ ] **Cadence engine** (BUILT — CRM-native, deterministic; no Vercel/LLM needed). Ships in **dry-run** (`CADENCE_ENABLED = false`): use Admin → Secuencias de outreach → "Ejecutar ahora" to preview who it would enroll/message — it writes/sends nothing. To go live **after** SMS/WhatsApp provisioning: set `CADENCE_ENABLED = true` in `Code.gs` (and `CADENCE_AGENT_NAME` / `CADENCE_COMPANY`), redeploy, then "Activar" the hourly trigger. It auto-enrolls every eligible lead and sends the templated multi-step cadence, honoring opt-out, quiet hours (08–20 local) and a daily cap (default 200).
 
 ## 4. Vercel side (your other repo / Claude Code chat) — parallel
 Hand these briefs to the website project's chat:
@@ -49,6 +50,6 @@ Hand these briefs to the website project's chat:
 ---
 
 ### Reality check
-- **Built & verified (CRM):** auth/roles, leads + pool/claim, pipeline, analytics, commissions (closer + provider), scraper + auto-scheduled scraping, country tier (CO + US), unified interaction history, country-aware SMS/WhatsApp composer, reply/opt-out capture, cadence control panel, tests + cache-busting.
-- **Built (contracts, for Vercel):** inbound leads, website chat, cadence engine.
-- **Not yet:** real provisioning (this doc), the Vercel AI engine, Project C email, founder Telegram alerts, call transcription.
+- **Built & verified (CRM):** auth/roles, leads + pool/claim, pipeline, analytics, commissions (closer + provider), scraper + auto-scheduled scraping, country tier (CO + US), unified interaction history, country-aware SMS/WhatsApp composer, reply/opt-out capture, cadence control panel, **CRM-native cadence engine (deterministic, dry-run verified — runs in Apps Script, no Vercel/LLM)**, tests + cache-busting.
+- **Built (contracts, for Vercel):** inbound leads, website chat, optional LLM "AI SDR" (an enhancement layered on the same `Sequences`/interactions API — not required for the CRM to self-drive outreach).
+- **Not yet:** real provisioning (this doc), the optional Vercel LLM layer, call transcription. (Cadence sends are built + dry-run verified; they go live once `CADENCE_ENABLED = true` + provisioning lands.)

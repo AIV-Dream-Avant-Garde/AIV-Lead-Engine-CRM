@@ -196,3 +196,112 @@ test('OUTREACH_TEMPLATES: seeded per country×channel, on-voice (no emoji)', () 
   assert(!/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(all), 'no emoji in seed templates');
   assert(all.includes('{agente}') && all.includes('{negocio}'), 'templates use merge tokens');
 });
+
+// ── Cadence engine: pure decision core (Motor de Secuencias) ─────────────
+test('cadenceChannel: country → channel routing', () => {
+  eq(cadenceChannel('Colombia'), 'whatsapp');
+  eq(cadenceChannel('Estados Unidos'), 'sms');
+  eq(cadenceChannel('estados unidos'), 'sms', 'case-insensitive');
+  eq(cadenceChannel('Mexico'), '', 'unknown country → no channel');
+  eq(cadenceChannel(''), '', 'empty → no channel');
+});
+
+test('cadenceResolveChannel: phone-by-country, else email, else unreachable', () => {
+  eq(cadenceResolveChannel({country:'Colombia', phone:'320 123 4567'}), 'whatsapp');
+  eq(cadenceResolveChannel({country:'Estados Unidos', phone:'(415) 555 1234'}), 'sms');
+  eq(cadenceResolveChannel({country:'Colombia', phone:'N/A', email:'a@b.co'}), 'email', 'no usable phone → email');
+  eq(cadenceResolveChannel({country:'', email:'a@b.co'}), 'email', 'no country but email');
+  eq(cadenceResolveChannel({country:'Colombia', phone:'123'}), '', 'junk phone, no email → unreachable');
+});
+
+test('cadenceEligible: only untouched + reachable + not-yet-enrolled', () => {
+  const ok = {status:'Nuevo', country:'Colombia', phone:'3201234567'};
+  assert(cadenceEligible(ok, false), 'fresh reachable lead is eligible');
+  assert(!cadenceEligible(ok, true), 'already enrolled → not eligible');
+  assert(!cadenceEligible({...ok, status:'Contactado'}, false), 'worked lead → not eligible');
+  assert(!cadenceEligible({...ok, status:'No llamar'}, false), 'opted-out → not eligible');
+  assert(!cadenceEligible({status:'Nuevo', country:'Mexico', phone:'3201234567'}, false), 'no channel → not eligible');
+});
+
+test('cadenceGuard: live state → correct stop/pause', () => {
+  const seq = {enrolledAt:'2026-05-01T00:00:00Z'};
+  eq(cadenceGuard({status:'Nuevo'}, seq), '', 'fresh → proceed');
+  eq(cadenceGuard({status:'No llamar'}, seq), 'stopped:optout');
+  eq(cadenceGuard({status:'Cerrado'}, seq), 'stopped:closed');
+  eq(cadenceGuard({status:'No interesado'}, seq), 'stopped:rejected');
+  eq(cadenceGuard({status:'Negociacion fallida'}, seq), 'stopped:rejected');
+  eq(cadenceGuard({status:'Nuevo', lockedBy:'agent1'}, seq), 'paused:claimed');
+  eq(cadenceGuard({status:'Contactado'}, seq), 'paused:claimed', 'human engaged');
+  eq(cadenceGuard({status:'Nuevo', lastReplyAt:'2026-05-02T00:00:00Z'}, seq), 'paused:replied');
+  eq(cadenceGuard(null, seq), 'stopped:rejected', 'missing lead');
+});
+
+test('replyShouldPause: only replies AFTER enrollment pause', () => {
+  const seq = {enrolledAt:'2026-05-10T00:00:00Z'};
+  assert(replyShouldPause({lastReplyAt:'2026-05-11T00:00:00Z'}, seq), 'later reply pauses');
+  assert(!replyShouldPause({lastReplyAt:'2026-05-09T00:00:00Z'}, seq), 'earlier reply does not');
+  assert(!replyShouldPause({}, seq), 'no reply → no pause');
+});
+
+test('withinQuietHours: 08:00–20:00 inclusive/exclusive boundary', () => {
+  assert(!withinQuietHours(7), '7am quiet');
+  assert(withinQuietHours(8), '8am ok');
+  assert(withinQuietHours(19), '7pm ok');
+  assert(!withinQuietHours(20), '8pm quiet');
+  assert(!withinQuietHours(23), 'night quiet');
+});
+
+test('pickVariant: deterministic, in-range, varies across leads', () => {
+  eq(pickVariant('leadA', 0, 1), 0, 'single variant → 0');
+  eq(pickVariant('leadA', 0, 3), pickVariant('leadA', 0, 3), 'stable for same lead+step');
+  const v = pickVariant('leadA', 0, 3); assert(v >= 0 && v < 3, 'in range');
+  // across many leads we should see more than one distinct variant chosen
+  const seen = new Set();
+  for (let i = 0; i < 30; i++) seen.add(pickVariant('lead' + i, 0, 3));
+  assert(seen.size >= 2, 'variants spread across leads');
+});
+
+test('cadenceJitterMinutes: deterministic, within bound', () => {
+  eq(cadenceJitterMinutes('leadA', 360), cadenceJitterMinutes('leadA', 360), 'stable');
+  const j = cadenceJitterMinutes('leadA', 360); assert(j >= 0 && j < 360, 'within window');
+});
+
+test('cadenceMessage: renders an on-voice, token-filled, emoji-free message', () => {
+  const lead = {id:'L1', country:'Colombia', phone:'3201234567', name:'Café Aroma', city:'Medellín', keyword:'Cafetería'};
+  const msg = cadenceMessage(lead, 0, 'AXIUS', 'Andrés');
+  assert(msg.includes('Café Aroma') && msg.includes('Medellín'), 'tokens filled');
+  assert(msg.includes('AXIUS') && msg.includes('Andrés'), 'company + agent filled');
+  assert(!msg.includes('{'), 'no leftover tokens');
+  assert(!/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(msg), 'no emoji');
+  eq(cadenceMessage(lead, 9, 'AXIUS', 'Andrés'), '', 'out-of-range step → empty');
+});
+
+test('advanceSequence: advances with gap, marks done at end', () => {
+  const now = Date.parse('2026-05-31T10:00:00Z'); const gap = 2*24*3600*1000;
+  const a = advanceSequence({stepIndex:0}, 2, now, gap, 0);
+  eq(a.stepIndex, 1); eq(a.state, 'active');
+  eq(a.nextRunAt, new Date(now + gap).toISOString(), 'next run = now + 2d');
+  const b = advanceSequence({stepIndex:1}, 2, now, gap, 0);
+  eq(b.stepIndex, 2); eq(b.state, 'done'); eq(b.nextRunAt, '', 'done has no nextRun');
+});
+
+test('alreadySent: real sends block, dryrun/error do not', () => {
+  const inter = [
+    {leadId:'L1', direction:'out', stepTag:'seq:0', status:'sent'},
+    {leadId:'L1', direction:'out', stepTag:'seq:1', status:'dryrun'},
+    {leadId:'L1', direction:'out', stepTag:'seq:2', status:'error'},
+    {leadId:'L1', direction:'in',  stepTag:'seq:3', status:'received'},
+  ];
+  assert(alreadySent(inter, 'L1', 'seq:0'), 'real send blocks');
+  assert(!alreadySent(inter, 'L1', 'seq:1'), 'dryrun does not block');
+  assert(!alreadySent(inter, 'L1', 'seq:2'), 'error does not block');
+  assert(!alreadySent(inter, 'L1', 'seq:3'), 'inbound does not count');
+  assert(!alreadySent(inter, 'L1', 'seq:9'), 'unsent step → free');
+});
+
+test('dailyRemaining: budget resets when the date rolls', () => {
+  eq(dailyRemaining({date:'2026-05-31', count:50}, 200, '2026-05-31'), 150, 'same day subtracts');
+  eq(dailyRemaining({date:'2026-05-30', count:50}, 200, '2026-05-31'), 200, 'new day resets');
+  eq(dailyRemaining({date:'2026-05-31', count:250}, 200, '2026-05-31'), 0, 'never negative');
+  eq(dailyRemaining(null, 200, '2026-05-31'), 200, 'no counter → full');
+});

@@ -29,6 +29,7 @@ const APP_FILES = [
   'js/features/import.js',  // parseCSV, autoMapHeaders, splitCSV
   'js/data/outreach-templates.js', // OUTREACH_TEMPLATES
   'js/features/outreach.js',// pickChannel, toE164, renderTemplate, isOptOut
+  'js/features/cadence-core.js', // cadence engine pure decision core
   'js/auth/auth.js',        // sha256, isWeakPin, sessionSig
 ];
 
