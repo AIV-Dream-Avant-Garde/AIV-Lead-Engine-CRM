@@ -31,6 +31,11 @@ const CADENCE_DAILY_CAP        = 200;     // max sends per day
 const CADENCE_STEP_GAP_DAYS    = 2;       // min days between proactive touches
 const CADENCE_FIRST_SPREAD_MIN = 360;     // spread first touches over N minutes (anti-burst)
 const CADENCE_GAP_MS           = CADENCE_STEP_GAP_DAYS * 24 * 3600 * 1000;
+// CAN-SPAM: every commercial email MUST carry a working unsubscribe + a physical
+// postal address. Fill this before sending real email. Appended to ALL outbound
+// email in resendSend_. (Automated suppression via a Resend bounce/complaint
+// webhook is still a separate follow-up — see GO-LIVE §1.)
+const COMPANY_POSTAL_ADDRESS   = 'TU_DIRECCION_POSTAL';   // e.g. 'AXIUS, Calle 00 #00-00, Medellín, Colombia'
 
 const SHEETS = { leads:'Leads', calls:'Llamadas', team:'Team', commissions:'Commissions', scripts:'Scripts', interactions:'Interactions', sequences:'Sequences' };
 
@@ -165,21 +170,24 @@ function doPost(e) {
       const pc=lh.indexOf('phone'), ic=lh.indexOf('id'), nc=lh.indexOf('name'), stc=lh.indexOf('status'),
             dc=lh.indexOf('dncReason'), rc=lh.indexOf('lastReplyAt'), uc=lh.indexOf('updatedAt'),
             csms=lh.indexOf('consentSms'), cwa=lh.indexOf('consentWhatsapp');
-      let row=-1, leadId='', leadName='';
-      for (let i=1;i<lr.length;i++){ if (fromKey && phoneKey(lr[i][pc])===fromKey) { row=i; leadId=lr[i][ic]; leadName=lr[i][nc]; } } // last match = most recent
+      // Match ALL leads sharing this phone (a number can belong to >1 lead row);
+      // opt-out must silence every one of them, not just the most recent.
+      const matchRows=[]; let leadId='', leadName='';
+      for (let i=1;i<lr.length;i++){ if (fromKey && phoneKey(lr[i][pc])===fromKey) { matchRows.push(i); leadId=lr[i][ic]; leadName=lr[i][nc]; } } // leadId/Name = most recent match (for the alert)
       const now = new Date().toISOString();
       const rec = { id:Utilities.getUuid(), leadId, leadName, phone:from, channel, direction:'in', body:text, stepTag:'', status:'received', sid:String(e.parameter.MessageSid||''), error:'', createdAt:now, createdBy:'inbound' };
       getSheet(SHEETS.interactions, INTERACTION_HDR).appendRow(INTERACTION_HDR.map(k => rec[k] ?? ''));
-      if (row >= 0) {
+      const optOut = isOptOutGs(text);
+      matchRows.forEach(function(row){
         if (rc>=0) ls.getRange(row+1, rc+1).setValue(now);
         if (uc>=0) ls.getRange(row+1, uc+1).setValue(now); // bump updatedAt so the reply/opt-out surfaces in since-filtered pulls
-        if (isOptOutGs(text)) {
+        if (optOut) {
           if (stc>=0) ls.getRange(row+1, stc+1).setValue('No llamar');
           if (dc>=0)  ls.getRange(row+1, dc+1).setValue('opt-out ('+channel+')');
           if (channel==='whatsapp' && cwa>=0) ls.getRange(row+1, cwa+1).setValue(false);
           if (channel==='sms' && csms>=0)     ls.getRange(row+1, csms+1).setValue(false);
         }
-      }
+      });
       const who = leadName || from;
       if (isOptOutGs(text)) notifyTelegram('Opt-out — ' + who + ' (' + channel + ') pidió no recibir más mensajes.');
       else notifyTelegram('Respuesta de ' + who + ' (' + channel + '): ' + text);
@@ -346,8 +354,8 @@ function doPost(e) {
       try {
         const s=getSheet(SHEETS.interactions, INTERACTION_HDR), rows=s.getDataRange().getValues();
         const h=rows[0]||INTERACTION_HDR, ic=h.indexOf('id');
-        const vals=INTERACTION_HDR.map(k=> b[k] ?? '');
-        for (let i=1;i<rows.length;i++){ if(String(rows[i][ic])===String(b.id)){ s.getRange(i+1,1,1,INTERACTION_HDR.length).setValues([vals]); return ok({saved:true,updated:true}); } }
+        const vals=h.map(k=> b[k] ?? '');   // write by ACTUAL header order (getSheet may have reconciled columns)
+        for (let i=1;i<rows.length;i++){ if(String(rows[i][ic])===String(b.id)){ s.getRange(i+1,1,1,h.length).setValues([vals]); return ok({saved:true,updated:true}); } }
         s.appendRow(vals);
         return ok({saved:true,updated:false});
       } finally { lock.releaseLock(); }
@@ -359,8 +367,8 @@ function doPost(e) {
       try {
         const s=getSheet(SHEETS.sequences, SEQUENCE_HDR), rows=s.getDataRange().getValues();
         const h=rows[0]||SEQUENCE_HDR, lc=h.indexOf('leadId');
-        const vals=SEQUENCE_HDR.map(k=> b[k] ?? '');
-        for (let i=1;i<rows.length;i++){ if(String(rows[i][lc])===String(b.leadId)){ s.getRange(i+1,1,1,SEQUENCE_HDR.length).setValues([vals]); return ok({saved:true,updated:true}); } }
+        const vals=h.map(k=> b[k] ?? '');   // write by ACTUAL header order (getSheet may have reconciled columns)
+        for (let i=1;i<rows.length;i++){ if(String(rows[i][lc])===String(b.leadId)){ s.getRange(i+1,1,1,h.length).setValues([vals]); return ok({saved:true,updated:true}); } }
         s.appendRow(vals);
         return ok({saved:true,updated:false});
       } finally { lock.releaseLock(); }
@@ -698,12 +706,19 @@ function twilioSend_(phoneE164, channel, body) {
   const d = JSON.parse(res.getContentText());
   return d.sid ? {sid:d.sid, status:d.status || 'sent'} : {error: d.message || 'send failed'};
 }
+// Append the CAN-SPAM footer (physical address + unsubscribe) required on every
+// commercial email. Bilingual so it's correct regardless of the body's language.
+function emailFooter_() {
+  const addr = (COMPANY_POSTAL_ADDRESS && COMPANY_POSTAL_ADDRESS.indexOf('TU_') !== 0) ? COMPANY_POSTAL_ADDRESS : CADENCE_COMPANY;
+  return '\n\n—\n' + addr +
+    '\nPara dejar de recibir estos correos, responde BAJA a este mensaje. · To unsubscribe, reply STOP.';
+}
 // Resend email. Returns {sid,status} on success, {error} on failure.
 function resendSend_(email, subject, body) {
   const res = UrlFetchApp.fetch('https://api.resend.com/emails', {
     method:'post', contentType:'application/json',
     headers:{ Authorization:'Bearer ' + RESEND_API_KEY },
-    payload: JSON.stringify({ from: RESEND_FROM, to: [email], subject: subject || 'AXIUS', text: body }),
+    payload: JSON.stringify({ from: RESEND_FROM, to: [email], subject: subject || 'AXIUS', text: String(body || '') + emailFooter_() }),
     muteHttpExceptions:true,
   });
   const d = JSON.parse(res.getContentText() || '{}');
@@ -870,9 +885,10 @@ function cadenceToE164_(phone, country) {
   if (dial && digits.indexOf(dial) === 0 && digits.length >= 11) return '+' + digits;
   return dial ? '+' + dial + digits : '+' + digits;
 }
-function writeSeqRow_(sheet, rowNum, seq) {
+function writeSeqRow_(sheet, rowNum, seq, hdr) {
   if (!rowNum) return;
-  sheet.getRange(rowNum, 1, 1, SEQUENCE_HDR.length).setValues([SEQUENCE_HDR.map(function(k){ return seq[k] != null ? seq[k] : ''; })]);
+  const h = hdr || SEQUENCE_HDR;   // write by the ACTUAL header order, not the constant
+  sheet.getRange(rowNum, 1, 1, h.length).setValues([h.map(function(k){ return seq[k] != null ? seq[k] : ''; })]);
 }
 function appendInteraction_(rec) {
   getSheet(SHEETS.interactions, INTERACTION_HDR).appendRow(INTERACTION_HDR.map(function(k){ return rec[k] != null ? rec[k] : ''; }));
@@ -881,6 +897,10 @@ function appendInteraction_(rec) {
 // The engine. Hourly trigger. Pass 1 enroll, Pass 2 advance. Dry-runs (writes
 // nothing, sends nothing) until CADENCE_ENABLED = true.
 function runCadence() {
+  // Single-run lock: the hourly trigger and the on-demand runCadenceNow must never
+  // overlap, or both would read the same pre-send snapshot and double-send a step.
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(0)) { Logger.log('runCadence: another run in progress; skipping.'); return { skipped: true }; }
   try {
     const live = CADENCE_ENABLED === true;
     const now = new Date(), nowMs = now.getTime();
@@ -888,7 +908,7 @@ function runCadence() {
     // Read leads once (with row indices for in-place stamps).
     const leadsSheet = getSheet(SHEETS.leads, LEAD_HDR);
     const leadVals = leadsSheet.getDataRange().getValues();
-    const lh = leadVals[0] || LEAD_HDR, touchCol = lh.indexOf('lastTouchAt');
+    const lh = leadVals[0] || LEAD_HDR, touchCol = lh.indexOf('lastTouchAt'), statusCol = lh.indexOf('status');
     const leads = [], leadRowOf = {}, leadById = {};
     for (let i = 1; i < leadVals.length; i++) {
       const o = {}; lh.forEach(function(k, j){ o[k] = leadVals[i][j]; });
@@ -921,11 +941,11 @@ function runCadence() {
         nextRunAt:new Date(nowMs + jitterMs).toISOString(),
         pausedReason:'', enrolledAt:now.toISOString(), updatedAt:now.toISOString() };
       enrolledSet[String(lead.id)] = true;
-      if (live) { newRows.push(SEQUENCE_HDR.map(function(k){ return seq[k] != null ? seq[k] : ''; })); enrolled++; }
+      if (live) { newRows.push(sh.map(function(k){ return seq[k] != null ? seq[k] : ''; })); enrolled++; }
       else wouldEnroll++;
     });
     if (live && newRows.length) {
-      seqsSheet.getRange(seqsSheet.getLastRow() + 1, 1, newRows.length, SEQUENCE_HDR.length).setValues(newRows);
+      seqsSheet.getRange(seqsSheet.getLastRow() + 1, 1, newRows.length, sh.length).setValues(newRows);
     }
 
     // ── Pass 2: advance pre-existing active sequences that are due ──
@@ -939,7 +959,7 @@ function runCadence() {
 
       const guard = cadenceGuard(lead, seq);
       if (guard) {
-        if (live) { seq.state = guard; seq.pausedReason = guard; seq.updatedAt = now.toISOString(); writeSeqRow_(seqsSheet, rowOf[String(seq.leadId)], seq); }
+        if (live) { seq.state = guard; seq.pausedReason = guard; seq.updatedAt = now.toISOString(); writeSeqRow_(seqsSheet, rowOf[String(seq.leadId)], seq, sh); }
         return;
       }
 
@@ -950,7 +970,7 @@ function runCadence() {
       const steps = cadenceSteps(lead);
       const stepIndex = Number(seq.stepIndex || 0);
       if (stepIndex >= steps.length) {
-        if (live) { seq.state = 'done'; seq.updatedAt = now.toISOString(); writeSeqRow_(seqsSheet, rowOf[String(seq.leadId)], seq); }
+        if (live) { seq.state = 'done'; seq.updatedAt = now.toISOString(); writeSeqRow_(seqsSheet, rowOf[String(seq.leadId)], seq, sh); }
         return;
       }
       const stepTag = 'seq:' + stepIndex;
@@ -963,7 +983,7 @@ function runCadence() {
         if (live) {
           const adv = advanceSequence(seq, steps.length, nowMs, CADENCE_GAP_MS, cadenceJitterMinutes(lead.id, 120) * 60000);
           seq.stepIndex = adv.stepIndex; seq.nextRunAt = adv.nextRunAt; seq.state = adv.state; seq.updatedAt = now.toISOString();
-          writeSeqRow_(seqsSheet, rowOf[String(seq.leadId)], seq);
+          writeSeqRow_(seqsSheet, rowOf[String(seq.leadId)], seq, sh);
         }
         return;
       }
@@ -972,6 +992,18 @@ function runCadence() {
         wouldSend++;
         if (preview.length < 10) preview.push({ lead:lead.name, channel:channel, step:stepIndex, body:body.slice(0, 140) });
         return;
+      }
+
+      // Re-check opt-out FRESH at send time: a reply/opt-out (inboundMsg flips status
+      // to 'No llamar') may have landed since the snapshot read. Mirrors the manual
+      // send handlers' leadOptedOut safety net — one cell read, capped at the daily cap.
+      if (statusCol >= 0 && leadRowOf[String(lead.id)]) {
+        const freshStatus = String(leadsSheet.getRange(leadRowOf[String(lead.id)], statusCol + 1).getValue());
+        if (freshStatus === 'No llamar') {
+          seq.state = 'stopped:optout'; seq.pausedReason = 'stopped:optout'; seq.updatedAt = now.toISOString();
+          writeSeqRow_(seqsSheet, rowOf[String(seq.leadId)], seq, sh);
+          return;
+        }
       }
 
       // ── LIVE send ──
@@ -989,7 +1021,7 @@ function runCadence() {
         sent++; remaining--;
         const adv = advanceSequence(seq, steps.length, nowMs, CADENCE_GAP_MS, cadenceJitterMinutes(lead.id, 120) * 60000);
         seq.stepIndex = adv.stepIndex; seq.nextRunAt = adv.nextRunAt; seq.state = adv.state; seq.updatedAt = now.toISOString();
-        writeSeqRow_(seqsSheet, rowOf[String(seq.leadId)], seq);
+        writeSeqRow_(seqsSheet, rowOf[String(seq.leadId)], seq, sh);
       }
       // send error → sequence stays on this step, retried next run
     });
@@ -1005,6 +1037,7 @@ function runCadence() {
     Logger.log('Cadence ' + (live ? 'LIVE' : 'DRY-RUN') + ': enrolled ' + summary.enrolled + ', ' + (live ? 'sent ' : 'would-send ') + summary.sent);
     return summary;
   } catch (err) { Logger.log('runCadence error: ' + err.message); return { error: err.message }; }
+  finally { lock.releaseLock(); }
 }
 
 function ok(d){return ContentService.createTextOutput(JSON.stringify({success:true,...d})).setMimeType(ContentService.MimeType.JSON)}

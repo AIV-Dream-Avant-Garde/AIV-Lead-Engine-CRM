@@ -216,7 +216,7 @@ function renderPagination(total, pages) {
 
 function goPage(p)    { S.page = p; renderTable(); }
 function clearFilters() {
-  ['tbl-q','f-country','f-city','f-barrio','f-source','f-status','f-followup'].forEach(id => {
+  ['tbl-q','f-country','f-city','f-barrio','f-source','f-status','f-followup','f-mine'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   populateFilters();   // restore the full (un-narrowed) city list

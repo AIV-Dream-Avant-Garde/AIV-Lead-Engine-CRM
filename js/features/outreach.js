@@ -299,6 +299,10 @@ async function runCadenceNow() {
   if (btn) { btn.disabled = true; btn.textContent = 'Ejecutando...'; }
   const res = await sheetsCall({ action:'runCadenceNow' });
   if (btn) { btn.disabled = false; btn.textContent = 'Ejecutar ahora'; }
+  if (res?.success && res.skipped) {
+    toast('Otra corrida del motor está en progreso. Intenta de nuevo en un momento.', 'error', 5000);
+    return;
+  }
   if (res?.success) {
     if (!S.triggerStatus) S.triggerStatus = {};
     S.triggerStatus.lastCadenceRun = { ranAt: res.ranAt, mode: res.mode, enrolled: res.enrolled, sent: res.sent };

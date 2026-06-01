@@ -80,10 +80,13 @@ function processCSV(file) {
       }).join('');
     }
 
+    // Count dupes on the MAPPED rows (apply the column mapping first) — keying on
+    // raw CSV headers reports 0 dupes for any non-English file (e.g. 'telefono'/'correo').
+    const mappedPreview = applyMapping(rows);
     const exP   = new Set(S.leads.map(l => phoneKey(l.phone)).filter(Boolean));
     const exE   = new Set(S.leads.map(l => (l.email||'').trim().toLowerCase()).filter(Boolean));
     const total = rows.length;
-    const dupes = rows.filter(r => (r.phone && exP.has(phoneKey(r.phone))) || (r.email && exE.has(String(r.email).trim().toLowerCase()))).length;
+    const dupes = mappedPreview.filter(r => (r.phone && exP.has(phoneKey(r.phone))) || (r.email && exE.has(String(r.email).trim().toLowerCase()))).length;
     S.pendingImport = rows;
     const sumEl = document.getElementById('imp-summary');
     if (sumEl) sumEl.textContent = total + ' filas — ' + (total - dupes) + ' nuevas, ' + dupes + ' duplicadas';
