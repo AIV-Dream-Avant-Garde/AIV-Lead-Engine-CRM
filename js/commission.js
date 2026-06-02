@@ -134,11 +134,12 @@ function adjustCollectedAmount(leadId, collectedRaw, reason) {
   }
   lead.collectedAmount = collected;
   lead.updatedAt = new Date().toISOString();
-  const {closerAmount} = calcCommissions(lead, collected);
+  const {closerAmount, providerAmount} = calcCommissions(lead, collected);
   S.commissions
     .filter(c => c.leadId === leadId && c.status === 'pending')
     .forEach(c => {
       c.closerAmount    = closerAmount;
+      c.providerAmount  = providerAmount;   // scale provider with partial collection too (was left at full deal value)
       c.collectedAmount = collected;
       c.adjustedBy      = S.session?.userName || 'Admin';
       c.adjustedAt      = new Date().toISOString();

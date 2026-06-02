@@ -108,6 +108,25 @@ function pipelineDrop(e, newStatus) {
   const lead = S.leads.find(l => l.id === leadId);
   if (!lead || (lead.status || 'Nuevo') === newStatus) return;
   if (newStatus === 'Cerrado') { interceptCerrado(leadId); return; }
+
+  // DNC — require a reason (legal record), matching the lead modal + bulk action.
+  if (newStatus === 'No llamar') {
+    const reason = (prompt('Razón DNC (requerido como registro legal):') || '').trim();
+    if (!reason) { toast('Razón DNC requerida — no se cambió el estado.', 'error'); renderPipeline(); return; }
+    lead.dncReason = reason;
+  }
+  // Negociacion fallida — release the closer + cancel pending commission (parity with saveLead).
+  if (newStatus === 'Negociacion fallida') {
+    if (!Array.isArray(lead.workHistory)) lead.workHistory = [];
+    if (lead.closerId) lead.workHistory.push({
+      closerId: lead.closerId,
+      closerName: S.team.find(m => m.id === lead.closerId)?.name || lead.closerId,
+      outcome: 'Negociacion fallida', releasedAt: new Date().toISOString(),
+    });
+    if (lead.commissionStatus === 'pending') lead.commissionStatus = 'cancelled';
+    lead.closerId = ''; lead.lockedBy = ''; lead.lockedUntil = ''; lead.assignedAt = '';
+  }
+
   lead.status    = newStatus;
   lead.updatedAt = new Date().toISOString();
   if (!Array.isArray(lead.workHistory)) lead.workHistory = [];
