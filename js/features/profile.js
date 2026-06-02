@@ -41,6 +41,8 @@ function renderPerfil() {
   setEl('pst-closed',  myClosed.length);
   setEl('pst-earned',  fmtCOP(totalPaid));
   setEl('pst-pending', fmtCOP(totalPending));
+  setEl('pst-rate',    (myLeads.length ? Math.round(myClosed.length / myLeads.length * 100) : 0) + '%');
+  setEl('pst-total',   fmtCOP(totalPaid + totalPending));
 
   // Call stats
   const myCalls  = isAdmin ? S.calls : S.calls.filter(c => {

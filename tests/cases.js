@@ -347,3 +347,48 @@ test('waitedLabel: compact m/h/d, clamps future', () => {
   eq(waitedLabel(now - 2*86400000, now), '2d');
   eq(waitedLabel(now + 1000, now), '0m', 'future clamps to 0');
 });
+
+// ── Rep performance + leaderboard (motivation / recruiting) ──────────────
+test('repStats: worked/closed/conversion + earnings across both roles', () => {
+  const leads = [
+    {id:'1', closerId:'me',   status:'Cerrado'},
+    {id:'2', closerId:'me',   status:'Contactado'},
+    {id:'3', providerId:'me', status:'Cerrado'},
+    {id:'4', closerId:'other',status:'Cerrado'},
+  ];
+  const comms = [
+    {leadId:'1', closerId:'me',   closerAmount:100000, status:'paid'},
+    {leadId:'3', providerId:'me', providerAmount:30000, status:'pending'},
+    {leadId:'9', closerId:'me',   closerAmount:50000, status:'cancelled'}, // excluded
+  ];
+  const r = repStats('me', leads, comms);
+  eq(r.worked, 3, 'closer x2 + provider x1');
+  eq(r.closed, 2, '2 closed');
+  eq(r.conversion, 67, 'round(2/3*100)');
+  eq(r.paid, 100000, 'paid');
+  eq(r.pending, 30000, 'pending');
+  eq(r.total, 130000, 'total');
+});
+
+test('repStats: empty + cancelled-only are safe', () => {
+  eq(repStats('x', [], []).total, 0, 'empty');
+  eq(repStats('x', [], [{closerId:'x',closerAmount:9,status:'cancelled'}]).paid, 0, 'cancelled ignored');
+  eq(repStats('x', [{id:'1',closerId:'x',status:'Nuevo'}], []).conversion, 0, '0 closed → 0%');
+});
+
+test('teamLeaderboard: ranks active members by closed desc', () => {
+  const team = [
+    {id:'a', name:'A', active:true},
+    {id:'b', name:'B', active:true},
+    {id:'c', name:'C', active:'false'}, // inactive excluded
+  ];
+  const leads = [
+    {id:'1', closerId:'a', status:'Cerrado'},
+    {id:'2', closerId:'a', status:'Cerrado'},
+    {id:'3', closerId:'b', status:'Cerrado'},
+  ];
+  const lb = teamLeaderboard(team, leads, []);
+  eq(lb.length, 2, 'only active members');
+  eq(lb[0].member.id, 'a', 'A leads with 2 closes');
+  eq(lb[1].member.id, 'b', 'B second');
+});

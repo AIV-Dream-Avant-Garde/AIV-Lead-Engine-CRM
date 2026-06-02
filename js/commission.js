@@ -7,6 +7,36 @@ function fmtCOP(n) {
   return new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0}).format(num);
 }
 
+// Per-rep performance + earnings. Pure (unit-tested). A rep's earnings = closer
+// cut on deals they closed + provider cut on deals they sourced; cancelled rows
+// excluded, clawbacks (negative) counted in paid so refunds reduce the total.
+function repStats(userId, leads, commissions) {
+  const me = String(userId || '');
+  const mine = (leads || []).filter(l => String(l.closerId) === me || String(l.providerId) === me);
+  const worked = mine.length;
+  const closed = mine.filter(l => l.status === 'Cerrado').length;
+  const conversion = worked ? Math.round(closed / worked * 100) : 0;
+  let paid = 0, pending = 0;
+  (commissions || []).forEach(c => {
+    if (c.status === 'cancelled') return;
+    let amt = 0;
+    if (String(c.closerId) === me)   amt += parseFloat(c.closerAmount || 0);
+    if (String(c.providerId) === me) amt += parseFloat(c.providerAmount || 0);
+    if (!amt) return;
+    if (c.status === 'paid' || c.status === 'clawback') paid += amt;
+    else if (c.status === 'pending') pending += amt;
+  });
+  return { worked, closed, conversion, paid, pending, total: paid + pending };
+}
+
+// Active team members ranked by closed deals, then total earnings. Pure.
+function teamLeaderboard(team, leads, commissions) {
+  return (team || [])
+    .filter(m => String(m.active) !== 'false')
+    .map(m => Object.assign({ member: m }, repStats(m.id, leads, commissions)))
+    .sort((a, b) => (b.closed - a.closed) || (b.total - a.total));
+}
+
 function calcCommissions(lead, dealValue) {
   const closer   = S.team.find(m => m.id === lead.closerId);
   const closRate = parseFloat(closer?.closerRate || lead.closerRate || 0);

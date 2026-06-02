@@ -711,32 +711,31 @@ function renderAdmin() {
       perfWrap.innerHTML = '<div class="notes-empty">Sin miembros del equipo.</div>';
     } else {
       const pCalls = S.calls.filter(c => new Date(c.calledAt) >= cutoff);
-      perfWrap.innerHTML = S.team.filter(m => String(m.active) !== 'false').map(m => {
+      const lb = teamLeaderboard(S.team, S.leads, S.commissions);   // ranked by closed, then earnings
+      const topTotal = lb[0] && lb[0].total ? lb[0].total : 0;
+      perfWrap.innerHTML = lb.map((entry, i) => {
+        const m = entry.member;
         const mCalls  = pCalls.filter(c => { const lead = S.leads.find(l => l.id === c.leadId); return lead && (lead.closerId===m.id||lead.providerId===m.id); });
         const ans     = mCalls.filter(c => c.outcome === 'answered').length;
-        const mLeads  = S.leads.filter(l => l.closerId===m.id||l.providerId===m.id);
-        const closed  = mLeads.filter(l => l.status==='Cerrado').length;
-        const inter   = mLeads.filter(l => l.status==='Interesado').length;
         const ansRate = mCalls.length ? Math.round(ans/mCalls.length*100) : 0;
-        const pendComm = S.commissions.filter(c => c.status==='pending'&&(c.providerId===m.id||c.closerId===m.id))
-          .reduce((s,c) => { let a=0; if(c.closerId===m.id)a+=parseFloat(c.closerAmount||0); if(c.providerId===m.id)a+=parseFloat(c.providerAmount||0); return s+a; }, 0);
         const initials = (m.name||'?').split(' ').map(w=>w[0]||'').join('').toUpperCase().slice(0,2);
         return `<div class="card" style="margin-bottom:10px;padding:14px 16px">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+            <span class="pill" style="font-family:'DM Mono',monospace;flex-shrink:0">#${i+1}</span>
             <div class="team-avatar">${esc(initials)}</div>
-            <div style="flex:1"><div class="team-name">${esc(m.name)}</div><div class="team-meta">${m.role}${m.contact?' · '+esc(m.contact):''}</div></div>
-            ${pendComm>0?`<span style="font-size:11px;color:var(--amber);font-family:'DM Mono',monospace">${fmtCOP(pendComm)} pendiente</span>`:''}
+            <div style="flex:1;min-width:0"><div class="team-name">${esc(m.name)}</div><div class="team-meta">${m.role}${m.contact?' · '+esc(m.contact):''}</div></div>
+            ${entry.pending>0?`<span style="font-size:11px;color:var(--amber);font-family:'DM Mono',monospace">${fmtCOP(entry.pending)} pendiente</span>`:''}
           </div>
           <div class="perf-grid">
             <div class="perf-stat"><div class="perf-val">${mCalls.length}</div><div class="perf-lbl">Llamadas</div></div>
-            <div class="perf-stat"><div class="perf-val">${ans}</div><div class="perf-lbl">Contestadas</div></div>
-            <div class="perf-stat"><div class="perf-val">${ansRate}%</div><div class="perf-lbl">Tasa respuesta</div></div>
-            <div class="perf-stat"><div class="perf-val">${closed}</div><div class="perf-lbl">Cerrados</div></div>
+            <div class="perf-stat"><div class="perf-val">${ansRate}%</div><div class="perf-lbl">Tasa resp.</div></div>
+            <div class="perf-stat"><div class="perf-val">${entry.closed}</div><div class="perf-lbl">Cerrados</div></div>
+            <div class="perf-stat"><div class="perf-val">${entry.conversion}%</div><div class="perf-lbl">Tasa cierre</div></div>
           </div>
           <div class="perf-bar-wrap" style="margin-top:8px">
-            <div class="perf-bar-label">Interesado</div>
-            <div class="perf-bar-track"><div class="perf-bar-fill" style="background:var(--s-interest);width:${mLeads.length?Math.min(100,Math.round(inter/mLeads.length*100)):0}%"></div></div>
-            <div class="perf-bar-val">${inter}</div>
+            <div class="perf-bar-label">Total ganado</div>
+            <div class="perf-bar-track"><div class="perf-bar-fill" style="background:var(--pos);width:${topTotal?Math.min(100,Math.round(entry.total/topTotal*100)):0}%"></div></div>
+            <div class="perf-bar-val">${fmtCOP(entry.total)}</div>
           </div>
         </div>`;
       }).join('') || '<div class="notes-empty">Sin actividad en este periodo.</div>';
