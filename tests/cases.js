@@ -305,3 +305,45 @@ test('dailyRemaining: budget resets when the date rolls', () => {
   eq(dailyRemaining({date:'2026-05-31', count:250}, 200, '2026-05-31'), 0, 'never negative');
   eq(dailyRemaining(null, 200, '2026-05-31'), 200, 'no counter → full');
 });
+
+// ── "Responder ahora" queue — speed-to-lead (Project: conversion) ─────────
+test('leadsNeedingResponse: surfaces leads whose latest message is inbound', () => {
+  const leads = [
+    {id:'A', name:'A', status:'Contactado'},
+    {id:'B', name:'B', status:'Nuevo'},
+    {id:'C', name:'C', status:'No llamar'},
+    {id:'D', name:'D', status:'Nuevo'},
+  ];
+  const inter = [
+    {leadId:'A', direction:'out', body:'hola',        createdAt:'2026-06-01T10:00:00Z'},
+    {leadId:'A', direction:'in',  body:'me interesa', createdAt:'2026-06-01T11:00:00Z'}, // replied after us → waits
+    {leadId:'B', direction:'in',  body:'quien?',      createdAt:'2026-06-01T09:00:00Z'},
+    {leadId:'B', direction:'out', body:'somos...',    createdAt:'2026-06-01T09:30:00Z'}, // we answered → not waiting
+    {leadId:'C', direction:'in',  body:'STOP',        createdAt:'2026-06-01T08:00:00Z'}, // opted out → excluded
+    // D: no interactions → excluded
+  ];
+  const r = leadsNeedingResponse(leads, inter);
+  eq(r.length, 1, 'only A waits');
+  eq(r[0].lead.id, 'A', 'A surfaced');
+  eq(r[0].lastMsg, 'me interesa', 'carries last inbound text');
+});
+
+test('leadsNeedingResponse: sorts most-recent reply first', () => {
+  const leads = [{id:'X',status:'Nuevo'},{id:'Y',status:'Nuevo'}];
+  const inter = [
+    {leadId:'X', direction:'in', createdAt:'2026-06-01T10:00:00Z'},
+    {leadId:'Y', direction:'in', createdAt:'2026-06-01T12:00:00Z'},
+  ];
+  const r = leadsNeedingResponse(leads, inter);
+  eq(r[0].lead.id, 'Y', 'newer reply first');
+  eq(r[1].lead.id, 'X', 'older second');
+  eq(leadsNeedingResponse([], []).length, 0, 'empty safe');
+});
+
+test('waitedLabel: compact m/h/d, clamps future', () => {
+  const now = Date.parse('2026-06-01T12:00:00Z');
+  eq(waitedLabel(now - 5*60000, now), '5m');
+  eq(waitedLabel(now - 3*3600000, now), '3h');
+  eq(waitedLabel(now - 2*86400000, now), '2d');
+  eq(waitedLabel(now + 1000, now), '0m', 'future clamps to 0');
+});

@@ -30,6 +30,7 @@ const APP_FILES = [
   'js/data/outreach-templates.js', // OUTREACH_TEMPLATES
   'js/features/outreach.js',// pickChannel, toE164, renderTemplate, isOptOut
   'js/features/cadence-core.js', // cadence engine pure decision core
+  'js/features/inbox.js',   // leadsNeedingResponse, waitedLabel
   'js/auth/auth.js',        // sha256, isWeakPin, sessionSig
 ];
 

@@ -3,7 +3,7 @@
 // Central mutable state object — all modules read/write S
 const S = {
   config: {
-    scriptUrl:'',crmSecret:'',companyName:'',
+    scriptUrl:'',crmSecret:'',companyName:'',bookingUrl:'',
     callScript:'',pitchScript:'',objectionsScript:'',closeScript:'',
   },
   leads:       [],

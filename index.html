@@ -6,10 +6,10 @@
 <title>AXIUS — Lead Engine &amp; CRM</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@twilio/voice-sdk@2.9.0/dist/twilio.min.js"></script>
-<link rel="stylesheet" href="css/base.css?v=20260601a">
-<link rel="stylesheet" href="css/layout.css?v=20260601a">
-<link rel="stylesheet" href="css/components.css?v=20260601a">
-<link rel="stylesheet" href="css/widgets.css?v=20260601a">
+<link rel="stylesheet" href="css/base.css?v=20260601b">
+<link rel="stylesheet" href="css/layout.css?v=20260601b">
+<link rel="stylesheet" href="css/components.css?v=20260601b">
+<link rel="stylesheet" href="css/widgets.css?v=20260601b">
 </head>
 <body>
 
@@ -76,6 +76,11 @@
       Importar CSV
     </div>
     <div class="sb-sec-label">CRM</div>
+    <div class="nav-item" data-sec="responder">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12v8H6l-3 2v-2H2z"/><path d="M5.5 7.5h5M5.5 9.5h3"/></svg>
+      Responder ahora
+      <span class="nav-badge red" id="nav-responder-badge" style="display:none">0</span>
+    </div>
     <div class="nav-item" data-sec="leads">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 11c0 1.1-2.7 2-6 2s-6-.9-6-2M14 8c0 1.1-2.7 2-6 2S2 9.1 2 8M14 5c0 1.1-2.7 2-6 2S2 6.1 2 5s2.7-2 6-2 6 .9 6 2z"/></svg>
       Leads
@@ -171,6 +176,7 @@
       <div class="card-title">Guion de llamadas</div>
       <div class="card-sub" style="margin-bottom:12px">Este guion aparece en el widget de llamada mientras el agente habla. Admin puede actualizarlo en cualquier momento.</div>
       <div class="field" style="margin-bottom:10px"><label>Nombre de la empresa (reemplaza [tu empresa])</label><input type="text" id="cfg-company" placeholder="Soluciones Axius" oninput="previewScript()"></div>
+      <div class="field" style="margin-bottom:10px"><label>Link de agenda (Cal.com / Calendly) — token {agenda}</label><input type="text" id="cfg-booking" placeholder="https://cal.com/tu-equipo/discovery"></div>
       <div class="field" style="margin-bottom:10px"><label>Script de apertura (consent + intro)</label><textarea class="script-editor" id="cfg-script" rows="3" oninput="previewScript()"></textarea></div>
       <div class="field" style="margin-bottom:10px"><label>Puntos de venta / Pitch principal</label><textarea class="script-editor" id="cfg-pitch" rows="4" placeholder="• Beneficio 1&#10;• Beneficio 2&#10;• Diferenciador clave"></textarea></div>
       <div class="field" style="margin-bottom:10px"><label>Objeciones comunes y respuestas</label><textarea class="script-editor" id="cfg-objections" rows="4" placeholder="&quot;No me interesa&quot; → ...&#10;&quot;Ya tengo proveedor&quot; → ..."></textarea></div>
@@ -334,6 +340,13 @@ Content-Type: application/json
 </div>
 
 <!-- LEADS SECTION -->
+<div class="section" id="sec-responder">
+  <div class="eyebrow">Prioridad</div>
+  <h1 class="section-title">Responder ahora</h1>
+  <p class="section-sub">Leads que ya contestaron y esperan respuesta de una persona. Atiéndelos primero: responder rápido es lo que más sube la conversión. <span id="responder-count" style="color:var(--pos);font-weight:600"></span></p>
+  <div id="responder-list"><div class="notes-empty">Nadie espera respuesta ahora mismo.</div></div>
+</div>
+
 <div class="section" id="sec-leads">
   <div class="eyebrow">CRM</div>
   <h1 class="section-title">Base de leads</h1>
@@ -782,6 +795,7 @@ Content-Type: application/json
         </div>
         <div class="field" id="msg-subject-wrap" style="display:none;margin-bottom:8px"><label>Asunto (email)</label><input type="text" id="msg-subject" placeholder="Asunto del correo" oninput="renderMsgPreview()"></div>
         <div class="field"><textarea id="msg-body" rows="4" placeholder="Escribe un mensaje humano y directo..." oninput="renderMsgPreview()"></textarea></div>
+        <button class="btn btn-ghost btn-xs" style="margin-top:6px" onclick="insertBookingLink()" title="Añade tu link de agenda para que reserven una llamada">+ Link de agenda</button>
         <div id="msg-preview" style="font-size:12px;color:var(--body);background:var(--surface-hi);border-radius:8px;padding:8px 10px;margin-top:6px;white-space:pre-wrap"></div>
         <div id="msg-optout-note" style="display:none;font-size:11px;color:var(--red);margin-top:6px"></div>
         <button class="btn btn-primary" id="msg-send-btn" style="margin-top:10px" onclick="sendComposer()">Enviar mensaje</button>
@@ -967,28 +981,29 @@ Content-Type: application/json
 </div>
 
 <!-- JS: load order matters — data → core → auth → locks → commission → features → main -->
-<script src="js/data/keywords.js?v=20260601a"></script>
-<script src="js/data/locations.js?v=20260601a"></script>
-<script src="js/data/constants.js?v=20260601a"></script>
-<script src="js/data/demo-data.js?v=20260601a"></script>
-<script src="js/data/outreach-templates.js?v=20260601a"></script>
-<script src="js/core/state.js?v=20260601a"></script>
-<script src="js/core/utils.js?v=20260601a"></script>
-<script src="js/core/storage.js?v=20260601a"></script>
-<script src="js/core/api.js?v=20260601a"></script>
-<script src="js/auth/auth.js?v=20260601a"></script>
-<script src="js/locks.js?v=20260601a"></script>
-<script src="js/commission.js?v=20260601a"></script>
-<script src="js/features/scraper.js?v=20260601a"></script>
-<script src="js/features/outreach.js?v=20260601a"></script>
-<script src="js/features/import.js?v=20260601a"></script>
-<script src="js/features/leads.js?v=20260601a"></script>
-<script src="js/features/pipeline.js?v=20260601a"></script>
-<script src="js/features/calls.js?v=20260601a"></script>
-<script src="js/features/profile.js?v=20260601a"></script>
-<script src="js/features/admin.js?v=20260601a"></script>
-<script src="js/features/analytics.js?v=20260601a"></script>
-<script src="js/features/export.js?v=20260601a"></script>
-<script src="js/main.js?v=20260601a"></script>
+<script src="js/data/keywords.js?v=20260601b"></script>
+<script src="js/data/locations.js?v=20260601b"></script>
+<script src="js/data/constants.js?v=20260601b"></script>
+<script src="js/data/demo-data.js?v=20260601b"></script>
+<script src="js/data/outreach-templates.js?v=20260601b"></script>
+<script src="js/core/state.js?v=20260601b"></script>
+<script src="js/core/utils.js?v=20260601b"></script>
+<script src="js/core/storage.js?v=20260601b"></script>
+<script src="js/core/api.js?v=20260601b"></script>
+<script src="js/auth/auth.js?v=20260601b"></script>
+<script src="js/locks.js?v=20260601b"></script>
+<script src="js/commission.js?v=20260601b"></script>
+<script src="js/features/scraper.js?v=20260601b"></script>
+<script src="js/features/outreach.js?v=20260601b"></script>
+<script src="js/features/inbox.js?v=20260601b"></script>
+<script src="js/features/import.js?v=20260601b"></script>
+<script src="js/features/leads.js?v=20260601b"></script>
+<script src="js/features/pipeline.js?v=20260601b"></script>
+<script src="js/features/calls.js?v=20260601b"></script>
+<script src="js/features/profile.js?v=20260601b"></script>
+<script src="js/features/admin.js?v=20260601b"></script>
+<script src="js/features/analytics.js?v=20260601b"></script>
+<script src="js/features/export.js?v=20260601b"></script>
+<script src="js/main.js?v=20260601b"></script>
 </body>
 </html>

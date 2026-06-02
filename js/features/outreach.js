@@ -34,6 +34,7 @@ function renderTemplate(body, lead, agent) {
     nombre:    lead.contactName || lead.name || '',
     empresa:   company,
     agente:    agent || '',
+    agenda:    (typeof S !== 'undefined' && S.config && S.config.bookingUrl) || '',
     seguimiento: lead.followUpDate ? (typeof fmtD === 'function' ? fmtD(lead.followUpDate) : String(lead.followUpDate)) : '',
   };
   return String(body || '')
@@ -179,6 +180,18 @@ function renderMsgPreview() {
   const body = document.getElementById('msg-body')?.value || '';
   const pv = document.getElementById('msg-preview');
   if (pv) pv.textContent = body ? renderTemplate(body, lead, agent) : 'La vista previa del mensaje aparecerá aquí.';
+}
+
+// Append the configured booking link to the composer body (drives toward a
+// booked discovery call — the conversion action). Templates can also use {agenda}.
+function insertBookingLink() {
+  const url = (S.config && S.config.bookingUrl || '').trim();
+  if (!url) { toast('Configura tu link de agenda en Configuración primero.', 'error'); return; }
+  const body = document.getElementById('msg-body'); if (!body) return;
+  const sep = (body.value && !/[\s]$/.test(body.value)) ? ' ' : '';
+  body.value = body.value + sep + url;
+  renderMsgPreview();
+  body.focus();
 }
 
 async function sendComposer() {

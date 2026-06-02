@@ -47,6 +47,10 @@ function updateBadges() {
   setEl('nav-leads-badge', S.leads.length);
   setEl('tb-leads-pill',   S.leads.length + ' leads');
   setEl('nav-calls-badge', S.calls.length);
+  // "Responder ahora" urgency badge — only shows when leads are waiting.
+  const rc = (typeof responderCount === 'function') ? responderCount() : 0;
+  const rb = document.getElementById('nav-responder-badge');
+  if (rb) { rb.textContent = rc; rb.style.display = rc > 0 ? '' : 'none'; }
   setEl('st-total', S.leads.length);
   setEl('st-new',   byStatus('Nuevo'));
   setEl('st-cont',  byStatus('Contactado'));
@@ -66,6 +70,7 @@ function renderAll() {
   if (document.getElementById('sec-pipeline')?.classList.contains('active')) renderPipeline();
   if (document.getElementById('sec-analytics')?.classList.contains('active')) renderAnalytics();
   if (document.getElementById('sec-perfil')?.classList.contains('active')) renderPerfil();
+  if (document.getElementById('sec-responder')?.classList.contains('active')) renderResponder();
 }
 
 // ── navigate — consolidated (all section logic merged) ─────
@@ -76,7 +81,7 @@ function navigate(id) {
   document.querySelector(`.nav-item[data-sec="${id}"]`)?.classList.add('active');
 
   const labels = {
-    setup:'Configuración', scraper:'Scraper', import:'Importar', leads:'Leads',
+    setup:'Configuración', scraper:'Scraper', import:'Importar', responder:'Responder ahora', leads:'Leads',
     pipeline:'Pipeline', llamadas:'Llamadas', export:'Exportar',
     perfil:'Mi Perfil', admin:'Admin', analytics:'Analytics',
   };
@@ -85,6 +90,7 @@ function navigate(id) {
 
   if (id === 'pipeline')  renderPipeline();
   if (id === 'analytics') renderAnalytics();
+  if (id === 'responder') renderResponder();
   if (id === 'leads')     { S.page = 1; renderTable(); }
   if (id === 'llamadas')  renderCallsSection();
   if (id === 'perfil')    renderPerfil();
@@ -104,6 +110,7 @@ function navigate(id) {
       const cfg = S.config;
       const setCfgEl = (eid, v) => { const el2 = document.getElementById(eid); if (el2) el2.value = v || ''; };
       setCfgEl('cfg-company',    cfg.companyName    || '');
+      setCfgEl('cfg-booking',    cfg.bookingUrl     || '');
       setCfgEl('cfg-script',     cfg.callScript     || '');
       setCfgEl('cfg-pitch',      cfg.pitchScript    || '');
       setCfgEl('cfg-objections', cfg.objectionsScript || '');

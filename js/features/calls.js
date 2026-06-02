@@ -366,6 +366,7 @@ function cwTab(tab) {
 
 function saveCallScript() {
   S.config.companyName      = document.getElementById('cfg-company')?.value?.trim()    || '';
+  S.config.bookingUrl       = document.getElementById('cfg-booking')?.value?.trim()    || '';
   S.config.callScript       = document.getElementById('cfg-script')?.value?.trim()     || '';
   S.config.pitchScript      = document.getElementById('cfg-pitch')?.value?.trim()      || '';
   S.config.objectionsScript = document.getElementById('cfg-objections')?.value?.trim() || '';
