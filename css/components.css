@@ -218,11 +218,15 @@ pre{padding:18px;overflow-x:auto;font-family:'DM Mono',monospace;font-size:12px;
 .funnel-label{width:130px;font-size:12px;color:var(--body);flex-shrink:0}
 .funnel-bar-wrap{flex:1;background:var(--surface);border-radius:4px;height:18px;overflow:hidden}
 .funnel-bar{height:100%;border-radius:4px;transition:width .3s;min-width:4px}
-.funnel-bar.status-new{background:var(--accent)}
-.funnel-bar.status-contacted{background:#3b82f6}
-.funnel-bar.status-interested{background:#8b5cf6}
-.funnel-bar.status-closed{background:var(--pos)}
-.funnel-bar.status-failed,.funnel-bar.status-dead,.funnel-bar.status-dnc{background:var(--sub)}
+/* Funnel stages reuse the status tokens so each stage is distinct AND matches the
+   lead badges (was: new + contacted were two near-identical blues). */
+.funnel-bar.status-new{background:var(--s-new)}
+.funnel-bar.status-contacted{background:var(--s-contact)}
+.funnel-bar.status-interested{background:var(--s-interest)}
+.funnel-bar.status-closed{background:var(--s-closed)}
+.funnel-bar.status-failed{background:var(--s-failed)}
+.funnel-bar.status-dead{background:var(--s-dead)}
+.funnel-bar.status-dnc{background:var(--s-dnc)}
 .funnel-count{width:80px;text-align:right;font-size:12px;color:var(--hl);font-family:'DM Mono',monospace;flex-shrink:0}
 .funnel-pct{color:var(--sub);font-size:11px}
 .analytics-call-stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
