@@ -109,9 +109,12 @@ function replyShouldPause(lead, seq) {
   return reply > 0 && reply > enrolled;
 }
 
-// Quiet hours: send only 08:00–20:00 in the lead's local tz (caller passes the
-// already-localized hour 0–23).
-function withinQuietHours(localHour) { return localHour >= 8 && localHour < 20; }
+// Quiet hours: send only within [start, end) in the lead's local tz (caller
+// passes the already-localized hour 0–23). Defaults 08:00–20:00.
+function withinQuietHours(localHour, start, end) {
+  const s = (start == null ? 8 : start), e = (end == null ? 20 : end);
+  return localHour >= s && localHour < e;
+}
 
 // Deterministic variant index from leadId+stepIndex (stable per lead, varied
 // across leads). No randomness → resume-safe and testable.

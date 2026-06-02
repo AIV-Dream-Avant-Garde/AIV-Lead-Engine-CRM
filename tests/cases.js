@@ -392,3 +392,11 @@ test('teamLeaderboard: ranks active members by closed desc', () => {
   eq(lb[0].member.id, 'a', 'A leads with 2 closes');
   eq(lb[1].member.id, 'b', 'B second');
 });
+
+test('withinQuietHours: custom window via config params', () => {
+  assert(withinQuietHours(9, 9, 18), '9 inside 9-18');
+  assert(!withinQuietHours(18, 9, 18), '18 excluded (end exclusive)');
+  assert(!withinQuietHours(8, 9, 18), '8 before custom start');
+  assert(withinQuietHours(10), 'defaults still 8-20 when no params');
+  assert(withinQuietHours(0, 0, 24), 'midnight inside 0-24');
+});

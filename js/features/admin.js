@@ -340,6 +340,7 @@ async function checkTriggerStatus() {
     S.triggerStatus = {
       scrape: !!res.scrapeTrigger, report: !!res.reportTrigger,
       cadence: !!res.cadenceTrigger, cadenceEnabled: !!res.cadenceEnabled,
+      cadenceConfig: res.cadenceConfig || null,
       lastScrapeRun: res.lastScrapeRun || null, lastCadenceRun: res.lastCadenceRun || null,
     };
     renderScheduledJobs();

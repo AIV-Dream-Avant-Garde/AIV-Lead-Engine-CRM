@@ -274,13 +274,15 @@ function pauseSequence(leadId)   { _updateSequence(leadId, { state:'paused:manua
 function resumeSequence(leadId)  { _updateSequence(leadId, { state:'active', pausedReason:'' }); toast('Secuencia reanudada.', 'success'); }
 function unenrollSequence(leadId){ if (!confirm('¿Sacar este lead de la secuencia?')) return; _updateSequence(leadId, { state:'stopped:manual', pausedReason:'manual' }); toast('Lead retirado de la secuencia.', 'success'); }
 
-// ── Cadence engine status + controls (the deterministic backend engine) ──────
-// Reads trigger/live state from S.triggerStatus (set by checkTriggerStatus).
+// ── Cadence engine status + editable config (the deterministic backend engine) ─
+// Reads trigger/live state + effective config from S.triggerStatus (checkTriggerStatus).
 function renderCadenceEngine() {
   const wrap = document.getElementById('admin-seq-engine'); if (!wrap) return;
   const ts = S.triggerStatus || {};
   const active = !!ts.cadence;          // hourly runCadence trigger installed?
-  const live   = !!ts.cadenceEnabled;   // CADENCE_ENABLED in Code.gs
+  const live   = !!ts.cadenceEnabled;   // effective enabled (UI config or constant)
+  const c  = ts.cadenceConfig || {};
+  const v  = (x, d) => (x == null ? d : x);
   const lr = ts.lastCadenceRun;
   const modeBadge = live
     ? `<span style="font-size:11px;font-weight:600;color:var(--pos)">● EN VIVO</span>`
@@ -288,7 +290,6 @@ function renderCadenceEngine() {
   const lastLine = lr && lr.ranAt
     ? `<div style="font-size:11px;color:var(--sub);margin-top:8px">Última corrida: ${fmtD(lr.ranAt)} ${fmtT(lr.ranAt)} · ${lr.mode==='live'?'inscritos':'inscribiría'} ${lr.enrolled||0} · ${lr.mode==='live'?'enviados':'enviaría'} ${lr.sent||0}</div>`
     : `<div style="font-size:11px;color:var(--sub);margin-top:8px">Sin corridas registradas aún.</div>`;
-  const liveNote = live ? '' : `<div style="font-size:11px;color:var(--amber);margin-top:6px">Modo simulación: registra lo que enviaría, sin enviar nada. Para activar envíos reales, pon <code>CADENCE_ENABLED = true</code> en Code.gs (tras aprovisionar Twilio/WhatsApp).</div>`;
   wrap.innerHTML = `
     <div class="card" style="background:var(--surface-hi);padding:12px 14px;margin-bottom:12px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -296,12 +297,55 @@ function renderCadenceEngine() {
         ${modeBadge}
         <span style="font-size:13px;color:var(--body)">· Trigger horario:</span>
         <span style="font-size:13px;font-weight:600;color:${active?'var(--pos)':'var(--body)'}">${active?'● Activo':'○ Inactivo'}</span>
-        <button class="btn ${active?'btn-danger':'btn-success'}" style="font-size:11px;padding:4px 10px" onclick="setTrigger('runCadence',${!active})">${active?'Desactivar':'Activar'}</button>
-        <button id="run-cadence-now-btn" class="btn btn-primary" style="font-size:11px;padding:4px 10px" onclick="runCadenceNow()">Ejecutar ahora</button>
+        <button class="btn ${active?'btn-danger':'btn-success'} btn-xs" onclick="setTrigger('runCadence',${!active})">${active?'Desactivar':'Activar'}</button>
+        <button id="run-cadence-now-btn" class="btn btn-primary btn-xs" onclick="runCadenceNow()">Ejecutar ahora</button>
       </div>
       ${lastLine}
-      ${liveNote}
+      <div class="form-grid" style="margin-top:12px;gap:8px">
+        <div class="field"><label>Tope diario de envíos</label><input type="number" id="cad-cap" value="${esc(String(v(c.dailyCap,200)))}" min="1"></div>
+        <div class="field"><label>Persona que firma · {agente}</label><input type="text" id="cad-agent" value="${esc(v(c.agentName,''))}" placeholder="Andrés"></div>
+        <div class="field"><label>Empresa · {empresa}</label><input type="text" id="cad-company" value="${esc(v(c.company,''))}" placeholder="AXIUS"></div>
+        <div class="field"><label>Días entre toques</label><input type="number" id="cad-gap" value="${esc(String(v(c.gapDays,2)))}" min="1"></div>
+        <div class="field"><label>Hora inicio (0–23)</label><input type="number" id="cad-qstart" value="${esc(String(v(c.quietStart,8)))}" min="0" max="23"></div>
+        <div class="field"><label>Hora fin (1–24)</label><input type="number" id="cad-qend" value="${esc(String(v(c.quietEnd,20)))}" min="1" max="24"></div>
+      </div>
+      <div class="field" style="margin-top:8px"><label>Dirección postal (CAN-SPAM · pie de email)</label><input type="text" id="cad-address" value="${esc(v(c.postalAddress,''))}" placeholder="AXIUS, Calle 00 #00-00, Medellín, Colombia"></div>
+      <label style="display:flex;align-items:flex-start;gap:8px;margin-top:10px;font-size:12px;color:var(--hl);cursor:pointer">
+        <input type="checkbox" id="cad-enabled" ${live?'checked':''} style="margin-top:2px">
+        <span>Enviar mensajes reales (en vivo). Sin marcar = simulación: registra qué enviaría sin enviar nada.</span>
+      </label>
+      <div style="font-size:11px;color:var(--amber);margin-top:6px">Activa "en vivo" solo con Twilio/WhatsApp aprovisionados y aprobados, y con base legal de consentimiento. El motor respeta opt-out, horario y tope siempre.</div>
+      <button class="btn btn-primary btn-xs" style="margin-top:10px" onclick="saveCadenceConfig()">Guardar configuración</button>
     </div>`;
+}
+
+// Persist the operator-tunable cadence config. Confirms before flipping to live.
+async function saveCadenceConfig() {
+  if (!S.config.scriptUrl) { toast('Configura el Apps Script URL primero.', 'error'); return; }
+  const g = id => document.getElementById(id);
+  const enabled = !!(g('cad-enabled') && g('cad-enabled').checked);
+  const wasLive = !!(S.triggerStatus && S.triggerStatus.cadenceEnabled);
+  if (enabled && !wasLive && !confirm('¿Activar envíos REALES? Asegúrate de tener Twilio/WhatsApp aprovisionados y aprobados, y la base legal de consentimiento. El motor empezará a enviar en la próxima corrida.')) return;
+  const config = {
+    enabled,
+    dailyCap:      parseInt(g('cad-cap')?.value) || 200,
+    agentName:     g('cad-agent')?.value?.trim() || '',
+    company:       g('cad-company')?.value?.trim() || '',
+    gapDays:       parseInt(g('cad-gap')?.value) || 2,
+    quietStart:    parseInt(g('cad-qstart')?.value),
+    quietEnd:      parseInt(g('cad-qend')?.value),
+    postalAddress: g('cad-address')?.value?.trim() || '',
+  };
+  const res = await sheetsCall({ action:'saveCadenceConfig', config });
+  if (res?.success) {
+    if (!S.triggerStatus) S.triggerStatus = {};
+    S.triggerStatus.cadenceConfig = res.config;
+    S.triggerStatus.cadenceEnabled = res.config.enabled;
+    toast('Configuración del motor guardada.', 'success');
+    renderCadenceEngine();
+  } else {
+    toast('Error al guardar la configuración del motor.', 'error', 5000);
+  }
 }
 
 // On-demand cadence pass (dry-run while CADENCE_ENABLED=false). Previews/verifies

@@ -139,7 +139,8 @@ function doGet(e) {
         scrapeTrigger: triggers.some(t => t.getHandlerFunction() === 'runScheduledScrapes'),
         reportTrigger: triggers.some(t => t.getHandlerFunction() === 'sendWeeklyReport'),
         cadenceTrigger: triggers.some(t => t.getHandlerFunction() === 'runCadence'),
-        cadenceEnabled: CADENCE_ENABLED === true,
+        cadenceEnabled: getCadenceCfg_().enabled,
+        cadenceConfig: getCadenceCfg_(),
         lastScrapeRun, lastCadenceRun,
       });
     }
@@ -396,6 +397,25 @@ function doPost(e) {
       // CRM admin preview/verify enrollment + intended sends without waiting for
       // the hourly trigger.
       return ok(runCadence() || {});
+    }
+    if (a === 'saveCadenceConfig') {
+      // Operator-tunable cadence config (CRM admin UI). Validated + clamped, then
+      // persisted as one Config blob that getCadenceCfg_ layers over the defaults.
+      const c = b.config || {};
+      const intIn = (v, d, lo, hi) => { const n = parseInt(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d; };
+      const clean = {
+        enabled:    c.enabled === true,
+        dailyCap:   intIn(c.dailyCap, CADENCE_DAILY_CAP, 1, 5000),
+        agentName:  String(c.agentName || '').slice(0, 60),
+        company:    String(c.company   || '').slice(0, 80),
+        gapDays:    intIn(c.gapDays,   CADENCE_STEP_GAP_DAYS, 1, 30),
+        spreadMin:  intIn(c.spreadMin, CADENCE_FIRST_SPREAD_MIN, 0, 1440),
+        quietStart: intIn(c.quietStart, 8, 0, 23),
+        quietEnd:   intIn(c.quietEnd, 20, 1, 24),
+        postalAddress: String(c.postalAddress || '').slice(0, 200),
+      };
+      cfgSet('cadenceConfig', JSON.stringify(clean));
+      return ok({ saved:true, config: getCadenceCfg_() });
     }
     if (a === 'saveReportEmail') {
       const ss=SpreadsheetApp.openById(SHEET_ID);
@@ -709,7 +729,8 @@ function twilioSend_(phoneE164, channel, body) {
 // Append the CAN-SPAM footer (physical address + unsubscribe) required on every
 // commercial email. Bilingual so it's correct regardless of the body's language.
 function emailFooter_() {
-  const addr = (COMPANY_POSTAL_ADDRESS && COMPANY_POSTAL_ADDRESS.indexOf('TU_') !== 0) ? COMPANY_POSTAL_ADDRESS : CADENCE_COMPANY;
+  const cfg = getCadenceCfg_();
+  const addr = (cfg.postalAddress && cfg.postalAddress.indexOf('TU_') !== 0) ? cfg.postalAddress : cfg.company;
   return '\n\n—\n' + addr +
     '\nPara dejar de recibir estos correos, responde BAJA a este mensaje. · To unsubscribe, reply STOP.';
 }
@@ -814,7 +835,10 @@ function replyShouldPause(lead, seq) {
   const enrolled = seq.enrolledAt   ? new Date(seq.enrolledAt).getTime()   : 0;
   return reply > 0 && reply > enrolled;
 }
-function withinQuietHours(localHour) { return localHour >= 8 && localHour < 20; }
+function withinQuietHours(localHour, start, end) {
+  const s = (start == null ? 8 : start), e = (end == null ? 20 : end);
+  return localHour >= s && localHour < e;
+}
 function pickVariant(leadId, stepIndex, variantCount) {
   if (!variantCount || variantCount <= 1) return 0;
   const s = String(leadId || '') + ':' + String(stepIndex || 0);
@@ -894,15 +918,38 @@ function appendInteraction_(rec) {
   getSheet(SHEETS.interactions, INTERACTION_HDR).appendRow(INTERACTION_HDR.map(function(k){ return rec[k] != null ? rec[k] : ''; }));
 }
 
+// Effective cadence config: operator overrides from the Config sheet
+// ('cadenceConfig' key, set in the CRM admin UI) layered over the Code.gs
+// constants as defaults. So the constants are the floor; the UI tunes the rest.
+function getCadenceCfg_() {
+  let s = {};
+  try { s = JSON.parse(cfgGet('cadenceConfig') || '{}'); } catch (e) {}
+  const num = (v, d) => (Number(v) > 0 ? Number(v) : d);
+  const hr  = (v, d) => (Number.isFinite(Number(v)) && Number(v) >= 0 && Number(v) <= 24 ? Number(v) : d);
+  return {
+    enabled:    typeof s.enabled === 'boolean' ? s.enabled : (CADENCE_ENABLED === true),
+    dailyCap:   num(s.dailyCap, CADENCE_DAILY_CAP),
+    agentName:  s.agentName || CADENCE_AGENT_NAME,
+    company:    s.company   || CADENCE_COMPANY,
+    gapDays:    num(s.gapDays, CADENCE_STEP_GAP_DAYS),
+    spreadMin:  num(s.spreadMin, CADENCE_FIRST_SPREAD_MIN),
+    quietStart: hr(s.quietStart, 8),
+    quietEnd:   hr(s.quietEnd, 20),
+    postalAddress: s.postalAddress || COMPANY_POSTAL_ADDRESS,
+  };
+}
+
 // The engine. Hourly trigger. Pass 1 enroll, Pass 2 advance. Dry-runs (writes
-// nothing, sends nothing) until CADENCE_ENABLED = true.
+// nothing, sends nothing) until the cadence config is enabled (UI or constant).
 function runCadence() {
   // Single-run lock: the hourly trigger and the on-demand runCadenceNow must never
   // overlap, or both would read the same pre-send snapshot and double-send a step.
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(0)) { Logger.log('runCadence: another run in progress; skipping.'); return { skipped: true }; }
   try {
-    const live = CADENCE_ENABLED === true;
+    const cfg = getCadenceCfg_();
+    const live = cfg.enabled === true;
+    const gapMs = cfg.gapDays * 24 * 3600 * 1000;
     const now = new Date(), nowMs = now.getTime();
 
     // Read leads once (with row indices for in-place stamps).
@@ -929,14 +976,14 @@ function runCadence() {
 
     let counter = {}; try { counter = JSON.parse(cfgGet('cadenceSentToday') || '{}'); } catch (e) {}
     const todayKey = Utilities.formatDate(now, 'America/Bogota', 'yyyy-MM-dd');
-    let remaining = dailyRemaining(counter, CADENCE_DAILY_CAP, todayKey);
+    let remaining = dailyRemaining(counter, cfg.dailyCap, todayKey);
 
     // ── Pass 1: enroll eligible, not-yet-enrolled leads (batched append) ──
     const newRows = []; let enrolled = 0, wouldEnroll = 0;
     leads.forEach(function(lead) {
       if (enrolledSet[String(lead.id)]) return;
       if (!cadenceEligible(lead, false)) return;
-      const jitterMs = cadenceJitterMinutes(lead.id, CADENCE_FIRST_SPREAD_MIN) * 60000;
+      const jitterMs = cadenceJitterMinutes(lead.id, cfg.spreadMin) * 60000;
       const seq = { leadId:lead.id, state:'active', stepIndex:0,
         nextRunAt:new Date(nowMs + jitterMs).toISOString(),
         pausedReason:'', enrolledAt:now.toISOString(), updatedAt:now.toISOString() };
@@ -965,7 +1012,7 @@ function runCadence() {
 
       const tz = cadenceTz_(lead.country);
       const localHour = parseInt(Utilities.formatDate(now, tz, 'H'), 10);
-      if (!withinQuietHours(localHour)) return;   // outside 08–20: skip; re-checked next hourly run
+      if (!withinQuietHours(localHour, cfg.quietStart, cfg.quietEnd)) return;   // outside window: skip; re-checked next hourly run
 
       const steps = cadenceSteps(lead);
       const stepIndex = Number(seq.stepIndex || 0);
@@ -975,13 +1022,13 @@ function runCadence() {
       }
       const stepTag = 'seq:' + stepIndex;
       const channel = cadenceResolveChannel(lead);
-      const body = cadenceMessage(lead, stepIndex, CADENCE_COMPANY, CADENCE_AGENT_NAME);
+      const body = cadenceMessage(lead, stepIndex, cfg.company, cfg.agentName);
       if (!body) return;
 
       // Idempotency: already really sent this step → just advance.
       if (alreadySent(interactions, lead.id, stepTag)) {
         if (live) {
-          const adv = advanceSequence(seq, steps.length, nowMs, CADENCE_GAP_MS, cadenceJitterMinutes(lead.id, 120) * 60000);
+          const adv = advanceSequence(seq, steps.length, nowMs, gapMs, cadenceJitterMinutes(lead.id, 120) * 60000);
           seq.stepIndex = adv.stepIndex; seq.nextRunAt = adv.nextRunAt; seq.state = adv.state; seq.updatedAt = now.toISOString();
           writeSeqRow_(seqsSheet, rowOf[String(seq.leadId)], seq, sh);
         }
@@ -1019,7 +1066,7 @@ function runCadence() {
 
       if (result.sid) {
         sent++; remaining--;
-        const adv = advanceSequence(seq, steps.length, nowMs, CADENCE_GAP_MS, cadenceJitterMinutes(lead.id, 120) * 60000);
+        const adv = advanceSequence(seq, steps.length, nowMs, gapMs, cadenceJitterMinutes(lead.id, 120) * 60000);
         seq.stepIndex = adv.stepIndex; seq.nextRunAt = adv.nextRunAt; seq.state = adv.state; seq.updatedAt = now.toISOString();
         writeSeqRow_(seqsSheet, rowOf[String(seq.leadId)], seq, sh);
       }
