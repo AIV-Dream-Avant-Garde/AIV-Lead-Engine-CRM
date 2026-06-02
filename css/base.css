@@ -4,7 +4,7 @@
 :root{
   --bg:#0B0D12;--surface:#12151D;--surface-hi:#1A1E2A;--border:#1F2535;--border-hi:#2A3147;
   --accent:#4B72FF;--acc-m:rgba(75,114,255,.10);--acc-g:rgba(75,114,255,.20);
-  --hl:#EDF0F7;--sub:#8B93A8;--body:#5A6278;--pos:#2DD4BF;--red:#FF4545;--amber:#F59E0B;
+  --hl:#EDF0F7;--sub:#8B93A8;--body:#828A9E;--pos:#2DD4BF;--red:#FF4545;--amber:#F59E0B;
   --sw:248px;
   --s-new:#4B72FF;--s-contact:#F59E0B;--s-interest:#2DD4BF;--s-closed:#22C55E;
   --s-failed:#FF6B35;--s-dead:#8B93A8;--s-dnc:#FF4545;
@@ -19,6 +19,13 @@
 html{font-size:14px;scroll-behavior:smooth}
 body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--hl);-webkit-font-smoothing:antialiased;display:flex;min-height:100vh;overflow:hidden;line-height:1.5;letter-spacing:-.01em}
 body::after{content:'';position:fixed;top:-200px;right:-200px;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(75,114,255,.05) 0%,transparent 70%);pointer-events:none;z-index:0}
+
+/* Keyboard focus: a visible ring on interactive elements for keyboard users
+   (mouse clicks are unaffected via :focus-visible). Inputs keep their own
+   box-shadow focus; this covers buttons, links, cards, pills, kanban cards. */
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn:focus-visible,.action-btn:focus-visible,.pill:focus-visible,.kanban-card:focus-visible,
+[role="button"]:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--r-xs)}
 
 /* Scrollbar */
 ::-webkit-scrollbar{width:5px;height:5px}
