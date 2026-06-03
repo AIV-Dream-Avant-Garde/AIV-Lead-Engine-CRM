@@ -73,8 +73,15 @@ function renderAll() {
   if (document.getElementById('sec-responder')?.classList.contains('active')) renderResponder();
 }
 
+// ── Mobile off-canvas sidebar ──────────────────────────────
+function toggleSidebar(force) {
+  const open = force === undefined ? !document.body.classList.contains('sb-open') : !!force;
+  document.body.classList.toggle('sb-open', open);
+}
+
 // ── navigate — consolidated (all section logic merged) ─────
 function navigate(id) {
+  document.body.classList.remove('sb-open');   // close the mobile drawer on navigation
   document.querySelectorAll('.section').forEach(s  => s.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('sec-' + id)?.classList.add('active');
@@ -193,6 +200,12 @@ function showShortcutsModal() {
 
   // 5. Initialize dropzone
   initDropzone();
+
+  // 5b. Background poll → near-real-time reply alerts. When logged in + connected,
+  // pull every 75s (incremental); new inbound replies fire a notification (inbox.js).
+  setInterval(() => {
+    if (S.session && S.config.scriptUrl && !S.isSyncing && !document.hidden) syncNow();
+  }, 75000);
 
   // 6. Initial render
   checkStorage();

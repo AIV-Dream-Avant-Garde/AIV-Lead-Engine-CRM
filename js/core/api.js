@@ -108,10 +108,19 @@ async function syncNow() {
     if (res.scripts)     { S.scripts     = res.scripts;     localStorage.setItem('aiv-scripts', JSON.stringify(S.scripts)); }
     if (Array.isArray(res.scheduledJobs)) { S.scheduledJobs = res.scheduledJobs; localStorage.setItem('aiv-sched-jobs', JSON.stringify(S.scheduledJobs)); }
     // Merge incoming interactions append-only, by id (never clobber; preserves local optimistic rows)
+    const freshInbound = [];
     if (Array.isArray(res.interactions)) {
       const seen = new Set(S.interactions.map(i => i.id));
-      res.interactions.forEach(i => { if (i.id && !seen.has(i.id)) { S.interactions.push({...i, _synced:true}); seen.add(i.id); } });
+      res.interactions.forEach(i => {
+        if (i.id && !seen.has(i.id)) {
+          S.interactions.push({...i, _synced:true}); seen.add(i.id);
+          if (i.direction === 'in' && S._syncedOnce) freshInbound.push(i);   // a new reply since we went live
+        }
+      });
     }
+    // Near-real-time: alert the rep to fresh replies (skipped on the first sync,
+    // which loads history). Speed-to-lead is the #1 conversion lever.
+    if (freshInbound.length && typeof notifyNewReplies === 'function') notifyNewReplies(freshInbound);
     // Reflect inbound replies onto the lead so the "Respondió" badge works frontend-side
     // regardless of whether the backend stamped lastReplyAt.
     (S.interactions || []).filter(i => i.direction === 'in' && i.leadId).forEach(i => {
@@ -131,6 +140,7 @@ async function syncNow() {
       localStorage.setItem('aiv-sequences', JSON.stringify(S.sequences));
     }
     S.lastSyncTimestamp = new Date().toISOString();
+    S._syncedOnce = true;   // first sync loads history silently; later syncs alert on fresh replies
     saveLocal();
     if (failed > 0) {
       setSyncUI('error', failed + ' sin sincronizar — reintentar');

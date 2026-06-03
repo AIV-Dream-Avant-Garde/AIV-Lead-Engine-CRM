@@ -36,7 +36,44 @@ function waitedLabel(ts, nowMs) {
 // ── Render (DOM) ───────────────────────────────────────────────────────────
 function responderCount() { return leadsNeedingResponse(S.leads, S.interactions).length; }
 
+// ── Near-real-time reply alerts (browser notification + sound) ───────────────
+// The background poll (main.js) syncs every ~75s; api.js calls notifyNewReplies()
+// when fresh inbound messages arrive, so a rep is alerted to respond fast.
+let _replyAlertsAsked = false;
+function requestReplyAlerts() {
+  if (_replyAlertsAsked) return; _replyAlertsAsked = true;
+  try { if (window.Notification && Notification.permission === 'default') Notification.requestPermission(); } catch (e) {}
+}
+function _replyBeep() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext; if (!Ctx) return;
+    const ctx = new Ctx(), o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'sine'; o.frequency.value = 880; o.connect(g); g.connect(ctx.destination);
+    g.gain.setValueAtTime(0.0001, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.25);
+    o.start(); o.stop(ctx.currentTime + 0.26);
+  } catch (e) {}
+}
+function notifyNewReplies(items) {
+  if (!Array.isArray(items) || !items.length) return;
+  _replyBeep();
+  const n = items.length, first = items[0] || {};
+  const who   = first.leadName || 'Un lead';
+  const title = n === 1 ? 'Nueva respuesta — ' + who : n + ' respuestas nuevas';
+  const body  = n === 1 ? String(first.body || '').slice(0, 120) : 'Ábrelas en "Responder ahora".';
+  try {
+    if (window.Notification && Notification.permission === 'granted') {
+      const note = new Notification(title, { body, tag: 'aiv-reply' });
+      note.onclick = () => { try { window.focus(); navigate('responder'); note.close(); } catch (e) {} };
+    }
+  } catch (e) {}
+  if (typeof toast === 'function') toast(title + (n === 1 ? '' : ''), 'success', 6000);
+  if (typeof updateBadges === 'function') updateBadges();
+}
+
 function renderResponder() {
+  requestReplyAlerts();   // ask for notification permission on first visit (user gesture)
   const wrap = document.getElementById('responder-list'); if (!wrap) return;
   const items = leadsNeedingResponse(S.leads, S.interactions);
   const cEl = document.getElementById('responder-count');

@@ -1,0 +1,44 @@
+/* ── RESPONSIVE: tablet + mobile breakpoints ───────────────────────────────
+   The app is desktop-first (fixed sidebar + dense grids). These breakpoints
+   make it usable on tablets and phones: off-canvas nav, scrollable kanban &
+   tables, stacking grids, full-width modals, repositioned call widget.        */
+
+/* Mobile-only chrome: hidden on desktop. */
+.mobile-menu-btn{display:none;align-items:center;justify-content:center;width:34px;height:34px;border:1px solid var(--border-hi);background:var(--surface);border-radius:8px;color:var(--hl);cursor:pointer;flex-shrink:0;margin-right:6px}
+.mobile-menu-btn:active{background:var(--surface-hi)}
+.sb-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:49}
+
+/* ── Tablet / small laptop ── */
+@media (max-width: 1100px){
+  .kanban{grid-template-columns:repeat(7,minmax(150px,1fr));overflow-x:auto;padding-bottom:10px}
+  .stats-grid,.stats-grid.col4{grid-template-columns:repeat(3,1fr)}
+  .perf-grid{grid-template-columns:repeat(2,1fr)}
+}
+
+/* ── Phones / small tablets: off-canvas sidebar ── */
+@media (max-width: 860px){
+  .sidebar{transform:translateX(-100%);transition:transform .25s cubic-bezier(.22,1,.36,1);box-shadow:var(--shadow-lg);width:min(86vw,300px)}
+  body.sb-open .sidebar{transform:translateX(0)}
+  body.sb-open .sb-backdrop{display:block}
+  .main{margin-left:0}
+  .mobile-menu-btn{display:inline-flex}
+  .topbar{padding:0 14px}
+  .content-area{padding:20px 14px 48px}
+  .section-title{font-size:22px}
+  .section-sub{margin-bottom:20px}
+  .stats-grid,.stats-grid.col4{grid-template-columns:repeat(2,1fr);gap:10px}
+  .form-grid,.form-grid.col3{grid-template-columns:1fr}
+  .table-wrap{overflow-x:auto}
+  .table-wrap table{min-width:600px}
+  .modal{width:calc(100vw - 24px) !important}
+  .call-widget{left:12px;right:12px;width:auto;bottom:12px}
+}
+
+/* ── Narrow phones ── */
+@media (max-width: 520px){
+  .stats-grid,.stats-grid.col4{grid-template-columns:1fr 1fr}
+  .perf-grid{grid-template-columns:1fr 1fr}
+  .tb-bc{max-width:44vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #sync-btn{font-size:0;padding:6px 9px}            /* icon-only sync on tiny screens */
+  #sync-btn::before{content:'\21BB';font-size:14px}
+}
