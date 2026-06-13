@@ -44,16 +44,19 @@ function doExport() {
   const csv   = [
     hdrs.join(','),
     ...leads.map(l => {
-      const {closerAmount, providerAmount} = l.dealValue ? calcCommissions(l, parseFloat(l.dealValue)) : {closerAmount:0, providerAmount:0};
+      // Emit the commission amounts recorded on the lead at close time — NOT a
+      // live recompute. Rates can change after a deal closes, and a recompute
+      // would make the export disagree with what was actually recorded and paid.
       const enriched = {
         ...l,
-        providerCommission: providerAmount || '',
-        closerCommission: closerAmount || '',
         providerName: S.team.find(m => m.id === l.providerId)?.name || '',
         closerName:  S.team.find(m => m.id === l.closerId)?.name || '',
         callCount:   S.calls.filter(c => c.leadId === l.id).length,
       };
-      return hdrs.map(h => `"${(enriched[h]||'').toString().replace(/"/g,'""')}"`).join(',');
+      return hdrs.map(h => {
+        const v = enriched[h];                              // preserve a literal 0
+        return `"${(v == null ? '' : v).toString().replace(/"/g,'""')}"`;
+      }).join(',');
     }),
   ].join('\n');
   const a = document.createElement('a');

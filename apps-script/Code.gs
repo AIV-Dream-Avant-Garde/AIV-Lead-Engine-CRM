@@ -200,14 +200,19 @@ function doPost(e) {
       return err_('Unauthorized — configura CRM_SECRET en Code.gs con el valor de Setup.');
     }
     if (a === 'push') {
+      // Dedup by id (the lead's stable unique key), NOT by phone. Phone-keying
+      // silently dropped every lead with a blank/'N/A' phone — they all collide
+      // on '' — losing them permanently. The client already dedups by phone at
+      // import, so the server only needs to avoid inserting the same id twice.
       const s=getSheet(SHEETS.leads,LEAD_HDR),rows=s.getDataRange().getValues();
-      const ph=rows[0]||LEAD_HDR, pc=ph.indexOf('phone');
-      const ex=rows.slice(1).map(r=>String(r[pc]).trim());
+      const hh=rows[0]||LEAD_HDR, ic=hh.indexOf('id');
+      const ex=new Set(rows.slice(1).map(r=>String(r[ic]).trim()));
       let added=0;
       (b.data||[]).forEach(l=>{
-        if(!ex.includes(String(l.phone||'').trim())){
+        const id=String(l.id||'').trim();
+        if(id && !ex.has(id)){
           s.appendRow(LEAD_HDR.map(h=>(h==='notes'||h==='workHistory')?JSON.stringify(l[h]||[]):(l[h]??'')));
-          ex.push(String(l.phone).trim()); added++;
+          ex.add(id); added++;
         }
       });
       return ok({added});
@@ -274,15 +279,21 @@ function doPost(e) {
       return ok({saved:true,updated:found});
     }
     if (a === 'saveCommission') {
-      const s=getSheet(SHEETS.commissions,COMM_HDR),rows=s.getDataRange().getValues();
-      const h=rows[0]||COMM_HDR,lc=h.indexOf('leadId');
-      // Allow clawback records even when a commission for the same lead already exists
-      if(!b.isClawback){
-        const exists=rows.slice(1).some(r=>String(r[lc])===String(b.leadId));
-        if(exists)return ok({saved:false,duplicate:true});
-      }
-      s.appendRow(COMM_HDR.map(col=>b[col]??''));
-      return ok({saved:true,duplicate:false});
+      // Lock the read-check-append so two simultaneous "mark closed" actions on
+      // the same lead can't both pass the dup check and write two payout rows.
+      const lock=LockService.getScriptLock();
+      try{ lock.waitLock(10000); }catch(e){ return err_('busy'); }
+      try{
+        const s=getSheet(SHEETS.commissions,COMM_HDR),rows=s.getDataRange().getValues();
+        const h=rows[0]||COMM_HDR,lc=h.indexOf('leadId');
+        // Allow clawback records even when a commission for the same lead already exists
+        if(!b.isClawback){
+          const exists=rows.slice(1).some(r=>String(r[lc])===String(b.leadId));
+          if(exists)return ok({saved:false,duplicate:true});
+        }
+        s.appendRow(COMM_HDR.map(col=>b[col]??''));
+        return ok({saved:true,duplicate:false});
+      } finally { lock.releaseLock(); }
     }
     if (a === 'cancelCommission') {
       const s=getSheet(SHEETS.commissions,COMM_HDR),rows=s.getDataRange().getValues(),h=rows[0];
@@ -560,7 +571,10 @@ function saveToDrive(recUrl,callSid){
   const auth=Utilities.base64Encode(TWILIO_ACCOUNT_SID+':'+TWILIO_AUTH_TOKEN);
   const res=UrlFetchApp.fetch(recUrl+'.mp3',{headers:{Authorization:'Basic '+auth},muteHttpExceptions:true});
   const f=DriveApp.getFolderById(DRIVE_FOLDER_ID).createFile(callSid+'.mp3',res.getBlob().setName(callSid+'.mp3'));
-  f.setSharing(DriveApp.Access.ANYONE_WITH_LINK,DriveApp.Permission.VIEW);
+  // Call recordings are consent/PII audio — do NOT make them world-readable.
+  // They stay private to the script owner; to let reps listen, share the Drive
+  // folder (DRIVE_FOLDER_ID) with their Google accounts instead.
+  f.setSharing(DriveApp.Access.PRIVATE,DriveApp.Permission.VIEW);
   return 'https://drive.google.com/uc?export=preview&id='+f.getId();
 }
 

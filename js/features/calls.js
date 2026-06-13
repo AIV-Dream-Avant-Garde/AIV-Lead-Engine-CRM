@@ -102,7 +102,7 @@ async function confirmConsentAndCall() {
   const l = S.leads.find(x => x.id === CALL.curLeadId);
   if (!l) return;
   try {
-    CALL.activeCall = await CALL.device.connect({params:{To: l.phone}});
+    CALL.activeCall = await CALL.device.connect({params:{To: normalizePhone(l.phone)}});
     CALL.activeCall.on('accept', call => {
       CALL.callSid = call.parameters.CallSid;
       setCWStatus('connected','Conectado');
@@ -145,7 +145,9 @@ function onCallEnd() {
   const smsWrap = document.getElementById('cw-sms-wrap');
   if (smsWrap) smsWrap.style.display = S.config.scriptUrl && !S.demoMode ? '' : 'none';
   const l = S.leads.find(x => x.id === CALL.curLeadId);
-  if (l && l.status === 'Nuevo') { l.status = 'Contactado'; l.updatedAt = new Date().toISOString(); pushLead(l); }
+  // Only advance to "Contactado" if the call actually connected. Failed/rejected/
+  // cancelled calls all route here with 0 seconds and must not inflate contact metrics.
+  if (l && l.status === 'Nuevo' && CALL.seconds > 0) { l.status = 'Contactado'; l.updatedAt = new Date().toISOString(); pushLead(l); }
 }
 
 function setOutcome(val) {

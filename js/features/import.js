@@ -152,7 +152,7 @@ async function confirmImport() {
       return true;
     })
     .map(r => ({
-      id:uid(), name:r.name||'Sin nombre', phone:r.phone||'N/A', email:(r.email||'').trim(),
+      id:uid(), name:r.name||'Sin nombre', phone:(r.phone ? normalizePhone(r.phone) : '') || 'N/A', email:(r.email||'').trim(),
       address:r.address||'N/A', website:r.website||'N/A',
       rating:r.rating||'N/A', reviews:r.reviews||'N/A',
       country, city, barrio, keyword:kw, source, sourceDetail:srcDetail,

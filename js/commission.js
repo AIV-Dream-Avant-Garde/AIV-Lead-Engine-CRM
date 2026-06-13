@@ -162,6 +162,15 @@ function adjustCollectedAmount(leadId, collectedRaw, reason) {
   if (isNaN(collected) || collected < 0 || collected > parseFloat(lead.dealValue || 0)) {
     toast('Monto inválido. Debe ser entre 0 y ' + fmtCOP(lead.dealValue) + '.', 'error'); return;
   }
+  // Adjusting collected only rescales *pending* commissions. If a commission for
+  // this lead was already paid, lowering the collected amount here would leave the
+  // rep overpaid (paid rows are never rescaled). Route that case through Reembolso,
+  // which issues a proper clawback for the difference.
+  const hasPaid = S.commissions.some(c => c.leadId === leadId && c.status === 'paid');
+  if (hasPaid && collected < parseFloat(lead.collectedAmount || lead.dealValue || 0)) {
+    toast('Esta comisión ya fue pagada. Usa "Reembolso" para registrar la reversión.', 'error', 6000);
+    return;
+  }
   lead.collectedAmount = collected;
   lead.updatedAt = new Date().toISOString();
   const {closerAmount, providerAmount} = calcCommissions(lead, collected);

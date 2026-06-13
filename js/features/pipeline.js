@@ -130,11 +130,14 @@ function pipelineDrop(e, newStatus) {
   lead.status    = newStatus;
   lead.updatedAt = new Date().toISOString();
   if (!Array.isArray(lead.workHistory)) lead.workHistory = [];
+  // A drag is a status move, not a close. Record who *moved* it (movedBy) rather
+  // than overwriting closer attribution — an admin dragging another rep's card
+  // must not be stamped as that lead's closer.
   lead.workHistory.push({
-    closerId:  S.session?.userId || '',
-    closerName: S.session?.userName || '',
-    outcome:   newStatus,
-    closedAt:  lead.updatedAt,
+    movedBy:     S.session?.userId || '',
+    movedByName: S.session?.userName || '',
+    outcome:     newStatus,
+    movedAt:     lead.updatedAt,
   });
   pushLead(lead);
   toast('Estado actualizado: ' + newStatus, 'success');

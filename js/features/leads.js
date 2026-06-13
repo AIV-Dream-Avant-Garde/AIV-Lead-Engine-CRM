@@ -100,9 +100,18 @@ function getSorted(arr) {
   if (col === 'score') {
     return [...arr].sort((a,b) => (scoreLead(b) - scoreLead(a)) * dir);
   }
+  // Numeric columns (money, rating, reviews) must compare as numbers, not as
+  // strings — lexical order puts "100" before "20". Dates are ISO so they sort
+  // correctly as strings; everything else falls back to locale-aware text.
+  const NUMERIC = new Set(['dealValue','collectedAmount','rating','reviews','closerCommission','providerCommission']);
   return [...arr].sort((a,b) => {
-    const av = a[col] || '', bv = b[col] || '';
-    return av < bv ? -dir : av > bv ? dir : 0;
+    if (NUMERIC.has(col)) {
+      const an = parseFloat(a[col]), bn = parseFloat(b[col]);
+      const af = isNaN(an) ? -Infinity : an, bf = isNaN(bn) ? -Infinity : bn;
+      return (af - bf) * dir;
+    }
+    const av = String(a[col] || ''), bv = String(b[col] || '');
+    return av.localeCompare(bv, 'es') * dir;
   });
 }
 
@@ -242,6 +251,10 @@ function updateBulkBar()      {
 function applyBulkStatus() {
   const st = document.getElementById('bulk-status')?.value;
   if (!st) { toast('Selecciona un estado.', 'error'); return; }
+  // "Cerrado" must capture a deal value and create the commission record — that
+  // only happens through the single-lead flow. Block it from the bulk path so a
+  // closed-won deal can never be recorded with zero revenue.
+  if (st === 'Cerrado') { toast('Abre cada lead para cerrarlo: "Cerrado" requiere el valor del negocio.', 'error', 6000); return; }
   const n = S.selected.size;
   if (!confirm(`¿Cambiar estado de ${n} lead${n !== 1 ? 's' : ''} a "${st}"? Esta acción no se puede deshacer.`)) return;
   S.leads.forEach(l => { if (S.selected.has(l.id)) { l.status = st; l.updatedAt = new Date().toISOString(); pushLead(l); } });
@@ -305,6 +318,8 @@ function applyBulkAction() {
 }
 function deleteSelected() {
   if (S.selected.size === 0) return;
+  const n = S.selected.size;
+  if (!confirm(`¿Eliminar ${n} lead${n !== 1 ? 's' : ''}? Esta acción no se puede deshacer.`)) return;
   S.selected.forEach(id => { if (S.config.scriptUrl) sheetsCall({action:'delete', id}); });
   S.leads = S.leads.filter(l => !S.selected.has(l.id));
   saveLocal(); clearSelection(); renderAll();
@@ -540,8 +555,12 @@ function saveLead() {
 
   const newStatus = document.getElementById('m-status')?.value;
 
-  // Intercept Cerrado — require deal value
+  // Intercept Cerrado — require deal value. Persist the field edits captured
+  // above FIRST: the deal-value overlay can be cancelled, and without this the
+  // name/phone/email/address edits would be lost (in-memory only, never saved).
   if (newStatus === 'Cerrado' && l.status !== 'Cerrado') {
+    l.updatedAt = new Date().toISOString();
+    pushLead(l);
     interceptCerrado(l.id);
     return;
   }

@@ -601,7 +601,7 @@ function renderAdmin() {
   if (pendingLbl) pendingLbl.textContent = pendingN > 0 ? `· ${pendingN} pendiente${pendingN!==1?'s':''}` : '';
 
   const filtered = S.commissions
-    .filter(c => (!commFilter || c.status === commFilter) && (!commPerson || c.closerId===commPerson))
+    .filter(c => (!commFilter || c.status === commFilter) && (!commPerson || c.closerId===commPerson || c.providerId===commPerson))
     .sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt))
     .slice(0, 60);
 

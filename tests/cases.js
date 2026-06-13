@@ -400,3 +400,27 @@ test('withinQuietHours: custom window via config params', () => {
   assert(withinQuietHours(10), 'defaults still 8-20 when no params');
   assert(withinQuietHours(0, 0, 24), 'midnight inside 0-24');
 });
+
+// ── Lead sorting: numeric columns must order by value, not lexically ──
+test('getSorted: deal value sorts numerically, not as strings', () => {
+  S.sortCol = 'dealValue'; S.sortDir = 1;   // ascending
+  const out = getSorted([{dealValue:'100'},{dealValue:'20'},{dealValue:'3'}]);
+  eq(out.map(l => l.dealValue).join(','), '3,20,100', 'numeric ascending order');
+  S.sortDir = -1;
+  const desc = getSorted([{dealValue:'100'},{dealValue:'20'},{dealValue:'3'}]);
+  eq(desc.map(l => l.dealValue).join(','), '100,20,3', 'numeric descending order');
+});
+
+test('getSorted: blank/non-numeric deal values sort below real numbers', () => {
+  S.sortCol = 'dealValue'; S.sortDir = 1;
+  const out = getSorted([{dealValue:'50'},{dealValue:''},{dealValue:'10'}]);
+  eq(out[0].dealValue, '', 'blank sinks to bottom ascending');
+  eq(out[2].dealValue, '50', 'largest last ascending');
+});
+
+// ── Phone normalization (dialing + dedup depend on it) ───────────────
+test('normalizePhone: Colombian + US formats normalize to E.164-ish', () => {
+  eq(normalizePhone('300 123 4567'), '+573001234567', 'CO mobile gets +57');
+  eq(normalizePhone('573001234567'), '+573001234567', 'CO with country code');
+  eq(normalizePhone('+1 (305) 555-0100'), '+13055550100', 'US keeps + and strips punctuation');
+});
