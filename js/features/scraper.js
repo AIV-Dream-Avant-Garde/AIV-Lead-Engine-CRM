@@ -183,7 +183,7 @@ async function runScraper() {
         const lead = {
           id:uid(), name:r.name||'No name', phone:r.phone, address:r.address||'N/A',
           website:r.website||'N/A', rating:r.rating||'N/A', reviews:r.reviews||'N/A',
-          country, city, barrio, keyword:kw, source, sourceDetail:srcDetail,
+          country, city: (r.cityReal ?? city), barrio: (r.neighborhood ?? barrio), keyword:kw, source, sourceDetail:srcDetail,
           status:'New', dncReason:'', followUpDate:'', notes:[],
           providerId:   isProvider ? sess.userId    : '',
           providerRate: isProvider ? (sess.providerRate || 0) : 0,
