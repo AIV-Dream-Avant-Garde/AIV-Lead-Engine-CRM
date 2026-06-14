@@ -372,11 +372,11 @@ function openLead(id) {
   ];
   // Partial collection indicator
   if (l.collectedAmount && parseFloat(l.collectedAmount) !== parseFloat(l.dealValue || 0)) {
-    detailRows.push({lb:'Collected', v:`<span style="color:var(--amber);font-weight:600">${fmtCOP(l.collectedAmount)}</span> of ${fmtCOP(l.dealValue)}`});
+    detailRows.push({lb:'Collected', v:`<span style="color:var(--amber);font-weight:600">${fmtUSD(l.collectedAmount)}</span> of ${fmtUSD(l.dealValue)}`});
   }
   // Refund indicator
   if (l.refundedAt) {
-    detailRows.push({lb:'Refund', v:`<span style="color:#c0392b;font-weight:600">${fmtCOP(l.refundAmount)}</span>${l.refundReason ? ' — ' + esc(l.refundReason) : ''}`});
+    detailRows.push({lb:'Refund', v:`<span style="color:#c0392b;font-weight:600">${fmtUSD(l.refundAmount)}</span>${l.refundReason ? ' — ' + esc(l.refundReason) : ''}`});
   }
   document.getElementById('m-details').innerHTML = detailRows
     .map(({lb,v}) => `<div class="detail-item${['Phone','Address'].includes(lb)?' editable':''}"><div class="detail-label">${lb}</div><div class="detail-val">${v}</div></div>`).join('');
@@ -651,7 +651,7 @@ function renderDealPreview(lead) {
   if (!val) { wrap.textContent = ''; return; }
   const {closerAmount} = calcCommissions(lead, val);
   const cName = S.team.find(m => m.id === lead.closerId)?.name || S.session?.userName || '—';
-  wrap.innerHTML = `Closer (${esc(cName)}): <strong>${fmtCOP(closerAmount)}</strong>`;
+  wrap.innerHTML = `Closer (${esc(cName)}): <strong>${fmtUSD(closerAmount)}</strong>`;
 }
 
 function startCallFromModal(leadId) { closeModal(); makeCall(leadId); }

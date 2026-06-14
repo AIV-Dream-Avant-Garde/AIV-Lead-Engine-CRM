@@ -25,9 +25,9 @@ function renderPipeline() {
   })();
   const metricsHtml = `<div class="pipeline-metrics">
     <div class="pipeline-metric"><strong>${openCount}</strong>Active leads</div>
-    <div class="pipeline-metric"><strong>${fmtCOP(openValue)}</strong>Open pipeline</div>
+    <div class="pipeline-metric"><strong>${fmtUSD(openValue)}</strong>Open pipeline</div>
     <div class="pipeline-metric"><strong>${closedThisMonth.length}</strong>Closed this month</div>
-    <div class="pipeline-metric"><strong>${fmtCOP(closedThisMonth.reduce((s,l)=>s+parseFloat(l.dealValue||0),0))}</strong>Revenue this month</div>
+    <div class="pipeline-metric"><strong>${fmtUSD(closedThisMonth.reduce((s,l)=>s+parseFloat(l.dealValue||0),0))}</strong>Revenue this month</div>
   </div>`;
 
   const kb = document.getElementById('kanban');
@@ -45,7 +45,7 @@ function renderPipeline() {
         ? `<span style="font-size:10px;background:var(--surface-hi);border-radius:4px;padding:1px 5px;margin-left:4px;color:var(--sub)">${ageDays}d</span>`
         : '';
       const dealChip = col.k === 'Closed Won' && l.dealValue
-        ? `<div style="font-size:10px;color:var(--green);font-weight:600;margin-top:3px">${fmtCOP(l.dealValue)}</div>`
+        ? `<div style="font-size:10px;color:var(--green);font-weight:600;margin-top:3px">${fmtUSD(l.dealValue)}</div>`
         : '';
       return `<div class="kanban-card pipeline-card" draggable="true"
           ondragstart="pipelineDragStart(event,'${l.id}')"

@@ -774,7 +774,7 @@ Content-Type: application/json
         <div class="field" style="margin-bottom:14px"><label>"Do Not Call" reason (required — legal record)</label><input type="text" id="m-dnc-reason" placeholder="E.g.: Requested not to be contacted on 03/15/2025"></div>
       </div>
       <div class="field" id="m-deal-wrap" style="margin-bottom:14px">
-        <label>Deal value (COP)</label>
+        <label>Deal value (USD)</label>
         <input type="number" id="m-deal-value" placeholder="E.g.: 5000000" min="0" step="100000" oninput="onDealValueInput()">
         <div id="m-deal-preview" style="font-size:11px;color:var(--sub);margin-top:4px"></div>
       </div>
@@ -836,7 +836,7 @@ Content-Type: application/json
     <div class="deal-title">Deal value</div>
     <div class="deal-sub">To calculate commissions correctly, enter the value of the closed deal. This value is recorded permanently.</div>
     <div class="field">
-      <label>Deal value (COP)</label>
+      <label>Deal value (USD)</label>
       <input type="number" id="deal-value-inp" placeholder="E.g.: 5000000" min="0" step="1000" oninput="updateDealPreview()">
     </div>
     <div id="deal-preview" class="deal-preview">

@@ -27,10 +27,11 @@ test('calcCommissions: zero when no rates anywhere', () => {
   eq(r.providerAmount, 0, 'provider zero');
 });
 
-test('fmtCOP: formats numbers, guards invalid input', () => {
-  assert(fmtCOP(0) !== '--', 'zero should format, not dash');
-  eq(fmtCOP(null),  '--', 'null → dash');
-  eq(fmtCOP('abc'), '--', 'NaN → dash');
+test('fmtUSD: formats numbers, guards invalid input', () => {
+  assert(fmtUSD(0) !== '--', 'zero should format, not dash');
+  assert(fmtUSD(3500).includes('3,500') && fmtUSD(3500).includes('$'), 'USD: $3,500');
+  eq(fmtUSD(null),  '--', 'null → dash');
+  eq(fmtUSD('abc'), '--', 'NaN → dash');
 });
 
 // ── PIN strength (security) ──────────────────────────────────────────

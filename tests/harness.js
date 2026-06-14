@@ -24,7 +24,7 @@ const APP_FILES = [
   'js/core/state.js',
   'js/core/utils.js',
   'js/features/leads.js',   // scoreLead, isOverdue, isTodayFU
-  'js/commission.js',       // calcCommissions, fmtCOP
+  'js/commission.js',       // calcCommissions, fmtUSD
   'js/features/scraper.js', // barrioCoords, barrioHash
   'js/features/import.js',  // parseCSV, autoMapHeaders, splitCSV
   'js/data/outreach-templates.js', // OUTREACH_TEMPLATES
