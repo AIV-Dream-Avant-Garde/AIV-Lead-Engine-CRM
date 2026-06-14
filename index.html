@@ -181,7 +181,7 @@
       <div class="card-title">Call script</div>
       <div class="card-sub" style="margin-bottom:12px">This script appears in the call widget while the agent is talking. Admin can update it at any time.</div>
       <div class="field" style="margin-bottom:10px"><label>Company name (replaces [your company])</label><input type="text" id="cfg-company" placeholder="Axius Solutions" oninput="previewScript()"></div>
-      <div class="field" style="margin-bottom:10px"><label>Booking link (Cal.com / Calendly) — {agenda} token</label><input type="text" id="cfg-booking" placeholder="https://cal.com/your-team/discovery"></div>
+      <div class="field" style="margin-bottom:10px"><label>Booking link (Cal.com / Calendly) — {booking} token</label><input type="text" id="cfg-booking" placeholder="https://cal.com/your-team/discovery"></div>
       <div class="field" style="margin-bottom:10px"><label>Opening script (consent + intro)</label><textarea class="script-editor" id="cfg-script" rows="3" oninput="previewScript()"></textarea></div>
       <div class="field" style="margin-bottom:10px"><label>Selling points / Main pitch</label><textarea class="script-editor" id="cfg-pitch" rows="4" placeholder="• Benefit 1&#10;• Benefit 2&#10;• Key differentiator"></textarea></div>
       <div class="field" style="margin-bottom:10px"><label>Common objections and responses</label><textarea class="script-editor" id="cfg-objections" rows="4" placeholder="&quot;I'm not interested&quot; → ...&#10;&quot;I already have a provider&quot; → ..."></textarea></div>
@@ -242,14 +242,14 @@
 Content-Type: application/json
 
 {
-  "_secret": "tu-crm-secret",
-  "name":         "Juan Perez",
-  "phone":        "+573001234567",
+  "_secret": "your-crm-secret",
+  "name":         "John Smith",
+  "phone":        "+13055550100",
   "source":       "Facebook Ads",
-  "sourceDetail": "Restaurants Medellin April Campaign",
-  "city":         "Medellín",
-  "address":      "Calle 50 #10-20",
-  "email":        "juan@email.com"
+  "sourceDetail": "Miami Restaurants April Campaign",
+  "city":         "Miami",
+  "address":      "123 Brickell Ave",
+  "email":        "john@email.com"
 }</pre>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
       <div style="background:var(--surface-hi);border-radius:8px;padding:10px 12px">
@@ -627,10 +627,10 @@ Content-Type: application/json
     <div class="admin-section-title">
       <span>SMS / WhatsApp templates</span>
     </div>
-    <div style="font-size:11px;color:var(--body);margin-bottom:12px">Use <code style="background:var(--surface-hi);padding:1px 4px;border-radius:3px">{nombre}</code>, <code style="background:var(--surface-hi);padding:1px 4px;border-radius:3px">{empresa}</code>, <code style="background:var(--surface-hi);padding:1px 4px;border-radius:3px">{seguimiento}</code> as variables.</div>
+    <div style="font-size:11px;color:var(--body);margin-bottom:12px">Use <code style="background:var(--surface-hi);padding:1px 4px;border-radius:3px">{name}</code>, <code style="background:var(--surface-hi);padding:1px 4px;border-radius:3px">{company}</code>, <code style="background:var(--surface-hi);padding:1px 4px;border-radius:3px">{followup}</code> as variables.</div>
     <div class="form-grid col1" style="margin-bottom:10px">
       <div class="field"><label>Template name</label><input type="text" id="sms-tpl-name" placeholder="Post-call follow-up"></div>
-      <div class="field"><label>Message</label><textarea class="script-editor" id="sms-tpl-body" rows="3" placeholder="Hi {nombre}, I'm reaching out from {empresa}..."></textarea></div>
+      <div class="field"><label>Message</label><textarea class="script-editor" id="sms-tpl-body" rows="3" placeholder="Hi {name}, I'm reaching out from {company}..."></textarea></div>
     </div>
     <button class="btn btn-primary btn-sm" style="margin-bottom:12px" onclick="addSmsTemplate()">+ Add template</button>
     <div id="admin-sms-list"><div class="notes-empty">No SMS templates.</div></div>
