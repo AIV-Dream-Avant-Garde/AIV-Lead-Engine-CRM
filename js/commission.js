@@ -7,6 +7,19 @@ function fmtUSD(n) {
   return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(num);
 }
 
+// The real close timestamp for a Closed Won lead, read from the 'Closed Won'
+// entry stamped into workHistory at close time (falls back to updatedAt for
+// legacy rows). Use this — NOT updatedAt — for "closed/revenue this month", so
+// later edits to an old deal never shift it into the current month.
+function leadClosedAt(lead) {
+  if (!lead) return '';
+  const wh = Array.isArray(lead.workHistory) ? lead.workHistory : [];
+  for (let i = wh.length - 1; i >= 0; i--) {
+    if (wh[i] && wh[i].outcome === 'Closed Won' && wh[i].closedAt) return wh[i].closedAt;
+  }
+  return lead.updatedAt || '';
+}
+
 // Per-rep performance + earnings. Pure (unit-tested). A rep's earnings = closer
 // cut on deals they closed + provider cut on deals they sourced; cancelled rows
 // excluded, clawbacks (negative) counted in paid so refunds reduce the total.

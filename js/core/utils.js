@@ -14,12 +14,12 @@ function esc(s) {
 }
 
 function fmtD(iso) {
-  try { return new Date(iso).toLocaleDateString('es-CO',{day:'2-digit',month:'short'}); }
+  try { return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'2-digit'}); }
   catch(e) { return iso || '--'; }
 }
 
 function fmtT(iso) {
-  try { return new Date(iso).toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'}); }
+  try { return new Date(iso).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); }
   catch(e) { return ''; }
 }
 

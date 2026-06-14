@@ -422,3 +422,11 @@ test('normalizePhone: US formats normalize to E.164', () => {
   eq(normalizePhone('13055550100'), '+13055550100', 'US with leading 1 gets +');
   eq(normalizePhone('+1 (305) 555-0100'), '+13055550100', 'US keeps + and strips punctuation');
 });
+
+// ── Close-date accuracy: "this month" must key off the real close, not edits ──
+test('leadClosedAt: reads Closed Won workHistory stamp, falls back to updatedAt', () => {
+  eq(leadClosedAt({workHistory:[{outcome:'Contacted',claimedAt:'2026-01-01'},{outcome:'Closed Won',closedAt:'2026-03-15T10:00:00Z'}], updatedAt:'2026-06-14T00:00:00Z'}),
+     '2026-03-15T10:00:00Z', 'uses the Closed Won close date, not a later edit');
+  eq(leadClosedAt({workHistory:[], updatedAt:'2026-06-14T00:00:00Z'}), '2026-06-14T00:00:00Z', 'no history → updatedAt');
+  eq(leadClosedAt(null), '', 'null safe');
+});

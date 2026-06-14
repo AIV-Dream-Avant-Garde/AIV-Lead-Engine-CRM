@@ -15,7 +15,7 @@ function renderAnalyticsKPIs() {
   const month = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
 
   const closedThisMonth = S.leads.filter(l =>
-    l.status === 'Closed Won' && l.updatedAt && l.updatedAt.startsWith(month)
+    l.status === 'Closed Won' && (leadClosedAt(l) || '').startsWith(month)
   );
   const revenueThisMonth = closedThisMonth.reduce((s, l) => s + parseFloat(l.dealValue || 0), 0);
 

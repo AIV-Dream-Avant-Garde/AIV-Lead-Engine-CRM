@@ -34,7 +34,7 @@ function setProgress(pct) {
 
 function setLastSynced() {
   const el = document.getElementById('tb-sync-time');
-  if (el) el.textContent = 'Sync ' + new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+  if (el) el.textContent = 'Sync ' + new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
 }
 
 async function syncNow() {
