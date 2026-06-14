@@ -405,9 +405,11 @@ function renderScheduledJobs() {
   if (triggerWrap) {
     const active = S.triggerStatus?.scrape;
     const lr = S.triggerStatus?.lastScrapeRun;
+    const runMeta = lr && lr.ofJobs ? ` · ${lr.jobsRun||0}/${lr.ofJobs} jobs this cycle` : '';
     const lastRunLine = lr && lr.ranAt
-      ? `<div style="font-size:11px;color:var(--sub);margin-bottom:10px">Last run: ${fmtD(lr.ranAt)} ${fmtT(lr.ranAt)} · +${lr.added||0} leads</div>`
+      ? `<div style="font-size:11px;color:var(--sub);margin-bottom:10px">Last run: ${fmtD(lr.ranAt)} ${fmtT(lr.ranAt)} · +${lr.added||0} leads${runMeta}</div>`
       : `<div style="font-size:11px;color:var(--sub);margin-bottom:10px">No runs recorded yet.</div>`;
+    const budgetHint = `<div style="font-size:11px;color:var(--sub);margin-bottom:10px">Runs once daily within a free-tier budget (~4.5&nbsp;min, ~100 searches). If you add more jobs than fit, they rotate across days so every one still runs — and you never exceed the free limits.</div>`;
     triggerWrap.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
         <span style="font-size:13px;color:var(--body)">Automatic trigger (daily 6am):</span>
@@ -422,7 +424,8 @@ function renderScheduledJobs() {
           Run now
         </button>
       </div>
-      ${lastRunLine}`;
+      ${lastRunLine}
+      ${budgetHint}`;
   }
 
   const wrap = document.getElementById('admin-jobs-list');

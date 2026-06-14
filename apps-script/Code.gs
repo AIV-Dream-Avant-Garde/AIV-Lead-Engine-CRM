@@ -686,14 +686,32 @@ function runScheduledScrapes() {
   const now = new Date().toISOString();
   let totalAdded = 0;
 
-  jobs.filter(j => j.active).forEach(job => {
+  // Self-limiting + rotating: stay well under the 6-min Apps Script cap and a
+  // per-run Google Places ceiling, then advance a saved cursor so the NEXT daily
+  // run continues from where this one stopped. Every job still runs — just spread
+  // across days — so the automation stays free-tier-safe no matter how many jobs
+  // are configured from the dashboard.
+  const active = jobs.filter(j => j.active);
+  if (!active.length) { cfgSet('lastScrapeRun', JSON.stringify({ranAt: now, added: 0, jobsRun: 0, ofJobs: 0})); return {added: 0, ranAt: now}; }
+  const RUN_BUDGET_MS = 270000;  // ~4.5 min of headroom under the 6-min hard limit
+  const MAX_CALLS     = 100;     // cap Places requests per daily run (free-tier friendly)
+  const t0 = Date.now();
+  let apiCalls = 0, jobsRun = 0;
+  let cursor = 0; try { cursor = parseInt(cfgGet('scrapeCursor')) || 0; } catch(e) {}
+  if (cursor < 0 || cursor >= active.length) cursor = 0;
+
+  for (let n = 0; n < active.length; n++) {
+    if (Date.now() - t0 > RUN_BUDGET_MS || apiCalls >= MAX_CALLS) break;   // budget reached — resume next run
+    const job = active[(cursor + n) % active.length];
+    jobsRun++;
     let leads = [], token = null, tries = 0;
     const max = parseInt(job.maxResults) || 50;
     const baseBody = {textQuery:job.keyword, locationBias:{circle:{center:{latitude:parseFloat(job.lat),longitude:parseFloat(job.lng)},radius:parseFloat(job.radius||1000)}},maxResultCount:20, ...(job.region?{regionCode:job.region}:{})};
-    while (leads.length < max && tries < 10) {
+    while (leads.length < max && tries < 10 && apiCalls < MAX_CALLS && (Date.now() - t0) < RUN_BUDGET_MS) {
       // Paging requests must repeat ALL original params + the pageToken (Places API New rule)
       const body = token ? {...baseBody, pageToken:token} : baseBody;
       const r = UrlFetchApp.fetch(url,{method:'post',headers:hdr,payload:JSON.stringify(body),muteHttpExceptions:true});
+      apiCalls++;
       const d = JSON.parse(r.getContentText());
       (d.places||[]).forEach(p => {
         if(leads.length < max) leads.push({
@@ -726,11 +744,12 @@ function runScheduledScrapes() {
         totalAdded++;
       }
     });
-  });
+  }
+  cfgSet('scrapeCursor', String((cursor + jobsRun) % active.length));
   const ranAt = new Date().toISOString();
-  cfgSet('lastScrapeRun', JSON.stringify({ranAt, added: totalAdded}));
-  Logger.log('Scheduled scrape complete. Added: ' + totalAdded + ' leads.');
-  return {added: totalAdded, ranAt};
+  cfgSet('lastScrapeRun', JSON.stringify({ranAt, added: totalAdded, jobsRun, ofJobs: active.length}));
+  Logger.log('Scheduled scrape: +' + totalAdded + ' leads, ' + jobsRun + '/' + active.length + ' jobs, ' + apiCalls + ' calls.');
+  return {added: totalAdded, ranAt, jobsRun, ofJobs: active.length};
 }
 
 // ── Low-level send helpers (shared by the message handlers + the cadence engine) ──
