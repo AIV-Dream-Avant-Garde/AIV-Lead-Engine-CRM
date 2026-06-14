@@ -137,8 +137,8 @@ function onSjCountryChange() {
 let scraperRunning = false;
 
 async function runScraper() {
-  if (scraperRunning) { alert('Hay un scrape en curso.'); return; }
-  if (!S.config.scriptUrl) { alert('Configura el Apps Script URL primero.'); return; }
+  if (scraperRunning) { alert('A scrape is already in progress.'); return; }
+  if (!S.config.scriptUrl) { alert('Set up the Apps Script URL first.'); return; }
   const country   = document.getElementById('sc-country')?.value || DEFAULT_COUNTRY;
   const region    = COUNTRY_REGION[country] || '';
   const city      = document.getElementById('sc-city')?.value   || '';
@@ -149,22 +149,22 @@ async function runScraper() {
   const max       = parseInt(document.getElementById('sc-max')?.value || '100');
   const src       = document.getElementById('sc-source')?.value || 'Google Maps';
   const srcDetail = document.getElementById('sc-source-detail')?.value?.trim() || '';
-  if (!lat || !lng) { alert('Selecciona un barrio primero.'); return; }
+  if (!lat || !lng) { alert('Select a neighborhood first.'); return; }
 
   scraperRunning = true;
   const btn      = document.getElementById('scraper-run-btn');
   const statusEl = document.getElementById('scraper-status');
   const rc = document.getElementById('scraper-result-card');
   if (rc) rc.style.display = 'none';
-  if (btn)      { btn.disabled = true; btn.textContent = 'Scrapeando...'; }
-  if (statusEl)   statusEl.textContent = 'Conectando con Apps Script...';
+  if (btn)      { btn.disabled = true; btn.textContent = 'Scraping...'; }
+  if (statusEl)   statusEl.textContent = 'Connecting to Apps Script...';
 
   try {
     const res = await sheetsCall({action:'scrape', keyword:kw, lat, lng, radius, maxResults:max, region});
     if (!res || !res.success || !res.leads) {
-      if (statusEl) statusEl.textContent = 'Error: ' + (res?.error || 'Sin respuesta');
+      if (statusEl) statusEl.textContent = 'Error: ' + (res?.error || 'No response');
       scraperRunning = false;
-      if (btn) { btn.disabled = false; btn.textContent = 'Iniciar scrape via Apps Script'; }
+      if (btn) { btn.disabled = false; btn.textContent = 'Start scrape via Apps Script'; }
       return;
     }
     const now      = new Date().toISOString();
@@ -181,7 +181,7 @@ async function runScraper() {
       const pk = phoneKey(r.phone);
       if (r.phone && r.phone !== 'N/A' && pk && !existing.has(pk)) {
         const lead = {
-          id:uid(), name:r.name||'Sin nombre', phone:r.phone, address:r.address||'N/A',
+          id:uid(), name:r.name||'No name', phone:r.phone, address:r.address||'N/A',
           website:r.website||'N/A', rating:r.rating||'N/A', reviews:r.reviews||'N/A',
           country, city, barrio, keyword:kw, source, sourceDetail:srcDetail,
           status:'New', dncReason:'', followUpDate:'', notes:[],
@@ -210,12 +210,12 @@ async function runScraper() {
         ? `<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
              <div>
                <div style="font-size:20px;font-weight:600;color:var(--pos)">+${added}</div>
-               <div style="font-size:11px;color:var(--body);margin-top:2px">leads añadidos al CRM</div>
+               <div style="font-size:11px;color:var(--body);margin-top:2px">leads added to the CRM</div>
              </div>
-             <div style="color:var(--body);font-size:12px">${res.leads.length - added} duplicado${res.leads.length - added !== 1 ? 's' : ''} omitido${res.leads.length - added !== 1 ? 's' : ''}</div>
-             <button class="btn btn-ghost" style="font-size:12px;padding:5px 12px;margin-left:auto" onclick="navigate('leads')">Ver en Leads →</button>
+             <div style="color:var(--body);font-size:12px">${res.leads.length - added} duplicate${res.leads.length - added !== 1 ? 's' : ''} skipped</div>
+             <button class="btn btn-ghost" style="font-size:12px;padding:5px 12px;margin-left:auto" onclick="navigate('leads')">View in Leads →</button>
            </div>`
-        : `<div style="font-size:13px;color:var(--body)">Sin leads nuevos — ${res.leads.length} encontrados, todos duplicados.</div>`;
+        : `<div style="font-size:13px;color:var(--body)">No new leads — ${res.leads.length} found, all duplicates.</div>`;
     }
 
     // Persist scrape history (max 50 entries)
@@ -241,14 +241,14 @@ async function runScraper() {
     if (statusEl) statusEl.textContent = 'Error: ' + ex.message;
   }
   scraperRunning = false;
-  if (btn) { btn.disabled = false; btn.textContent = 'Iniciar scrape via Apps Script'; }
+  if (btn) { btn.disabled = false; btn.textContent = 'Start scrape via Apps Script'; }
 }
 
 function renderScrapeHistory() {
   const el = document.getElementById('scrape-history-list');
   if (!el) return;
   if (!S.scrapeHistory || !S.scrapeHistory.length) {
-    el.innerHTML = '<div style="font-size:12px;color:var(--body)">Sin historial de scrapes.</div>';
+    el.innerHTML = '<div style="font-size:12px;color:var(--body)">No scrape history.</div>';
     return;
   }
   el.innerHTML = S.scrapeHistory.map(h =>
@@ -261,7 +261,7 @@ function renderScrapeHistory() {
 }
 
 function clearScrapeHistory() {
-  if (!confirm('¿Borrar historial de scrapes?')) return;
+  if (!confirm('Clear scrape history?')) return;
   S.scrapeHistory = [];
   try { localStorage.removeItem('aiv-scrape-history'); } catch(e) {}
   renderScrapeHistory();

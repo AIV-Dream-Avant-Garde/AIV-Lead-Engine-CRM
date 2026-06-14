@@ -1,5 +1,5 @@
 // AXIUS CRM — Apps Script v4
-// Rellena TODAS las constantes antes de deployar
+// Fill in ALL the constants before deploying
 
 const SHEET_ID           = 'TU_SPREADSHEET_ID';
 const PLACES_API_KEY     = 'TU_GOOGLE_PLACES_API_KEY';
@@ -17,13 +17,13 @@ const RESEND_FROM        = 'AXIUS <hola@axius.tech>';      // verified sending d
 const TELEGRAM_ALERT_BOT_TOKEN = 'TU_TELEGRAM_BOT_TOKEN';  // founder alerts — @BotFather token
 const TELEGRAM_ALERT_CHAT_ID   = 'TU_TELEGRAM_CHAT_ID';    // your personal chat id (from getUpdates)
 
-// ── CADENCE ENGINE config (Motor de Secuencias) ────────────────────────────
+// ── CADENCE ENGINE config (Cadence Engine) ────────────────────────────
 // Autonomous templated outreach (deterministic; no LLM). SAFETY: inert until
 // CADENCE_ENABLED = true. While false the engine DRY-RUNS — it logs what it
 // WOULD enroll/send (Logger + Config 'lastCadenceRun') but writes NO sequence
 // rows and sends NOTHING. Go live AFTER provisioning (10DLC / WhatsApp
 // templates): set CADENCE_ENABLED = true AND enable the hourly trigger for
-// runCadence (CRM Admin → Secuencias automáticas, or Triggers → runCadence).
+// runCadence (CRM Admin → Automated sequences, or Triggers → runCadence).
 const CADENCE_ENABLED          = false;   // master switch (false = dry-run, sends nothing)
 const CADENCE_COMPANY          = 'AXIUS'; // {empresa} token
 const CADENCE_AGENT_NAME       = 'Andrés';// {agente} token — the sending persona name
@@ -190,14 +190,14 @@ function doPost(e) {
         }
       });
       const who = leadName || from;
-      if (isOptOutGs(text)) notifyTelegram('Opt-out — ' + who + ' (' + channel + ') pidió no recibir más mensajes.');
-      else notifyTelegram('Respuesta de ' + who + ' (' + channel + '): ' + text);
+      if (isOptOutGs(text)) notifyTelegram('Opt-out — ' + who + ' (' + channel + ') asked to stop receiving messages.');
+      else notifyTelegram('Reply from ' + who + ' (' + channel + '): ' + text);
       return ContentService.createTextOutput('<?xml version="1.0"?><Response></Response>').setMimeType(ContentService.MimeType.XML);
     }
 
     const b = JSON.parse((e.postData && e.postData.contents) || '{}');
     if (b._secret !== CRM_SECRET) {
-      return err_('Unauthorized — configura CRM_SECRET en Code.gs con el valor de Setup.');
+      return err_('Unauthorized — set CRM_SECRET in Code.gs to the value from Setup.');
     }
     if (a === 'push') {
       // Dedup by id (the lead's stable unique key), NOT by phone. Phone-keying
@@ -228,7 +228,7 @@ function doPost(e) {
               const calIdCol=h.indexOf('calendarEventId');
               const oldCalId=calIdCol>=0?String(rows[i][calIdCol]||''):'';
               const evDate=new Date(b.followUpDate);
-              const title='Seguimiento: '+(b.name||'Lead');
+              const title='Follow-up: '+(b.name||'Lead');
               let calEventId=oldCalId;
               if(calEventId){
                 try{
@@ -533,10 +533,10 @@ function doPost(e) {
       if(duplicate) return ok({added:false,duplicate:true});
       const now=new Date().toISOString();
       const firstMsg=String(b.message||'').trim();
-      const notes=firstMsg?[{date:now,text:'Mensaje inicial ('+(b.source||'Inbound')+'): '+firstMsg}]:[];
+      const notes=firstMsg?[{date:now,text:'Initial message ('+(b.source||'Inbound')+'): '+firstMsg}]:[];
       const lead={
         id:b.id||Utilities.getUuid(),
-        name:b.name||'Sin nombre',phone:phone||'N/A',email,externalId:extId,
+        name:b.name||'No name',phone:phone||'N/A',email,externalId:extId,
         address:b.address||'N/A',website:b.website||'N/A',
         rating:'N/A',reviews:'N/A',
         country:b.country||'',city:b.city||'',barrio:b.barrio||'',keyword:b.keyword||'',
@@ -551,7 +551,7 @@ function doPost(e) {
         importedAt:now,updatedAt:now,
       };
       s.appendRow(LEAD_HDR.map(h=>lead[h]??''));
-      notifyTelegram('New lead — ' + (lead.name||'Sin nombre') + ' · ' + (lead.source||'Inbound') + (lead.city?(' · '+lead.city):'') + (firstMsg?('\n"'+firstMsg.slice(0,200)+'"'):''));
+      notifyTelegram('New lead — ' + (lead.name||'No name') + ' · ' + (lead.source||'Inbound') + (lead.city?(' · '+lead.city):'') + (firstMsg?('\n"'+firstMsg.slice(0,200)+'"'):''));
       return ok({added:true,duplicate:false,id:lead.id});
     }
     return ok({received:true});
@@ -615,39 +615,39 @@ function sendWeeklyReport() {
   const html = `
 <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#1a1a2e">
   <div style="background:linear-gradient(135deg,#0f0f23,#1a1a2e);padding:28px 32px;border-radius:12px 12px 0 0">
-    <h2 style="color:#fff;margin:0;font-size:20px">AXIUS CRM — Reporte Semanal</h2>
-    <p style="color:rgba(255,255,255,.6);margin:6px 0 0;font-size:13px">${now.toLocaleDateString('es-CO',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
+    <h2 style="color:#fff;margin:0;font-size:20px">AXIUS CRM — Weekly Report</h2>
+    <p style="color:rgba(255,255,255,.6);margin:6px 0 0;font-size:13px">${now.toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
   </div>
   <div style="background:#f9f9fb;padding:24px 32px;border-radius:0 0 12px 12px">
-    <h3 style="font-size:14px;color:#888;text-transform:uppercase;letter-spacing:.8px;margin:0 0 16px">Esta semana</h3>
+    <h3 style="font-size:14px;color:#888;text-transform:uppercase;letter-spacing:.8px;margin:0 0 16px">This week</h3>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px">
       <div style="background:#fff;border-radius:8px;padding:14px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.06)">
         <div style="font-size:28px;font-weight:700;color:#4b72ff">${newLeads}</div>
-        <div style="font-size:11px;color:#888;margin-top:4px">Leads nuevos</div>
+        <div style="font-size:11px;color:#888;margin-top:4px">New leads</div>
       </div>
       <div style="background:#fff;border-radius:8px;padding:14px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.06)">
         <div style="font-size:28px;font-weight:700;color:#2dd4bf">${weekCalls.length}</div>
-        <div style="font-size:11px;color:#888;margin-top:4px">Llamadas</div>
+        <div style="font-size:11px;color:#888;margin-top:4px">Calls</div>
       </div>
       <div style="background:#fff;border-radius:8px;padding:14px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.06)">
         <div style="font-size:28px;font-weight:700;color:#22c55e">${ansRate}%</div>
-        <div style="font-size:11px;color:#888;margin-top:4px">Tasa respuesta</div>
+        <div style="font-size:11px;color:#888;margin-top:4px">Answer rate</div>
       </div>
     </div>
-    <h3 style="font-size:14px;color:#888;text-transform:uppercase;letter-spacing:.8px;margin:0 0 12px">Acumulado total</h3>
+    <h3 style="font-size:14px;color:#888;text-transform:uppercase;letter-spacing:.8px;margin:0 0 12px">All-time totals</h3>
     <table style="width:100%;border-collapse:collapse;font-size:13px">
       <tr style="background:#f0f0f5"><td style="padding:8px 12px;border-radius:6px">Total leads</td><td style="padding:8px 12px;text-align:right;font-weight:600">${leads.length}</td></tr>
-      <tr><td style="padding:8px 12px">Cerrados</td><td style="padding:8px 12px;text-align:right;font-weight:600;color:#22c55e">${closedAll}</td></tr>
-      <tr style="background:#f0f0f5"><td style="padding:8px 12px;border-radius:6px">Interesados</td><td style="padding:8px 12px;text-align:right;font-weight:600;color:#2dd4bf">${interAll}</td></tr>
+      <tr><td style="padding:8px 12px">Closed Won</td><td style="padding:8px 12px;text-align:right;font-weight:600;color:#22c55e">${closedAll}</td></tr>
+      <tr style="background:#f0f0f5"><td style="padding:8px 12px;border-radius:6px">Interested</td><td style="padding:8px 12px;text-align:right;font-weight:600;color:#2dd4bf">${interAll}</td></tr>
       <tr><td style="padding:8px 12px">Do Not Call</td><td style="padding:8px 12px;text-align:right;color:#888">${dncAll}</td></tr>
     </table>
   </div>
-  <p style="font-size:11px;color:#aaa;text-align:center;margin-top:16px">Generado automaticamente por AXIUS CRM</p>
+  <p style="font-size:11px;color:#aaa;text-align:center;margin-top:16px">Automatically generated by AXIUS CRM</p>
 </div>`;
 
   MailApp.sendEmail({
     to: recipientEmail,
-    subject: 'AXIUS CRM — Reporte semanal ' + now.toLocaleDateString('es-CO'),
+    subject: 'AXIUS CRM — Weekly report ' + now.toLocaleDateString('en-US'),
     htmlBody: html,
   });
   Logger.log('Weekly report sent to ' + recipientEmail);
@@ -761,7 +761,7 @@ function resendSend_(email, subject, body) {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   CADENCE ENGINE — "Motor de Secuencias" (time-triggered, deterministic)
+   CADENCE ENGINE — "Cadence Engine" (time-triggered, deterministic)
    Autonomous templated outreach. Enrolls eligible leads, advances each through
    the multi-step cadence, honoring opt-out / quiet hours / claim / reply /
    daily cap. Inert until CADENCE_ENABLED = true (dry-runs otherwise).

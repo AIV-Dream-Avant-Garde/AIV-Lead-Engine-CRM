@@ -68,7 +68,7 @@ function updateDealPreview() {
     if (provRate > 0) {
       const providerMember = S.team.find(m => m.id === lead.providerId);
       document.getElementById('dp-provider-label').textContent =
-        (providerMember ? providerMember.name.split(' ')[0] : 'Proveedor') + ' (' + provRate + '%):';
+        (providerMember ? providerMember.name.split(' ')[0] : 'Provider') + ' (' + provRate + '%):';
       document.getElementById('dp-provider-amt').textContent = fmtCOP(providerAmount);
       provRow.style.display = '';
     } else {
@@ -98,7 +98,7 @@ function interceptCerrado(leadId) {
 
 function confirmDealValue() {
   const val = parseFloat(document.getElementById('deal-value-inp')?.value || '0');
-  if (!val || val <= 0) { toast('Ingresa un valor válido mayor a 0.', 'error'); return; }
+  if (!val || val <= 0) { toast('Enter a valid value greater than 0.', 'error'); return; }
   document.getElementById('deal-overlay').classList.remove('open');
   confirmCerradoWithValue(S.pendingCerrado, val);
   S.pendingCerrado = null;
@@ -148,7 +148,7 @@ function confirmCerradoWithValue(leadId, dealValue) {
   S.commissions.push(commRec);
   saveLocal();
   if (S.config.scriptUrl) sheetsCall({action:'saveCommission', ...commRec});
-  toast('Negocio cerrado — comisión registrada', 'success');
+  toast('Deal closed — commission recorded', 'success');
   closeModal();
   renderAll();
 }
@@ -160,15 +160,15 @@ function adjustCollectedAmount(leadId, collectedRaw, reason) {
   if (!lead) return;
   const collected = parseFloat(collectedRaw);
   if (isNaN(collected) || collected < 0 || collected > parseFloat(lead.dealValue || 0)) {
-    toast('Monto inválido. Debe ser entre 0 y ' + fmtCOP(lead.dealValue) + '.', 'error'); return;
+    toast('Invalid amount. Must be between 0 and ' + fmtCOP(lead.dealValue) + '.', 'error'); return;
   }
   // Adjusting collected only rescales *pending* commissions. If a commission for
   // this lead was already paid, lowering the collected amount here would leave the
-  // rep overpaid (paid rows are never rescaled). Route that case through Reembolso,
+  // rep overpaid (paid rows are never rescaled). Route that case through Refund,
   // which issues a proper clawback for the difference.
   const hasPaid = S.commissions.some(c => c.leadId === leadId && c.status === 'paid');
   if (hasPaid && collected < parseFloat(lead.collectedAmount || lead.dealValue || 0)) {
-    toast('Esta comisión ya fue pagada. Usa "Reembolso" para registrar la reversión.', 'error', 6000);
+    toast('This commission was already paid. Use "Refund" to record the reversal.', 'error', 6000);
     return;
   }
   lead.collectedAmount = collected;
@@ -188,7 +188,7 @@ function adjustCollectedAmount(leadId, collectedRaw, reason) {
   if (S.config.scriptUrl) sheetsCall({action:'adjustCollected', leadId, collected, reason: reason || '', adjustedBy: S.session?.userName || 'Admin'});
   saveLocal();
   auditLog('adjustCollected', leadId, `${lead.name} → ${fmtCOP(collected)}`);
-  toast('Monto cobrado actualizado', 'success');
+  toast('Collected amount updated', 'success');
   renderAll();
 }
 
@@ -205,7 +205,7 @@ function cancelCommission(commId, reason) {
   if (S.config.scriptUrl) sheetsCall({action:'cancelCommission', id: commId, reason: reason || '', adjustedBy: c.adjustedBy});
   saveLocal();
   auditLog('cancelCommission', commId, reason || '');
-  toast('Comisión cancelada', 'warning');
+  toast('Commission cancelled', 'warning');
   renderAll();
 }
 
@@ -259,6 +259,6 @@ function issueRefund(leadId, reason) {
   pushLead(lead);
   saveLocal();
   auditLog('issueRefund', leadId, reason);
-  toast('Reembolso registrado', 'warning');
+  toast('Refund recorded', 'warning');
   renderAll();
 }

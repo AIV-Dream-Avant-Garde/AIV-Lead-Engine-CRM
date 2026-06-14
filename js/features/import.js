@@ -55,13 +55,13 @@ function processCSV(file) {
   const reader = new FileReader();
   reader.onload = ev => {
     const { headers, rows } = parseCSV(ev.target.result);
-    if (!rows.length) { toast('CSV sin filas de datos.', 'error'); return; }
+    if (!rows.length) { toast('CSV has no data rows.', 'error'); return; }
 
     const autoMap = autoMapHeaders(headers);
     // Warn (non-blocking) if neither key field was auto-detected — guides manual mapping.
     const detected = new Set(Object.values(autoMap));
     if (!detected.has('name') && !detected.has('phone')) {
-      toast('No se detectaron columnas Nombre/Teléfono — asígnalas manualmente abajo antes de importar.', 'error', 7000);
+      toast('No Name/Phone columns detected — map them manually below before importing.', 'error', 7000);
     }
 
     const mapperEl = document.getElementById('csv-mapper-rows');
@@ -72,7 +72,7 @@ function processCSV(file) {
           <span class="mapper-col">${esc(h)}</span>
           <span class="mapper-arrow">→</span>
           <select class="mapper-sel" data-col="${esc(h)}">
-            <option value="">— ignorar —</option>
+            <option value="">— ignore —</option>
             ${CRM_FIELDS.map(fld => `<option value="${fld}"${autoMap[h]===fld?' selected':''}>${CRM_FIELD_LABELS[fld]}</option>`).join('')}
           </select>
           <span class="mapper-preview">${esc(preview)}</span>
@@ -89,7 +89,7 @@ function processCSV(file) {
     const dupes = mappedPreview.filter(r => (r.phone && exP.has(phoneKey(r.phone))) || (r.email && exE.has(String(r.email).trim().toLowerCase()))).length;
     S.pendingImport = rows;
     const sumEl = document.getElementById('imp-summary');
-    if (sumEl) sumEl.textContent = total + ' filas — ' + (total - dupes) + ' nuevas, ' + dupes + ' duplicadas';
+    if (sumEl) sumEl.textContent = total + ' rows — ' + (total - dupes) + ' new, ' + dupes + ' duplicates';
     const previewEl = document.getElementById('import-preview');
     if (previewEl) previewEl.style.display = 'block';
     const dz = document.getElementById('dropzone');
@@ -152,7 +152,7 @@ async function confirmImport() {
       return true;
     })
     .map(r => ({
-      id:uid(), name:r.name||'Sin nombre', phone:(r.phone ? normalizePhone(r.phone) : '') || 'N/A', email:(r.email||'').trim(),
+      id:uid(), name:r.name||'No name', phone:(r.phone ? normalizePhone(r.phone) : '') || 'N/A', email:(r.email||'').trim(),
       address:r.address||'N/A', website:r.website||'N/A',
       rating:r.rating||'N/A', reviews:r.reviews||'N/A',
       country, city, barrio, keyword:kw, source, sourceDetail:srcDetail,
@@ -169,7 +169,7 @@ async function confirmImport() {
   saveLocal();
 
   if (S.config.scriptUrl) {
-    setSyncUI('syncing','Guardando...');
+    setSyncUI('syncing','Saving...');
     let failed = 0;
     for (let i = 0; i < toAdd.length; i += 20) {
       const batch = toAdd.slice(i, i + 20);
@@ -178,11 +178,11 @@ async function confirmImport() {
       else failed += batch.length;   // stays unsynced + dirty → retried by syncNow
     }
     saveLocal();
-    if (failed > 0) { setSyncUI('error', failed + ' sin sincronizar'); toast(failed + ' lead(s) se guardaron localmente; se reintentarán al sincronizar.', 'error', 6000); }
-    else { setSyncUI('ok','Sincronizado'); setLastSynced(); }
+    if (failed > 0) { setSyncUI('error', failed + ' not synced'); toast(failed + ' lead(s) were saved locally; they will be retried on sync.', 'error', 6000); }
+    else { setSyncUI('ok','Synced'); setLastSynced(); }
   }
 
-  toast(toAdd.length + ' leads importados.', 'success');
+  toast(toAdd.length + ' leads imported.', 'success');
   cancelImport();
   renderAll();
   navigate('leads');

@@ -45,7 +45,7 @@ function renderFunnel() {
     {label:'Contacted',        key:'Contacted',         cls:'contacted'},
     {label:'Interested',        key:'Interested',         cls:'interested'},
     {label:'Closed Won',           key:'Closed Won',            cls:'closed'},
-    {label:'Neg. Fallida',      key:'Closed Lost',cls:'failed'},
+    {label:'Closed Lost',      key:'Closed Lost',cls:'failed'},
     {label:'Not Interested',     key:'Not Interested',      cls:'dead'},
     {label:'Do Not Call',         key:'Do Not Call',          cls:'dnc'},
   ];
@@ -69,7 +69,7 @@ function renderSourceROI() {
   if (!tbody) return;
   const map = {};
   S.leads.forEach(l => {
-    const src = (l.source || '').split(' · ')[0] || 'Sin fuente';
+    const src = (l.source || '').split(' · ')[0] || 'No source';
     if (!map[src]) map[src] = {total:0, closed:0, revenue:0};
     map[src].total++;
     if (l.status === 'Closed Won') { map[src].closed++; map[src].revenue += parseFloat(l.dealValue || 0); }
@@ -86,7 +86,7 @@ function renderSourceROI() {
         <td>${r.rate}%</td>
         <td>${fmtCOP(r.revenue)}</td>
       </tr>`).join('')
-    : '<tr><td colspan="5" class="notes-empty">Sin datos</td></tr>';
+    : '<tr><td colspan="5" class="notes-empty">No data</td></tr>';
 }
 
 // ── Team Leaderboard ───────────────────────────────────────
@@ -110,14 +110,14 @@ function renderLeaderboard() {
         <td>${fmtCOP(m.revenue)}</td>
         <td>${m.calls}</td>
       </tr>`).join('')
-    : '<tr><td colspan="6" class="notes-empty">Sin miembros activos</td></tr>';
+    : '<tr><td colspan="6" class="notes-empty">No active members</td></tr>';
 }
 
 // ── Call Performance ───────────────────────────────────────
 function renderCallPerformance() {
   const el = document.getElementById('analytics-calls-stats');
   if (!el) return;
-  if (!S.calls.length) { el.innerHTML = '<div class="notes-empty">Sin llamadas registradas.</div>'; return; }
+  if (!S.calls.length) { el.innerHTML = '<div class="notes-empty">No calls recorded.</div>'; return; }
 
   const total    = S.calls.length;
   const answered = S.calls.filter(c => c.outcome === 'answered').length;
@@ -130,9 +130,9 @@ function renderCallPerformance() {
   const perDay = recent.length > 0 ? (recent.length / 30).toFixed(1) : '0';
 
   el.innerHTML = `<div class="analytics-call-stats-grid">
-    <div class="call-stat"><div class="call-stat-val">${total}</div><div class="call-stat-lbl">Llamadas totales</div></div>
-    <div class="call-stat"><div class="call-stat-val">${ansRate}%</div><div class="call-stat-lbl">Tasa de respuesta</div></div>
-    <div class="call-stat"><div class="call-stat-val">${fmtSec(avgDur)}</div><div class="call-stat-lbl">Duración promedio</div></div>
-    <div class="call-stat"><div class="call-stat-val">${perDay}</div><div class="call-stat-lbl">Llamadas/día (30d)</div></div>
+    <div class="call-stat"><div class="call-stat-val">${total}</div><div class="call-stat-lbl">Total calls</div></div>
+    <div class="call-stat"><div class="call-stat-val">${ansRate}%</div><div class="call-stat-lbl">Answer rate</div></div>
+    <div class="call-stat"><div class="call-stat-val">${fmtSec(avgDur)}</div><div class="call-stat-lbl">Average duration</div></div>
+    <div class="call-stat"><div class="call-stat-val">${perDay}</div><div class="call-stat-lbl">Calls/day (30d)</div></div>
   </div>`;
 }

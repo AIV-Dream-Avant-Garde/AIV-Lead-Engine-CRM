@@ -14,8 +14,8 @@ function isTodayFU(lead) {
 
 function fuBadgeHTML(lead) {
   if (!lead.followUpDate) return '';
-  if (isOverdue(lead))  return `<span class="fu-badge fu-overdue">Vencido ${fmtD(lead.followUpDate)}</span>`;
-  if (isTodayFU(lead))  return `<span class="fu-badge fu-today">Hoy</span>`;
+  if (isOverdue(lead))  return `<span class="fu-badge fu-overdue">Overdue ${fmtD(lead.followUpDate)}</span>`;
+  if (isTodayFU(lead))  return `<span class="fu-badge fu-today">Today</span>`;
   return `<span class="fu-badge fu-upcoming">${fmtD(lead.followUpDate)}</span>`;
 }
 
@@ -53,10 +53,10 @@ function scoreDotHTML(l) {
   const s    = scoreLead(l);
   const tier = s >= 60 ? 'high' : s >= 30 ? 'mid' : 'low';
   const tips = [
-    l.phone && l.phone !== 'N/A' ? '+' + SCORE_WEIGHTS.hasPhone + ' teléfono' : '',
-    parseFloat(l.rating) >= 4 ? '+' + SCORE_WEIGHTS.ratingHigh + ' rating alto' : '',
-    isOverdue(l) ? '+' + SCORE_WEIGHTS.fuOverdue + ' FU vencido' : isTodayFU(l) ? '+' + SCORE_WEIGHTS.fuToday + ' FU hoy' : '',
-  ].filter(Boolean).join(', ') || 'sin datos';
+    l.phone && l.phone !== 'N/A' ? '+' + SCORE_WEIGHTS.hasPhone + ' phone' : '',
+    parseFloat(l.rating) >= 4 ? '+' + SCORE_WEIGHTS.ratingHigh + ' high rating' : '',
+    isOverdue(l) ? '+' + SCORE_WEIGHTS.fuOverdue + ' FU overdue' : isTodayFU(l) ? '+' + SCORE_WEIGHTS.fuToday + ' FU today' : '',
+  ].filter(Boolean).join(', ') || 'no data';
   return `<span class="score-chip score-${tier}" title="${s} pts: ${tips}">${s}</span>`;
 }
 
@@ -142,7 +142,7 @@ function renderTable() {
     slice = filtered.slice(0, 200);
     const pag = document.getElementById('tbl-pages');
     if (pag) pag.innerHTML = total > 200
-      ? `<span style="font-size:11px;color:var(--sub)">Primeros 200 de ${total} — afina la búsqueda</span>`
+      ? `<span style="font-size:11px;color:var(--sub)">First 200 of ${total} — refine your search</span>`
       : '';
   } else {
     const pages = Math.max(1, Math.ceil(total / S.pageSize));
@@ -159,9 +159,9 @@ function renderTable() {
     tbody.innerHTML = `<tr><td colspan="13" class="table-empty">
       <div style="padding:40px;text-align:center">
         <div style="margin-bottom:8px;opacity:.35"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:32px;height:32px"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg></div>
-        <div style="font-weight:600;color:var(--hl);margin-bottom:4px">Sin resultados</div>
-        <div style="font-size:12px;color:var(--sub);margin-bottom:12px">${q ? 'No se encontraron leads con "' + esc(q) + '"' : 'No hay leads con los filtros actuales'}</div>
-        ${q || hasFilters ? '<button class="btn btn-ghost" style="font-size:12px" onclick="clearFilters()">Limpiar filtros</button>' : ''}
+        <div style="font-weight:600;color:var(--hl);margin-bottom:4px">No results</div>
+        <div style="font-size:12px;color:var(--sub);margin-bottom:12px">${q ? 'No leads found for "' + esc(q) + '"' : 'No leads match the current filters'}</div>
+        ${q || hasFilters ? '<button class="btn btn-ghost" style="font-size:12px" onclick="clearFilters()">Clear filters</button>' : ''}
       </div>
     </td></tr>`;
   } else {
@@ -175,20 +175,20 @@ function renderTable() {
       const lc_  = lc0 ? fmtD(lc0.calledAt) + ' ' + esc(OUTCOME_LABELS[lc0.outcome] || lc0.outcome) : '—';
       // Lock column
       let lockCell = '';
-      if (isLockedByMe(l))    lockCell = `<span class="lock-badge lock-mine">Mío · ${lockCountdown(l)}</span>`;
+      if (isLockedByMe(l))    lockCell = `<span class="lock-badge lock-mine">Mine · ${lockCountdown(l)}</span>`;
       else if (isLockedByOther(l)) lockCell = `<span class="lock-badge lock-other">${esc(getLockerName(l))} · ${lockCountdown(l)}</span>`;
-      else                    lockCell = `<button class="claim-btn" onclick="event.stopPropagation();claimLead('${l.id}')">Reclamar</button>`;
+      else                    lockCell = `<button class="claim-btn" onclick="event.stopPropagation();claimLead('${l.id}')">Claim</button>`;
       return `<tr class="${sel} ${dnc}" onclick="rowClick(event,'${l.id}')">
         <td onclick="event.stopPropagation()"><input type="checkbox" ${S.selected.has(l.id)?'checked':''} onchange="toggleSel('${l.id}',this.checked)"></td>
         <td style="text-align:center;width:36px">${scoreDotHTML(l)}</td>
-        <td class="name-cell">${highlight(l.name, q)}${l.lastReplyAt && (!l.lastTouchAt || new Date(l.lastReplyAt) > new Date(l.lastTouchAt)) ? ' <span class="sbadge" style="background:var(--pos);color:#04140d;font-size:9px;padding:1px 5px">Respondió</span>' : ''}</td>
+        <td class="name-cell">${highlight(l.name, q)}${l.lastReplyAt && (!l.lastTouchAt || new Date(l.lastReplyAt) > new Date(l.lastTouchAt)) ? ' <span class="sbadge" style="background:var(--pos);color:#04140d;font-size:9px;padding:1px 5px">Replied</span>' : ''}</td>
         <td style="font-family:'DM Mono',monospace;font-size:11px">${highlight(l.phone || '', q)}</td>
         <td style="font-size:11px">${esc(l.city   || '--')}</td>
         <td style="font-size:11px">${esc(l.barrio || '--')}</td>
         <td>${srcBadgeHTML(l.source)}</td>
         <td>${fuBadgeHTML(l)}</td>
         <td style="font-family:'DM Mono',monospace;font-size:11px">${esc(rat)}</td>
-        <td><span class="sbadge ${sc}">${esc(l.status || 'New')}</span>${l.refundedAt ? '<span style="font-size:9px;background:#c0392b;color:#fff;border-radius:3px;padding:1px 4px;margin-left:3px">Reemb.</span>' : ''}</td>
+        <td><span class="sbadge ${sc}">${esc(l.status || 'New')}</span>${l.refundedAt ? '<span style="font-size:9px;background:#c0392b;color:#fff;border-radius:3px;padding:1px 4px;margin-left:3px">Refund</span>' : ''}</td>
         <td style="font-size:11px">${fmtD(l.updatedAt || l.importedAt)}</td>
         <td style="font-size:11px">${lc_}</td>
         <td>${lockCell}</td>
@@ -246,17 +246,17 @@ function updateBulkBar()      {
   const n = S.selected.size;
   document.getElementById('bulk-bar')?.classList.toggle('visible', n > 0);
   const bc = document.getElementById('bulk-count');
-  if (bc) bc.textContent = n + ' seleccionado' + (n !== 1 ? 's' : '');
+  if (bc) bc.textContent = n + ' selected';
 }
 function applyBulkStatus() {
   const st = document.getElementById('bulk-status')?.value;
-  if (!st) { toast('Selecciona un estado.', 'error'); return; }
+  if (!st) { toast('Select a status.', 'error'); return; }
   // "Closed Won" must capture a deal value and create the commission record — that
   // only happens through the single-lead flow. Block it from the bulk path so a
   // closed-won deal can never be recorded with zero revenue.
-  if (st === 'Closed Won') { toast('Abre cada lead para cerrarlo: "Closed Won" requiere el valor del negocio.', 'error', 6000); return; }
+  if (st === 'Closed Won') { toast('Open each lead to close it: "Closed Won" requires the deal value.', 'error', 6000); return; }
   const n = S.selected.size;
-  if (!confirm(`¿Cambiar estado de ${n} lead${n !== 1 ? 's' : ''} a "${st}"? Esta acción no se puede deshacer.`)) return;
+  if (!confirm(`Change status of ${n} lead${n !== 1 ? 's' : ''} to "${st}"? This cannot be undone.`)) return;
   S.leads.forEach(l => { if (S.selected.has(l.id)) { l.status = st; l.updatedAt = new Date().toISOString(); pushLead(l); } });
   clearSelection(); renderAll();
 }
@@ -268,27 +268,27 @@ function onBulkActionChange() {
   if (date) date.style.display = 'none';
   if (text) text.style.display = 'none';
   if (act === 'followup' && date) { date.style.display = ''; }
-  if (act === 'source'   && text) { text.style.display = ''; text.placeholder = 'Nueva fuente...'; }
-  if (act === 'dnc'      && text) { text.style.display = ''; text.placeholder = 'Razon DNC...'; }
+  if (act === 'source'   && text) { text.style.display = ''; text.placeholder = 'New source...'; }
+  if (act === 'dnc'      && text) { text.style.display = ''; text.placeholder = 'DNC reason...'; }
 }
 
 function applyBulkAction() {
   const act  = document.getElementById('bulk-action')?.value || '';
-  if (!act) { toast('Selecciona una acción.', 'error'); return; }
-  if (S.selected.size === 0) { toast('Selecciona al menos un lead.', 'error'); return; }
+  if (!act) { toast('Select an action.', 'error'); return; }
+  if (S.selected.size === 0) { toast('Select at least one lead.', 'error'); return; }
   const now  = new Date().toISOString();
   const sess = S.session;
 
   if (act === 'followup') {
     const d = document.getElementById('bulk-action-date')?.value;
-    if (!d) { toast('Selecciona una fecha de seguimiento.', 'error'); return; }
+    if (!d) { toast('Select a follow-up date.', 'error'); return; }
     S.leads.forEach(l => { if (S.selected.has(l.id)) { l.followUpDate = d; l.updatedAt = now; pushLead(l); } });
   } else if (act === 'source') {
     const src = document.getElementById('bulk-action-text')?.value?.trim();
-    if (!src) { toast('Ingresa la nueva fuente.', 'error'); return; }
+    if (!src) { toast('Enter the new source.', 'error'); return; }
     S.leads.forEach(l => { if (S.selected.has(l.id)) { l.source = src; l.updatedAt = now; pushLead(l); } });
   } else if (act === 'closer') {
-    if (!sess) { toast('Debes iniciar sesión.', 'error'); return; }
+    if (!sess) { toast('You must be logged in.', 'error'); return; }
     S.leads.forEach(l => {
       if (S.selected.has(l.id)) {
         l.closerId   = sess.userId;
@@ -300,8 +300,8 @@ function applyBulkAction() {
     });
   } else if (act === 'dnc') {
     const reason = document.getElementById('bulk-action-text')?.value?.trim();
-    if (!reason) { toast('Ingresa la razón DNC — requerido como registro legal.', 'error'); return; }
-    if (!confirm(`¿Marcar ${S.selected.size} lead(s) como "Do Not Call"?`)) return;
+    if (!reason) { toast('Enter the DNC reason — required as a legal record.', 'error'); return; }
+    if (!confirm(`Mark ${S.selected.size} lead(s) as "Do Not Call"?`)) return;
     S.leads.forEach(l => {
       if (S.selected.has(l.id)) {
         l.status    = 'Do Not Call';
@@ -319,7 +319,7 @@ function applyBulkAction() {
 function deleteSelected() {
   if (S.selected.size === 0) return;
   const n = S.selected.size;
-  if (!confirm(`¿Eliminar ${n} lead${n !== 1 ? 's' : ''}? Esta acción no se puede deshacer.`)) return;
+  if (!confirm(`Delete ${n} lead${n !== 1 ? 's' : ''}? This cannot be undone.`)) return;
   S.selected.forEach(id => { if (S.config.scriptUrl) sheetsCall({action:'delete', id}); });
   S.leads = S.leads.filter(l => !S.selected.has(l.id));
   saveLocal(); clearSelection(); renderAll();
@@ -338,12 +338,12 @@ function openLead(id) {
     titleEl.contentEditable = 'true';
     titleEl.style.outline   = 'none';
     titleEl.style.borderBottom = '1px dashed var(--border-hi)';
-    titleEl.title           = 'Click para editar';
+    titleEl.title           = 'Click to edit';
   }
   const _seq = (typeof getSequence === 'function') ? getSequence(l.id) : null;
   document.getElementById('m-meta').textContent =
     [l.country, l.city, l.barrio, l.keyword].filter(Boolean).join(' · ')
-    + (_seq ? ' · Secuencia: ' + seqStateLabel(_seq.state) : '');
+    + (_seq ? ' · Sequence: ' + seqStateLabel(_seq.state) : '');
   document.getElementById('m-status').value    = l.status     || 'New';
   document.getElementById('m-followup').value  = l.followUpDate || '';
 
@@ -357,40 +357,40 @@ function openLead(id) {
 
   // Detail grid with editable phone + address
   const detailRows = [
-    {lb:'Telefono', v:`<input value="${esc(l.phone||'')}" id="edit-phone" placeholder="Sin telefono">`},
-    {lb:'Email',    v:`<input value="${esc(l.email||'')}" id="edit-email" placeholder="Sin email">`},
-    {lb:'Rating',   v: l.rating && l.rating !== 'N/A' ? `★ ${l.rating} (${l.reviews} reseñas)` : '--'},
-    {lb:'Direccion',v:`<input value="${esc(l.address||'')}" id="edit-address" placeholder="Sin direccion">`},
+    {lb:'Phone', v:`<input value="${esc(l.phone||'')}" id="edit-phone" placeholder="No phone">`},
+    {lb:'Email',    v:`<input value="${esc(l.email||'')}" id="edit-email" placeholder="No email">`},
+    {lb:'Rating',   v: l.rating && l.rating !== 'N/A' ? `★ ${l.rating} (${l.reviews} reviews)` : '--'},
+    {lb:'Address',v:`<input value="${esc(l.address||'')}" id="edit-address" placeholder="No address">`},
     {lb:'Website',  v: l.website && l.website !== 'N/A'
       ? `<a href="${esc(l.website)}" target="_blank">${esc(l.website.replace(/^https?:\/\//,''))}</a>` : '--'},
-    {lb:'Fuente',   v: esc(l.source||'--') + (l.sourceDetail ? ' · ' + esc(l.sourceDetail) : '')},
-    {lb:'Seguimiento', v: l.followUpDate
-      ? (isOverdue(l) ? `<span class="fu-badge fu-overdue">Vencido ${fmtD(l.followUpDate)}</span>` : fmtD(l.followUpDate))
-      : 'Sin definir'},
-    {lb:'Importado',  v: fmtD(l.importedAt)},
-    {lb:'Actualizado',v: fmtD(l.updatedAt)},
+    {lb:'Source',   v: esc(l.source||'--') + (l.sourceDetail ? ' · ' + esc(l.sourceDetail) : '')},
+    {lb:'Follow-up', v: l.followUpDate
+      ? (isOverdue(l) ? `<span class="fu-badge fu-overdue">Overdue ${fmtD(l.followUpDate)}</span>` : fmtD(l.followUpDate))
+      : 'Not set'},
+    {lb:'Imported',  v: fmtD(l.importedAt)},
+    {lb:'Updated',v: fmtD(l.updatedAt)},
   ];
   // Partial collection indicator
   if (l.collectedAmount && parseFloat(l.collectedAmount) !== parseFloat(l.dealValue || 0)) {
-    detailRows.push({lb:'Cobrado', v:`<span style="color:var(--amber);font-weight:600">${fmtCOP(l.collectedAmount)}</span> de ${fmtCOP(l.dealValue)}`});
+    detailRows.push({lb:'Collected', v:`<span style="color:var(--amber);font-weight:600">${fmtCOP(l.collectedAmount)}</span> of ${fmtCOP(l.dealValue)}`});
   }
   // Refund indicator
   if (l.refundedAt) {
-    detailRows.push({lb:'Reembolso', v:`<span style="color:#c0392b;font-weight:600">${fmtCOP(l.refundAmount)}</span>${l.refundReason ? ' — ' + esc(l.refundReason) : ''}`});
+    detailRows.push({lb:'Refund', v:`<span style="color:#c0392b;font-weight:600">${fmtCOP(l.refundAmount)}</span>${l.refundReason ? ' — ' + esc(l.refundReason) : ''}`});
   }
   document.getElementById('m-details').innerHTML = detailRows
-    .map(({lb,v}) => `<div class="detail-item${['Telefono','Direccion'].includes(lb)?' editable':''}"><div class="detail-label">${lb}</div><div class="detail-val">${v}</div></div>`).join('');
+    .map(({lb,v}) => `<div class="detail-item${['Phone','Address'].includes(lb)?' editable':''}"><div class="detail-label">${lb}</div><div class="detail-val">${v}</div></div>`).join('');
 
   // Lock/claim UI
   const lockWrap = document.getElementById('m-lock-wrap');
   if (lockWrap) {
     if (isLockedByMe(l))
-      lockWrap.innerHTML = `<span class="lock-badge lock-mine">Reclamado por ti · ${lockCountdown(l)}</span>
-        <button class="btn btn-ghost" style="font-size:11px;padding:4px 9px;margin-left:8px" onclick="releaseLead('${l.id}')">Liberar</button>`;
+      lockWrap.innerHTML = `<span class="lock-badge lock-mine">Claimed by you · ${lockCountdown(l)}</span>
+        <button class="btn btn-ghost" style="font-size:11px;padding:4px 9px;margin-left:8px" onclick="releaseLead('${l.id}')">Release</button>`;
     else if (isLockedByOther(l))
-      lockWrap.innerHTML = `<span class="lock-badge lock-other">Reclamado por ${esc(getLockerName(l))} · ${lockCountdown(l)}</span>`;
+      lockWrap.innerHTML = `<span class="lock-badge lock-other">Claimed by ${esc(getLockerName(l))} · ${lockCountdown(l)}</span>`;
     else
-      lockWrap.innerHTML = `<button class="claim-btn" onclick="claimLead('${l.id}')">Reclamar este lead</button>`;
+      lockWrap.innerHTML = `<button class="claim-btn" onclick="claimLead('${l.id}')">Claim this lead</button>`;
   }
 
   // Work history
@@ -399,7 +399,7 @@ function openLead(id) {
     const wh = Array.isArray(l.workHistory) ? l.workHistory : [];
     whWrap.innerHTML = wh.length
       ? wh.map(w => `<div class="wh-item"><strong>${esc(w.closerName||w.closerId||'--')}</strong> · ${esc(w.outcome||'--')} · ${fmtD(w.closedAt||w.releasedAt||w.claimedAt)}</div>`).join('')
-      : '<div class="notes-empty" style="font-size:11px">Sin historial previo.</div>';
+      : '<div class="notes-empty" style="font-size:11px">No prior history.</div>';
   }
 
   // Action buttons
@@ -407,7 +407,7 @@ function openLead(id) {
   const mapsLink = addr ? `<a class="action-btn" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}" target="_blank"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;vertical-align:middle;margin-right:4px"><path d="M8 1a5 5 0 0 0-5 5c0 3.5 5 9 5 9s5-5.5 5-9a5 5 0 0 0-5-5z"/><circle cx="8" cy="6" r="1.5"/></svg>Maps</a>` : '';
   const canCall  = l.status !== 'Do Not Call' && l.phone && l.phone !== 'N/A';
   const callBtn  = canCall
-    ? `<button class="action-btn" onclick="startCallFromModal('${l.id}')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;vertical-align:middle;margin-right:4px"><path d="M5 1.5H3.5A1.5 1.5 0 0 0 2 3C2 9.6 6.4 14 13 14a1.5 1.5 0 0 0 1.5-1.5V11l-3-1-1 1.5C9 10.7 5.3 7 4.5 5.5L6 4.5l-1-3z"/></svg>Llamar</button>`
+    ? `<button class="action-btn" onclick="startCallFromModal('${l.id}')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;vertical-align:middle;margin-right:4px"><path d="M5 1.5H3.5A1.5 1.5 0 0 0 2 3C2 9.6 6.4 14 13 14a1.5 1.5 0 0 0 1.5-1.5V11l-3-1-1 1.5C9 10.7 5.3 7 4.5 5.5L6 4.5l-1-3z"/></svg>Call</button>`
     : `<span class="action-btn red-btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;vertical-align:middle;margin-right:4px"><circle cx="8" cy="8" r="6.5"/><path d="M3.5 3.5l9 9"/></svg>Do Not Call</span>`;
   document.getElementById('m-action-btns').innerHTML = mapsLink + callBtn;
 
@@ -432,9 +432,9 @@ function renderModalNotes(l) {
         `<div class="note-item">
           <div class="note-date">${fmtD(n.date)} ${fmtT(n.date)}</div>
           <div class="note-text">${esc(n.text)}</div>
-          <button class="note-del" onclick="delNote(${i})" title="Eliminar">&times;</button>
+          <button class="note-del" onclick="delNote(${i})" title="Delete">&times;</button>
         </div>`).join('')
-    : '<div class="notes-empty">Sin notas aun.</div>';
+    : '<div class="notes-empty">No notes yet.</div>';
 }
 
 function switchModalTab(tab) {
@@ -455,14 +455,14 @@ function renderLeadTimeline(l) {
     events.push({
       date: c.calledAt,
       icon: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:13px;height:13px"><path d="M5 1.5H3.5A1.5 1.5 0 0 0 2 3C2 9.6 6.4 14 13 14a1.5 1.5 0 0 0 1.5-1.5V11l-3-1-1 1.5C9 10.7 5.3 7 4.5 5.5L6 4.5l-1-3z"/></svg>',
-      text: 'Llamada: ' + (OUTCOME_LABELS[c.outcome] || c.outcome) + ' · ' + fmtSec(parseInt(c.duration || 0)) + (c.notes ? ' — ' + c.notes : ''),
+      text: 'Call: ' + (OUTCOME_LABELS[c.outcome] || c.outcome) + ' · ' + fmtSec(parseInt(c.duration || 0)) + (c.notes ? ' — ' + c.notes : ''),
     });
   });
 
   (S.interactions || []).filter(i => i.leadId === l.id).forEach(i => {
     const arrow = i.direction === 'in' ? '←' : '→';
     const ch = (CHANNEL_LABELS && CHANNEL_LABELS[i.channel]) || i.channel || '';
-    const fail = i.status === 'failed' ? ' (falló)' : '';
+    const fail = i.status === 'failed' ? ' (failed)' : '';
     events.push({
       date: i.createdAt,
       icon: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:13px;height:13px"><path d="M2 3.5h12v8H4l-2 2z"/></svg>',
@@ -479,7 +479,7 @@ function renderLeadTimeline(l) {
     events.push({date: ts, icon: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:13px;height:13px"><circle cx="8" cy="8" r="6.5"/><path d="M8 4.5V8l2.5 2.5"/></svg>', text: (w.closerName || w.closerId || '—') + ': ' + (w.outcome || '')});
   });
 
-  if (l.importedAt) events.push({date: l.importedAt, icon: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:13px;height:13px"><path d="M8 3v10M3 8h10"/></svg>', text: 'Lead importado'});
+  if (l.importedAt) events.push({date: l.importedAt, icon: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:13px;height:13px"><path d="M8 3v10M3 8h10"/></svg>', text: 'Lead imported'});
 
   events.sort((a, b) => new Date(b.date) - new Date(a.date));
 
@@ -491,7 +491,7 @@ function renderLeadTimeline(l) {
           <div class="tl-date">${fmtD(e.date)} ${fmtT(e.date)}</div>
         </div>
       </div>`).join('')
-    : '<div class="notes-empty">Sin actividad registrada.</div>';
+    : '<div class="notes-empty">No activity recorded.</div>';
 }
 
 function closeModal() {
@@ -542,7 +542,7 @@ function saveLead() {
     const normPhone = normalizePhone(np);
     if (normPhone !== normalizePhone(l.phone || '')) {
       const dup = S.leads.find(x => x.id !== l.id && normalizePhone(x.phone || '') === normPhone && normPhone);
-      if (dup && !confirm(`El teléfono ya existe en el lead "${dup.name}". ¿Continuar de todas formas?`)) return;
+      if (dup && !confirm(`That phone number already exists on lead "${dup.name}". Continue anyway?`)) return;
       l.phone = normPhone;
     }
   }
@@ -583,7 +583,7 @@ function saveLead() {
   // DNC guard — require reason
   if (newStatus === 'Do Not Call' && l.status !== 'Do Not Call') {
     const reason = document.getElementById('m-dnc-reason')?.value?.trim();
-    if (!reason) { toast('Por favor ingresa la razón DNC — requerido como registro legal.', 'error'); return; }
+    if (!reason) { toast('Please enter the DNC reason — required as a legal record.', 'error'); return; }
     l.dncReason = reason;
   }
 
@@ -601,7 +601,7 @@ function saveLead() {
   l.updatedAt    = new Date().toISOString();
   pushLead(l);
   closeModal();
-  toast('Lead guardado', 'success');
+  toast('Lead saved', 'success');
   renderAll();
 }
 
@@ -609,7 +609,7 @@ function deleteLeadModal() {
   const l = S.leads.find(x => x.id === S.curLeadId);
   if (!l) return;
   if (l.status === 'Do Not Call' && S.session?.role !== 'admin') {
-    toast('Solo admin puede eliminar leads marcados como "Do Not Call".', 'error');
+    toast('Only an admin can delete leads marked "Do Not Call".', 'error');
     return;
   }
   if (S.config.scriptUrl) sheetsCall({action:'delete', id:S.curLeadId});

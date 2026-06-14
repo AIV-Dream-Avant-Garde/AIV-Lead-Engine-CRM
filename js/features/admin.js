@@ -1,4 +1,4 @@
-/* ── FEATURE: Admin panel — team, commissions, audit ─────── */
+/* ── FEATURE: Admin panel — team, commissions, audit log ─────── */
 
 // ── Audit log (in-memory, max 200, last 50 persisted) ─────
 function auditLog(action, targetId, detail) {
@@ -19,34 +19,34 @@ function auditLog(action, targetId, detail) {
 
 // ── Admin PIN rotation (stored as override hash in S.config) ─
 async function changeAdminPin() {
-  if (S.session?.role !== 'admin') { toast('Solo el administrador puede cambiar el PIN.', 'error'); return; }
+  if (S.session?.role !== 'admin') { toast('Only the admin can change the PIN.', 'error'); return; }
   const cur = document.getElementById('apin-cur')?.value?.trim() || '';
   const nw  = document.getElementById('apin-new')?.value?.trim() || '';
   const nw2 = document.getElementById('apin-new2')?.value?.trim() || '';
-  if (!/^\d{4}$/.test(nw))           { toast('El nuevo PIN debe tener exactamente 4 dígitos.', 'error'); return; }
-  if (isWeakPin(nw))                 { toast('PIN demasiado débil (evita repetidos como 1111 o secuencias como 1234).', 'error'); return; }
-  if (nw !== nw2)                    { toast('Los PINs nuevos no coinciden.', 'error'); return; }
-  if (nw === '0809')                 { toast('El PIN 0809 está reservado para Demo.', 'error'); return; }
+  if (!/^\d{4}$/.test(nw))           { toast('The new PIN must be exactly 4 digits.', 'error'); return; }
+  if (isWeakPin(nw))                 { toast('PIN is too weak (avoid repeats like 1111 or sequences like 1234).', 'error'); return; }
+  if (nw !== nw2)                    { toast('The new PINs do not match.', 'error'); return; }
+  if (nw === '0809')                 { toast('PIN 0809 is reserved for Demo.', 'error'); return; }
   const curHash = await sha256(cur);
-  if (curHash !== (S.config.adminHash || ADMIN_HASH)) { toast('El PIN actual es incorrecto.', 'error'); return; }
+  if (curHash !== (S.config.adminHash || ADMIN_HASH)) { toast('The current PIN is incorrect.', 'error'); return; }
   const newHash = await sha256(nw);
-  if (S.team.find(m => m.pinHash === newHash)) { toast('Ese PIN ya lo usa un miembro del equipo.', 'error'); return; }
+  if (S.team.find(m => m.pinHash === newHash)) { toast('That PIN is already used by a team member.', 'error'); return; }
   S.config.adminHash = newHash;
   saveLocal();
-  auditLog('changeAdminPin', 'admin', 'Admin PIN rotado');
+  auditLog('changeAdminPin', 'admin', 'Admin PIN rotated');
   ['apin-cur','apin-new','apin-new2'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
-  toast('PIN de administrador actualizado.', 'success');
+  toast('Admin PIN updated.', 'success');
 }
 
 // Opt-out of storing revealable plaintext team PINs in localStorage.
 function setHidePinPlain(on) {
-  if (S.session?.role !== 'admin') { toast('Solo el administrador puede cambiar esto.', 'error'); return; }
+  if (S.session?.role !== 'admin') { toast('Only the admin can change this.', 'error'); return; }
   S.config.hidePinPlain = !!on;
   if (on) (S.team || []).forEach(m => { delete m.pinPlain; });   // purge existing plaintext
   saveLocal();
   auditLog('setHidePinPlain', '', on ? 'on' : 'off');
   if (document.getElementById('admin-team-list')) renderAdmin();
-  toast(on ? 'PINs en texto plano desactivados y purgados.' : 'Almacenamiento de PIN en texto plano reactivado.', 'success');
+  toast(on ? 'Plaintext PINs disabled and purged.' : 'Plaintext PIN storage re-enabled.', 'success');
 }
 
 // ── Signal banner ──────────────────────────────────────────
@@ -60,23 +60,23 @@ function showSignalBanner() {
     isOverdue(l) && (role === 'admin' || l.closerId === uid_ || l.lockedBy === uid_)
   );
   if (overdue.length)
-    items.push(`${overdue.length} seguimiento${overdue.length !== 1 ? 's' : ''} vencido${overdue.length !== 1 ? 's' : ''}`);
+    items.push(`${overdue.length} overdue follow-up${overdue.length !== 1 ? 's' : ''}`);
 
   if (role === 'closer' || role === 'solo') {
     const assigned = S.leads.filter(l => l.closerId === uid_ && l.status !== 'Closed Won' && l.status !== 'Do Not Call');
     if (assigned.length)
-      items.push(`${assigned.length} lead${assigned.length !== 1 ? 's' : ''} asignado${assigned.length !== 1 ? 's' : ''} a ti`);
+      items.push(`${assigned.length} lead${assigned.length !== 1 ? 's' : ''} assigned to you`);
   }
 
   if (role === 'solo' || role === 'admin') {
     const myNew = S.leads.filter(l => l.providerId === uid_ && l.status === 'New');
-    if (myNew.length) items.push(`${myNew.length} de tus leads sin trabajar aun`);
+    if (myNew.length) items.push(`${myNew.length} of your leads not yet worked`);
   }
 
   if (role === 'admin') {
     const pendingComm = S.commissions.filter(c => c.status === 'pending');
     if (pendingComm.length)
-      items.push(`${pendingComm.length} comision${pendingComm.length !== 1 ? 'es' : ''} pendiente${pendingComm.length !== 1 ? 's' : ''} de pago`);
+      items.push(`${pendingComm.length} commission${pendingComm.length !== 1 ? 's' : ''} pending payment`);
   }
 
   const banner  = document.getElementById('signal-banner');
@@ -86,7 +86,7 @@ function showSignalBanner() {
 
   if (items.length) {
     banner.classList.add('visible');
-    titleEl.textContent = 'Bienvenido, ' + S.session.userName.split(' ')[0];
+    titleEl.textContent = 'Welcome, ' + S.session.userName.split(' ')[0];
     itemsEl.innerHTML   = items.map(i => `<div class="signal-item">${esc(i)}</div>`).join('');
   } else {
     banner.classList.remove('visible');
@@ -126,7 +126,7 @@ function openTeamModal(memberId) {
   if (memberId) {
     const m = S.team.find(x => x.id === memberId);
     if (m) {
-      titleEl.textContent                     = 'Editar miembro';
+      titleEl.textContent                     = 'Edit member';
       document.getElementById('tm-id').value      = m.id;
       document.getElementById('tm-name').value    = m.name    || '';
       document.getElementById('tm-role').value    = m.role    || 'closer';
@@ -135,7 +135,7 @@ function openTeamModal(memberId) {
       document.getElementById('tm-contact').value = m.contact || '';
     }
   } else {
-    titleEl.textContent = 'New miembro del equipo';
+    titleEl.textContent = 'Add team member';
   }
   modal.classList.add('open');
 }
@@ -160,20 +160,20 @@ async function saveTeamMember() {
   const crate      = parseFloat(document.getElementById('tm-crate').value || 0);
   const prate      = parseFloat(document.getElementById('tm-prate')?.value || 0);
 
-  if (!name)                          { toast('El nombre es requerido.', 'error');             return; }
+  if (!name)                          { toast('Name is required.', 'error');             return; }
   const isNew = !existingId;
-  if (isNew && !pin)                  { toast('El PIN es requerido para nuevos miembros.', 'error'); return; }
-  if (pin && pin.length !== 4)        { toast('El PIN debe tener exactamente 4 dígitos.', 'error'); return; }
-  if (pin && !/^\d{4}$/.test(pin))    { toast('El PIN solo puede contener dígitos.', 'error'); return; }
-  if (pin && isWeakPin(pin))          { toast('PIN demasiado débil (evita repetidos como 1111 o secuencias como 1234).', 'error'); return; }
-  if (pin && pin !== pin2)            { toast('Los PINs no coinciden.', 'error'); return; }
-  if (pin === '2819')                 { toast('El PIN 2819 está reservado para Admin.', 'error'); return; }
-  if (pin === '0809')                 { toast('El PIN 0809 está reservado para el modo Demo.', 'error'); return; }
+  if (isNew && !pin)                  { toast('A PIN is required for new members.', 'error'); return; }
+  if (pin && pin.length !== 4)        { toast('The PIN must be exactly 4 digits.', 'error'); return; }
+  if (pin && !/^\d{4}$/.test(pin))    { toast('The PIN can only contain digits.', 'error'); return; }
+  if (pin && isWeakPin(pin))          { toast('PIN is too weak (avoid repeats like 1111 or sequences like 1234).', 'error'); return; }
+  if (pin && pin !== pin2)            { toast('The PINs do not match.', 'error'); return; }
+  if (pin === '2819')                 { toast('PIN 2819 is reserved for Admin.', 'error'); return; }
+  if (pin === '0809')                 { toast('PIN 0809 is reserved for Demo mode.', 'error'); return; }
 
   if (pin) {
     const newHash   = await sha256(pin);
     const collision = S.team.find(m => m.pinHash === newHash && m.id !== (existingId || '__new__'));
-    if (collision)  { toast('Este PIN ya está en uso por ' + collision.name + '.', 'error'); return; }
+    if (collision)  { toast('This PIN is already in use by ' + collision.name + '.', 'error'); return; }
   }
 
   const id     = existingId || uid();
@@ -195,7 +195,7 @@ async function saveTeamMember() {
   auditLog(isNew ? 'createTeamMember' : 'updateTeamMember', id, name + ' role=' + role);
   closeTeamModal();
   renderAdmin();
-  toast('Miembro guardado correctamente.', 'success');
+  toast('Member saved successfully.', 'success');
 }
 
 function toggleTeamActive(memberId) {
@@ -229,11 +229,11 @@ function forceReleaseLead(leadId) {
   auditLog('forceReleaseLead', leadId, lead.name + ' (was locked by ' + lockerName + ')');
   renderAdmin();
   renderTable();
-  toast('Lead liberado — vuelve al pool universal.', 'success');
+  toast('Lead released — back to the universal pool.', 'success');
 }
 
 async function markCommissionPaid(commId) {
-  const ref = prompt('Referencia de pago (ej: transferencia #123, efectivo, bancolombia):');
+  const ref = prompt('Payment reference (e.g., transfer #123, cash, bank):');
   if (ref === null) return;
   const comm = S.commissions.find(c => c.id === commId);
   if (!comm) return;
@@ -244,18 +244,18 @@ async function markCommissionPaid(commId) {
   saveLocal();
   if (S.config.scriptUrl) sheetsCall({action:'markCommissionPaid', id:commId, paidBy:comm.paidBy, paymentRef:ref});
   auditLog('markCommissionPaid', commId, ref);
-  toast('Comisión marcada como pagada', 'success');
+  toast('Commission marked as paid', 'success');
   renderAdmin();
   renderPerfil();
 }
 
 async function bulkMarkPaid() {
   const person = document.getElementById('admin-comm-person')?.value;
-  if (!person) { toast('Selecciona un miembro primero.', 'error'); return; }
-  const ref = prompt('Referencia de pago (ej: transferencia #123):');
+  if (!person) { toast('Select a member first.', 'error'); return; }
+  const ref = prompt('Payment reference (e.g., transfer #123):');
   if (ref === null) return;
   const pending = S.commissions.filter(c => c.status === 'pending' && (c.providerId === person || c.closerId === person));
-  if (!pending.length) { toast('Sin comisiones pendientes para este miembro.', 'error'); return; }
+  if (!pending.length) { toast('No pending commissions for this member.', 'error'); return; }
   pending.forEach(comm => {
     comm.status = 'paid'; comm.paidAt = new Date().toISOString();
     comm.paidBy = S.session?.userName || ''; comm.paymentRef = ref;
@@ -264,20 +264,20 @@ async function bulkMarkPaid() {
   saveLocal();
   auditLog('bulkMarkPaid', '', 'count=' + pending.length + ' ref=' + ref);
   renderAdmin(); renderPerfil();
-  toast(pending.length + ' comisiones marcadas como pagadas.', 'success');
+  toast(pending.length + ' commissions marked as paid.', 'success');
 }
 
 function promptAdjustCollected(leadId) {
   const lead = S.leads.find(l => l.id === leadId);
   if (!lead) return;
-  const raw = prompt(`¿Cuánto se cobró efectivamente? (COP)\nValor contratado: ${fmtCOP(lead.dealValue)}`, lead.collectedAmount || lead.dealValue || '');
+  const raw = prompt(`How much was actually collected? (COP)\nContracted value: ${fmtCOP(lead.dealValue)}`, lead.collectedAmount || lead.dealValue || '');
   if (raw === null) return;
-  const reason = prompt('Motivo del ajuste (opcional):') || '';
+  const reason = prompt('Reason for the adjustment (optional):') || '';
   adjustCollectedAmount(leadId, raw, reason);
 }
 
 function promptCancelCommission(commId) {
-  const reason = prompt('Razón de cancelación (requerida):');
+  const reason = prompt('Reason for cancellation (required):');
   if (!reason) return;
   cancelCommission(commId, reason);
 }
@@ -285,8 +285,8 @@ function promptCancelCommission(commId) {
 function promptIssueRefund(leadId) {
   const lead = S.leads.find(l => l.id === leadId);
   if (!lead) return;
-  if (!confirm(`¿Emitir reembolso para "${lead.name}"?\nEsto cancelará comisiones pendientes y creará registros de reembolso para las ya pagadas.`)) return;
-  const reason = prompt('Razón del reembolso (requerida):');
+  if (!confirm(`Issue a refund for "${lead.name}"?\nThis will cancel pending commissions and create refund records for those already paid.`)) return;
+  const reason = prompt('Reason for the refund (required):');
   if (!reason) return;
   issueRefund(leadId, reason);
 }
@@ -297,7 +297,7 @@ function renderSmsTemplates() {
   if (!wrap) return;
   const templates = S.smsTemplates || [];
   if (!templates.length) {
-    wrap.innerHTML = '<div class="notes-empty">Sin plantillas. Agrega una para enviar SMS/WhatsApp post-llamada.</div>';
+    wrap.innerHTML = '<div class="notes-empty">No templates. Add one to send SMS/WhatsApp after a call.</div>';
     return;
   }
   wrap.innerHTML = templates.map((t,i) =>
@@ -307,7 +307,7 @@ function renderSmsTemplates() {
         <div class="team-meta" style="white-space:pre-wrap;max-height:36px;overflow:hidden">${esc(t.body.slice(0,100))}${t.body.length>100?'…':''}</div>
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0">
-        <button class="btn btn-danger" style="font-size:11px;padding:4px 9px" onclick="deleteSmsTemplate(${i})">Borrar</button>
+        <button class="btn btn-danger" style="font-size:11px;padding:4px 9px" onclick="deleteSmsTemplate(${i})">Delete</button>
       </div>
     </div>`).join('');
 }
@@ -315,8 +315,8 @@ function renderSmsTemplates() {
 function addSmsTemplate() {
   const name = document.getElementById('sms-tpl-name')?.value?.trim();
   const body = document.getElementById('sms-tpl-body')?.value?.trim();
-  if (!name) { toast('Nombre requerido.', 'error'); return; }
-  if (!body) { toast('Cuerpo del mensaje requerido.', 'error'); return; }
+  if (!name) { toast('Name is required.', 'error'); return; }
+  if (!body) { toast('Message body is required.', 'error'); return; }
   if (!Array.isArray(S.smsTemplates)) S.smsTemplates = [];
   S.smsTemplates.push({id:uid(), name, body});
   saveLocal();
@@ -326,7 +326,7 @@ function addSmsTemplate() {
 }
 
 function deleteSmsTemplate(idx) {
-  if (!confirm('¿Eliminar esta plantilla?')) return;
+  if (!confirm('Delete this template?')) return;
   S.smsTemplates.splice(idx, 1);
   saveLocal();
   renderSmsTemplates();
@@ -351,23 +351,23 @@ async function checkTriggerStatus() {
 
 // Run all active saved scrape jobs immediately (on-demand), then pull the new leads.
 async function runScrapesNow() {
-  if (!S.config.scriptUrl) { toast('Configura el Apps Script URL primero.', 'error'); return; }
+  if (!S.config.scriptUrl) { toast('Set up the Apps Script URL first.', 'error'); return; }
   const btn = document.getElementById('run-scrapes-now-btn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Ejecutando...'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Running...'; }
   const res = await sheetsCall({action:'runScrapesNow'});
-  if (btn) { btn.disabled = false; btn.textContent = 'Ejecutar ahora'; }
+  if (btn) { btn.disabled = false; btn.textContent = 'Run now'; }
   if (res?.success) {
     if (S.triggerStatus) S.triggerStatus.lastScrapeRun = {ranAt: res.ranAt, added: res.added};
-    toast('Scrape ejecutado: +' + (res.added || 0) + ' leads nuevos.', 'success', 5000);
+    toast('Scrape ran: +' + (res.added || 0) + ' new leads.', 'success', 5000);
     await syncNow();          // bring the newly-appended leads into the pool now
     renderScheduledJobs();
   } else {
-    toast('Error al ejecutar el scrape. Verifica el Apps Script y la API key.', 'error', 5000);
+    toast('Error running the scrape. Check the Apps Script and the API key.', 'error', 5000);
   }
 }
 
 async function setTrigger(fn, enabled) {
-  if (!S.config.scriptUrl) { toast('Configura el Apps Script URL primero.', 'error'); return; }
+  if (!S.config.scriptUrl) { toast('Set up the Apps Script URL first.', 'error'); return; }
   const res = await sheetsCall({action:'setTrigger', fn, enabled});
   if (res?.success) {
     if (fn === 'runScheduledScrapes') S.triggerStatus.scrape = enabled;
@@ -377,7 +377,7 @@ async function setTrigger(fn, enabled) {
     renderReportTrigger();
     if (typeof renderCadenceEngine === 'function') renderCadenceEngine();
   } else {
-    toast('Error al actualizar el trigger. Verifica que el script esté desplegado con los permisos correctos.', 'error', 5000);
+    toast('Error updating the trigger. Make sure the script is deployed with the correct permissions.', 'error', 5000);
   }
 }
 
@@ -387,13 +387,13 @@ function renderReportTrigger() {
   const active = S.triggerStatus?.report;
   wrap.innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <span style="font-size:13px;color:var(--body)">Trigger automático (lunes 8am):</span>
+      <span style="font-size:13px;color:var(--body)">Automatic trigger (Monday 8am):</span>
       <span style="font-size:13px;font-weight:600;color:${active?'var(--green)':'var(--body)'}">
-        ${active ? '● Activo' : '○ Inactivo'}
+        ${active ? '● Active' : '○ Inactive'}
       </span>
       <button class="btn ${active?'btn-danger':'btn-success'}" style="font-size:11px;padding:4px 10px"
         onclick="setTrigger('sendWeeklyReport',${!active})">
-        ${active ? 'Desactivar' : 'Activar'}
+        ${active ? 'Deactivate' : 'Activate'}
       </button>
     </div>`;
 }
@@ -406,20 +406,20 @@ function renderScheduledJobs() {
     const active = S.triggerStatus?.scrape;
     const lr = S.triggerStatus?.lastScrapeRun;
     const lastRunLine = lr && lr.ranAt
-      ? `<div style="font-size:11px;color:var(--sub);margin-bottom:10px">Última ejecución: ${fmtD(lr.ranAt)} ${fmtT(lr.ranAt)} · +${lr.added||0} leads</div>`
-      : `<div style="font-size:11px;color:var(--sub);margin-bottom:10px">Sin ejecuciones registradas aún.</div>`;
+      ? `<div style="font-size:11px;color:var(--sub);margin-bottom:10px">Last run: ${fmtD(lr.ranAt)} ${fmtT(lr.ranAt)} · +${lr.added||0} leads</div>`
+      : `<div style="font-size:11px;color:var(--sub);margin-bottom:10px">No runs recorded yet.</div>`;
     triggerWrap.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
-        <span style="font-size:13px;color:var(--body)">Trigger automático (diario 6am):</span>
+        <span style="font-size:13px;color:var(--body)">Automatic trigger (daily 6am):</span>
         <span style="font-size:13px;font-weight:600;color:${active?'var(--green)':'var(--body)'}">
-          ${active ? '● Activo' : '○ Inactivo'}
+          ${active ? '● Active' : '○ Inactive'}
         </span>
         <button class="btn ${active?'btn-danger':'btn-success'}" style="font-size:11px;padding:4px 10px"
           onclick="setTrigger('runScheduledScrapes',${!active})">
-          ${active ? 'Desactivar' : 'Activar'}
+          ${active ? 'Deactivate' : 'Activate'}
         </button>
         <button id="run-scrapes-now-btn" class="btn btn-primary" style="font-size:11px;padding:4px 10px" onclick="runScrapesNow()">
-          Ejecutar ahora
+          Run now
         </button>
       </div>
       ${lastRunLine}`;
@@ -429,18 +429,18 @@ function renderScheduledJobs() {
   if (!wrap) return;
   const jobs = S.scheduledJobs || [];
   if (!jobs.length) {
-    wrap.innerHTML = '<div class="notes-empty">Sin trabajos programados. Agrega uno para que el scraper corra automaticamente.</div>';
+    wrap.innerHTML = '<div class="notes-empty">No scheduled jobs. Add one so the scraper runs automatically.</div>';
     return;
   }
   wrap.innerHTML = jobs.map((j,i) =>
     `<div class="team-row" style="margin-bottom:6px">
       <div class="team-info">
         <div class="team-name">${esc(j.keyword)} · ${esc([j.country, j.city, j.barrio].filter(Boolean).join(' · '))}</div>
-        <div class="team-meta">Radio: ${esc(String(j.radius||1000))}m · Max: ${esc(String(j.maxResults||50))} · ${j.active?'Activo':'Inactivo'}</div>
+        <div class="team-meta">Radius: ${esc(String(j.radius||1000))}m · Max: ${esc(String(j.maxResults||50))} · ${j.active?'Active':'Inactive'}</div>
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0">
-        <button class="btn btn-ghost" style="font-size:11px;padding:4px 9px" onclick="toggleScheduledJob(${i})">${j.active?'Pausar':'Activar'}</button>
-        <button class="btn btn-danger" style="font-size:11px;padding:4px 9px" onclick="deleteScheduledJob(${i})">Borrar</button>
+        <button class="btn btn-ghost" style="font-size:11px;padding:4px 9px" onclick="toggleScheduledJob(${i})">${j.active?'Pause':'Activate'}</button>
+        <button class="btn btn-danger" style="font-size:11px;padding:4px 9px" onclick="deleteScheduledJob(${i})">Delete</button>
       </div>
     </div>`).join('');
 }
@@ -456,9 +456,9 @@ function addScheduledJob() {
   const keyword     = document.getElementById('sj-keyword')?.value || '';
   const radius      = document.getElementById('sj-radius')?.value  || '1000';
   const max         = parseInt(document.getElementById('sj-max')?.value || '50');
-  if (!city)    { toast('La ciudad es requerida.', 'error');    return; }
-  if (!keyword) { toast('El keyword es requerido.', 'error');   return; }
-  if (!lat || !lng) { toast('No se pudo determinar la ubicación. Selecciona un barrio.', 'error'); return; }
+  if (!city)    { toast('City is required.', 'error');    return; }
+  if (!keyword) { toast('Keyword is required.', 'error');   return; }
+  if (!lat || !lng) { toast('Could not determine the location. Select a neighborhood.', 'error'); return; }
   if (!Array.isArray(S.scheduledJobs)) S.scheduledJobs = [];
   S.scheduledJobs.push({keyword, country, city, barrio, lat, lng, radius, maxResults:max, region:COUNTRY_REGION[country]||'', source:'Scraper (auto)', active:true});
   saveLocal();
@@ -475,7 +475,7 @@ function toggleScheduledJob(idx) {
 }
 
 function deleteScheduledJob(idx) {
-  if (!confirm('¿Eliminar este trabajo programado?')) return;
+  if (!confirm('Delete this scheduled job?')) return;
   S.scheduledJobs.splice(idx, 1);
   saveLocal();
   if (S.config.scriptUrl) sheetsCall({action:'saveScheduledJobs', jobs:S.scheduledJobs});
@@ -508,8 +508,8 @@ function saveScript() {
   const name  = document.getElementById('sc-modal-name').value.trim();
   const stage = document.getElementById('sc-modal-stage').value;
   const body  = document.getElementById('sc-modal-body').value.trim();
-  if (!name) { toast('El nombre del guion es requerido.', 'error'); return; }
-  if (!body) { toast('El cuerpo del guion es requerido.', 'error'); return; }
+  if (!name) { toast('Script name is required.', 'error'); return; }
+  if (!body) { toast('Script body is required.', 'error'); return; }
   const now = new Date().toISOString();
   const sc  = {id, name, stage, body, createdAt:now, updatedAt:now};
   const idx = (S.scripts||[]).findIndex(x => x.id === id);
@@ -522,7 +522,7 @@ function saveScript() {
 }
 
 function deleteScript(scriptId) {
-  if (!confirm('¿Eliminar este guion?')) return;
+  if (!confirm('Delete this script?')) return;
   S.scripts = (S.scripts||[]).filter(x => x.id !== scriptId);
   saveLocal();
   if (S.config.scriptUrl) sheetsCall({action:'deleteScript', id:scriptId});
@@ -534,7 +534,7 @@ function renderScripts() {
   if (!wrap) return;
   const scripts = S.scripts || [];
   if (!scripts.length) {
-    wrap.innerHTML = '<div class="notes-empty">Sin guiones. Agrega uno para que aparezca en el widget de llamada.</div>';
+    wrap.innerHTML = '<div class="notes-empty">No scripts. Add one so it appears in the call widget.</div>';
     return;
   }
   const stageOrder = ['opening','pitch','objections','close','rebuttals'];
@@ -552,8 +552,8 @@ function renderScripts() {
           <div class="team-meta" style="white-space:pre-wrap;max-height:50px;overflow:hidden">${esc(sc.body.slice(0,120))}${sc.body.length>120?'…':''}</div>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0">
-          <button class="btn btn-ghost" style="font-size:11px;padding:4px 9px" onclick="openScriptModal('${sc.id}')">Editar</button>
-          <button class="btn btn-danger" style="font-size:11px;padding:4px 9px" onclick="deleteScript('${sc.id}')">Borrar</button>
+          <button class="btn btn-ghost" style="font-size:11px;padding:4px 9px" onclick="openScriptModal('${sc.id}')">Edit</button>
+          <button class="btn btn-danger" style="font-size:11px;padding:4px 9px" onclick="deleteScript('${sc.id}')">Delete</button>
         </div>
       </div>`).join('')}
     </div>`;
@@ -576,20 +576,20 @@ function renderAdmin() {
             <div class="team-avatar">${esc(initials)}</div>
             <div class="team-info">
               <div class="team-name">${esc(m.name)}</div>
-              <div class="team-meta">${roleLabels[m.role]||m.role} · ${inactive?'Inactivo':'Activo'}${m.contact?' · '+esc(m.contact):''}</div>
-              <div class="team-meta" style="font-size:10px;opacity:.75">Closer ${esc(String(m.closerRate||0))}% · Proveedor ${esc(String(m.providerRate||0))}%</div>
+              <div class="team-meta">${roleLabels[m.role]||m.role} · ${inactive?'Inactive':'Active'}${m.contact?' · '+esc(m.contact):''}</div>
+              <div class="team-meta" style="font-size:10px;opacity:.75">Closer ${esc(String(m.closerRate||0))}% · Provider ${esc(String(m.providerRate||0))}%</div>
               <div class="team-pin" style="font-size:11px;color:var(--sub);font-family:'DM Mono',monospace">
                 PIN: <span id="pin-${m.id}">••••</span>
-                ${m.pinPlain ? `<span onclick="togglePin('${m.id}','${m.pinPlain}')" style="cursor:pointer;margin-left:4px;opacity:.55;color:var(--accent)" title="Revelar PIN"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;vertical-align:middle"><path d="M1 8c1.5-3.5 3.8-5.5 7-5.5S13.5 4.5 15 8c-1.5 3.5-3.8 5.5-7 5.5S2.5 11.5 1 8z"/><circle cx="8" cy="8" r="2.5"/></svg></span>` : '<span style="opacity:.4;font-size:10px"> (reasignar)</span>'}
+                ${m.pinPlain ? `<span onclick="togglePin('${m.id}','${m.pinPlain}')" style="cursor:pointer;margin-left:4px;opacity:.55;color:var(--accent)" title="Reveal PIN"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;vertical-align:middle"><path d="M1 8c1.5-3.5 3.8-5.5 7-5.5S13.5 4.5 15 8c-1.5 3.5-3.8 5.5-7 5.5S2.5 11.5 1 8z"/><circle cx="8" cy="8" r="2.5"/></svg></span>` : '<span style="opacity:.4;font-size:10px"> (reassign)</span>'}
               </div>
             </div>
             <div class="team-actions">
-              <button class="btn btn-ghost" style="font-size:11px;padding:4px 9px" onclick="openTeamModal('${m.id}')">Editar</button>
-              <button class="btn ${inactive?'btn-success':'btn-danger'}" style="font-size:11px;padding:4px 9px" onclick="toggleTeamActive('${m.id}')">${inactive?'Activar':'Desactivar'}</button>
+              <button class="btn btn-ghost" style="font-size:11px;padding:4px 9px" onclick="openTeamModal('${m.id}')">Edit</button>
+              <button class="btn ${inactive?'btn-success':'btn-danger'}" style="font-size:11px;padding:4px 9px" onclick="toggleTeamActive('${m.id}')">${inactive?'Activate':'Deactivate'}</button>
             </div>
           </div>`;
         }).join('')
-      : '<div class="notes-empty">Usa "+ Agregar miembro" para crear el primer perfil del equipo.</div>';
+      : '<div class="notes-empty">Use "+ Add team member" to create the first team profile.</div>';
   }
 
   // Commissions
@@ -598,7 +598,7 @@ function renderAdmin() {
   const commWrap   = document.getElementById('admin-comm-list');
   const pendingN   = S.commissions.filter(c => c.status === 'pending').length;
   const pendingLbl = document.getElementById('admin-comm-pending-label');
-  if (pendingLbl) pendingLbl.textContent = pendingN > 0 ? `· ${pendingN} pendiente${pendingN!==1?'s':''}` : '';
+  if (pendingLbl) pendingLbl.textContent = pendingN > 0 ? `· ${pendingN} pending` : '';
 
   const filtered = S.commissions
     .filter(c => (!commFilter || c.status === commFilter) && (!commPerson || c.closerId===commPerson || c.providerId===commPerson))
@@ -612,31 +612,31 @@ function renderAdmin() {
           const provAmt  = parseFloat(c.providerAmount||0);
           const totalAmt = parseFloat(c.closerAmount||0) + provAmt;
           const statusCls = {pending:'comm-pending', paid:'comm-paid', cancelled:'comm-cancelled', clawback:'comm-cancelled'}[c.status] || 'comm-pending';
-          const statusLbl = {pending:'Pendiente', paid:'Pagado', cancelled:'Cancelado', clawback:'Reembolso'}[c.status] || c.status;
+          const statusLbl = {pending:'Pending', paid:'Paid', cancelled:'Cancelled', clawback:'Refund'}[c.status] || c.status;
           const paidInfo  = c.status === 'paid' ? ` · ${esc(c.paidBy||'')} · ${esc(c.paymentRef||'')}` : '';
-          const refundInfo = (c.refundReason && c.status !== 'paid') ? ` · Motivo: ${esc(c.refundReason)}` : '';
+          const refundInfo = (c.refundReason && c.status !== 'paid') ? ` · Reason: ${esc(c.refundReason)}` : '';
           const collInfo  = c.collectedAmount && parseFloat(c.collectedAmount) !== parseFloat(c.dealValue)
-            ? ` · Cobrado: ${fmtCOP(c.collectedAmount)}`
+            ? ` · Collected: ${fmtCOP(c.collectedAmount)}`
             : '';
           const amtStyle  = isClawback ? 'color:#c0392b;' : '';
           const actions   = c.status === 'pending'
-            ? `<button class="btn btn-success" style="font-size:11px;padding:4px 9px;flex-shrink:0" onclick="markCommissionPaid('${c.id}')">Marcar pagado</button>
-               <button class="btn btn-ghost" style="font-size:11px;padding:4px 9px;flex-shrink:0" onclick="promptAdjustCollected('${c.leadId}')">Ajustar cobrado</button>
-               <button class="btn btn-danger" style="font-size:11px;padding:4px 9px;flex-shrink:0" onclick="promptCancelCommission('${c.id}')">Cancelar</button>`
+            ? `<button class="btn btn-success" style="font-size:11px;padding:4px 9px;flex-shrink:0" onclick="markCommissionPaid('${c.id}')">Mark paid</button>
+               <button class="btn btn-ghost" style="font-size:11px;padding:4px 9px;flex-shrink:0" onclick="promptAdjustCollected('${c.leadId}')">Adjust collected</button>
+               <button class="btn btn-danger" style="font-size:11px;padding:4px 9px;flex-shrink:0" onclick="promptCancelCommission('${c.id}')">Cancel</button>`
             : c.status === 'paid'
-            ? `<button class="btn btn-danger" style="font-size:11px;padding:4px 9px;flex-shrink:0" onclick="promptIssueRefund('${c.leadId}')">Reembolso</button>`
+            ? `<button class="btn btn-danger" style="font-size:11px;padding:4px 9px;flex-shrink:0" onclick="promptIssueRefund('${c.leadId}')">Refund</button>`
             : '';
           return `<div class="admin-comm-row">
             <div class="admin-comm-info">
               <div class="admin-comm-lead">${esc(c.leadName||'--')}</div>
-              <div class="admin-comm-detail">Contratado: ${fmtCOP(c.dealValue)}${collInfo} · Closer: ${esc(c.closerName||'--')} ${fmtCOP(c.closerAmount)}${provAmt ? ' · Proveedor: ' + esc(c.providerName||'--') + ' ' + fmtCOP(c.providerAmount) : ''} · ${fmtD(c.createdAt)}${paidInfo}${refundInfo}</div>
+              <div class="admin-comm-detail">Contracted: ${fmtCOP(c.dealValue)}${collInfo} · Closer: ${esc(c.closerName||'--')} ${fmtCOP(c.closerAmount)}${provAmt ? ' · Provider: ' + esc(c.providerName||'--') + ' ' + fmtCOP(c.providerAmount) : ''} · ${fmtD(c.createdAt)}${paidInfo}${refundInfo}</div>
             </div>
             <span class="admin-comm-amount" style="${amtStyle}">${fmtCOP(totalAmt)}</span>
             <span class="comm-status-badge ${statusCls}">${statusLbl}</span>
             ${actions}
           </div>`;
         }).join('')
-      : `<div class="notes-empty">Sin comisiones${commFilter ? ' con ese filtro' : ''}.</div>`;
+      : `<div class="notes-empty">No commissions${commFilter ? ' with that filter' : ''}.</div>`;
   }
   const bulkWrap = document.getElementById('admin-comm-bulk-wrap');
   if (bulkWrap) bulkWrap.style.display = (commPerson && filtered.some(c => c.status === 'pending')) ? 'block' : 'none';
@@ -652,7 +652,7 @@ function renderAdmin() {
             <span><span class="audit-action">${esc(a.userName||a.userId)}</span>
             <span class="audit-detail"> · ${esc(a.action)} ${a.targetId?'· '+esc(a.targetId.slice(0,8)):''} ${a.detail?'· '+esc(a.detail):''}</span></span>
           </div>`).join('')
-      : '<div class="notes-empty">Sin entradas de auditoría aun.</div>';
+      : '<div class="notes-empty">No audit log entries yet.</div>';
   }
 
   // Locked leads
@@ -667,16 +667,16 @@ function renderAdmin() {
           return `<div class="team-row">
             <div class="team-info">
               <div class="team-name">${esc(l.name)}</div>
-              <div class="team-meta">${esc(l.phone||'--')} · ${esc(l.city||'')} ${esc(l.barrio||'')} · Estado: ${esc(l.status||'New')}</div>
-              <div class="team-meta" style="color:var(--amber)">Reclamado por: ${esc(lockerName)} · Expira en: ${lockCountdown(l)}</div>
+              <div class="team-meta">${esc(l.phone||'--')} · ${esc(l.city||'')} ${esc(l.barrio||'')} · Status: ${esc(l.status||'New')}</div>
+              <div class="team-meta" style="color:var(--amber)">Claimed by: ${esc(lockerName)} · Expires in: ${lockCountdown(l)}</div>
             </div>
             <div style="display:flex;gap:6px;flex-shrink:0">
-              <button class="btn btn-ghost" style="font-size:11px;padding:4px 9px" onclick="openLead('${l.id}')">Ver ficha</button>
-              <button class="btn btn-amber" style="font-size:11px;padding:4px 9px" onclick="forceReleaseLead('${l.id}')">Liberar</button>
+              <button class="btn btn-ghost" style="font-size:11px;padding:4px 9px" onclick="openLead('${l.id}')">View record</button>
+              <button class="btn btn-amber" style="font-size:11px;padding:4px 9px" onclick="forceReleaseLead('${l.id}')">Release</button>
             </div>
           </div>`;
         }).join('')
-      : '<div class="notes-empty">No hay leads reclamados actualmente.</div>';
+      : '<div class="notes-empty">No leads are currently claimed.</div>';
   }
 
   // DNC registry
@@ -691,11 +691,11 @@ function renderAdmin() {
             <div class="team-info">
               <div class="team-name">${esc(l.name)}</div>
               <div class="team-meta">${esc(l.phone||'--')} · ${esc(l.city||'')} ${esc(l.barrio||'')} · ${fmtD(l.updatedAt)}</div>
-              ${l.dncReason ? `<div class="team-meta" style="color:var(--red);margin-top:2px">Razón: ${esc(l.dncReason)}</div>` : ''}
+              ${l.dncReason ? `<div class="team-meta" style="color:var(--red);margin-top:2px">Reason: ${esc(l.dncReason)}</div>` : ''}
             </div>
-            <button class="btn btn-ghost" style="font-size:11px;padding:4px 9px" onclick="openLead('${l.id}')">Ver ficha</button>
+            <button class="btn btn-ghost" style="font-size:11px;padding:4px 9px" onclick="openLead('${l.id}')">View record</button>
           </div>`).join('')
-      : '<div class="notes-empty">Sin leads marcados como "Do Not Call".</div>';
+      : '<div class="notes-empty">No leads marked as "Do Not Call".</div>';
   }
 
   // Performance stats by team member
@@ -709,7 +709,7 @@ function renderAdmin() {
   const perfWrap = document.getElementById('admin-perf-list');
   if (perfWrap) {
     if (!(S.team||[]).length) {
-      perfWrap.innerHTML = '<div class="notes-empty">Sin miembros del equipo.</div>';
+      perfWrap.innerHTML = '<div class="notes-empty">No team members.</div>';
     } else {
       const pCalls = S.calls.filter(c => new Date(c.calledAt) >= cutoff);
       const lb = teamLeaderboard(S.team, S.leads, S.commissions);   // ranked by closed, then earnings
@@ -725,21 +725,21 @@ function renderAdmin() {
             <span class="pill" style="font-family:'DM Mono',monospace;flex-shrink:0">#${i+1}</span>
             <div class="team-avatar">${esc(initials)}</div>
             <div style="flex:1;min-width:0"><div class="team-name">${esc(m.name)}</div><div class="team-meta">${m.role}${m.contact?' · '+esc(m.contact):''}</div></div>
-            ${entry.pending>0?`<span style="font-size:11px;color:var(--amber);font-family:'DM Mono',monospace">${fmtCOP(entry.pending)} pendiente</span>`:''}
+            ${entry.pending>0?`<span style="font-size:11px;color:var(--amber);font-family:'DM Mono',monospace">${fmtCOP(entry.pending)} pending</span>`:''}
           </div>
           <div class="perf-grid">
-            <div class="perf-stat"><div class="perf-val">${mCalls.length}</div><div class="perf-lbl">Llamadas</div></div>
-            <div class="perf-stat"><div class="perf-val">${ansRate}%</div><div class="perf-lbl">Tasa resp.</div></div>
-            <div class="perf-stat"><div class="perf-val">${entry.closed}</div><div class="perf-lbl">Cerrados</div></div>
-            <div class="perf-stat"><div class="perf-val">${entry.conversion}%</div><div class="perf-lbl">Tasa cierre</div></div>
+            <div class="perf-stat"><div class="perf-val">${mCalls.length}</div><div class="perf-lbl">Calls</div></div>
+            <div class="perf-stat"><div class="perf-val">${ansRate}%</div><div class="perf-lbl">Answer rate</div></div>
+            <div class="perf-stat"><div class="perf-val">${entry.closed}</div><div class="perf-lbl">Closed</div></div>
+            <div class="perf-stat"><div class="perf-val">${entry.conversion}%</div><div class="perf-lbl">Close rate</div></div>
           </div>
           <div class="perf-bar-wrap" style="margin-top:8px">
-            <div class="perf-bar-label">Total ganado</div>
+            <div class="perf-bar-label">Total earned</div>
             <div class="perf-bar-track"><div class="perf-bar-fill" style="background:var(--pos);width:${topTotal?Math.min(100,Math.round(entry.total/topTotal*100)):0}%"></div></div>
             <div class="perf-bar-val">${fmtCOP(entry.total)}</div>
           </div>
         </div>`;
-      }).join('') || '<div class="notes-empty">Sin actividad en este periodo.</div>';
+      }).join('') || '<div class="notes-empty">No activity in this period.</div>';
     }
   }
 
@@ -754,7 +754,7 @@ function renderAdmin() {
 }
 
 function exportAuditLog() {
-  if (!S.auditLog.length) { toast('Sin entradas de auditoría.', 'error'); return; }
+  if (!S.auditLog.length) { toast('No audit log entries.', 'error'); return; }
   const hdrs = ['timestamp','userName','action','targetId','detail'];
   const csv = [
     hdrs.join(','),

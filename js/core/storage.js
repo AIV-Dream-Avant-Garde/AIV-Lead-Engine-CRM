@@ -19,7 +19,7 @@ function saveLocal() {
     checkStorage();
   } catch(e) {
     checkStorage();
-    toast('Almacenamiento lleno — sincroniza con Sheets o exporta CSV. Datos seguros en memoria.', 'error', 7000);
+    toast('Storage full — sync with Sheets or export CSV. Your data is safe in memory.', 'error', 7000);
   }
 }
 
@@ -69,7 +69,7 @@ function checkStorage() {
   if (pct >= .75) {
     warn.style.display = 'block';
     warn.innerHTML = '<div class="card ' + (pct >= .92 ? 'warn' : 'amber-card') + '" style="margin-bottom:0">' +
-      '<div class="card-sub"><strong>Almacenamiento al ' + dp + '%.</strong> Sincroniza con Sheets regularmente.</div></div>';
+      '<div class="card-sub"><strong>Storage at ' + dp + '%.</strong> Sync with Sheets regularly.</div></div>';
   } else {
     warn.style.display = 'none';
   }

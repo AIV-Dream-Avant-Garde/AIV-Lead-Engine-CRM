@@ -10,14 +10,14 @@
 const OUTREACH_TEMPLATES = {
   'Colombia': {        // WhatsApp — conversational, warm, assured
     whatsapp: [
-      { name: 'Primer contacto', body:
-        'Hola, soy {agente} de {empresa}. Vi {negocio} en {ciudad} y me parece que están haciendo las cosas bien. Trabajamos con negocios como el suyo para conseguir más clientes de forma constante, y creo que les podemos aportar. ¿Tiene un minuto para que le cuente cómo?' },
-      { name: 'Seguimiento (valor)', body:
-        'Hola de nuevo, soy {agente} de {empresa}. Le escribo porque lo que hacemos encaja muy bien con un {categoria} como {negocio}. Si le interesa, le muestro en concreto qué resultados podríamos lograr. Si por ahora no es el momento, lo entiendo perfectamente.' },
+      { name: 'First touch', body:
+        "Hi, this is {agente} with {empresa}. I came across {negocio} in {ciudad} and it looks like you're doing things right. We work with businesses like yours to bring in customers consistently, and I think we can add real value. Do you have a minute for me to share how?" },
+      { name: 'Follow-up (value)', body:
+        "Hi again, this is {agente} with {empresa}. I'm reaching out because what we do is a great fit for a {categoria} like {negocio}. If you're interested, I can show you exactly what results we could drive. If now isn't the right time, I completely understand." },
     ],
     email: [
-      { name: 'Primer contacto (email)', body:
-        'Hola, soy {agente} de {empresa}. Vi el trabajo de {negocio} en {ciudad} y creo que podemos ayudarles a atraer clientes de forma más constante. Me encantaría mostrarles, en concreto, qué resultados podríamos lograr juntos. ¿Tienen 15 minutos esta semana para una llamada corta?\n\nUn saludo,\n{agente} — {empresa}' },
+      { name: 'First touch (email)', body:
+        "Hi, this is {agente} with {empresa}. I saw the work {negocio} is doing in {ciudad} and I think we can help you attract customers more consistently. I'd love to show you exactly what results we could drive together. Do you have 15 minutes this week for a quick call?\n\nBest,\n{agente} — {empresa}" },
     ],
   },
   'Estados Unidos': {  // SMS — brief, respectful, one clear ask

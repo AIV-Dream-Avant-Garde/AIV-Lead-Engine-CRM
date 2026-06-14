@@ -18,7 +18,7 @@ function lockCountdown(lead) {
 
 function getLockerName(lead) {
   if (!lead.lockedBy) return '';
-  if (lead.lockedBy === S.session?.userId) return 'Ti';
+  if (lead.lockedBy === S.session?.userId) return 'You';
   const m = S.team.find(x => x.id === lead.lockedBy);
   return m ? m.name.split(' ')[0] : lead.lockedBy.slice(0,6);
 }
@@ -27,7 +27,7 @@ function claimLead(leadId) {
   const lead = S.leads.find(l => l.id === leadId);
   if (!lead) return;
   if (isLockedByOther(lead)) {
-    toast('Lead reclamado por ' + getLockerName(lead) + ' — expira en ' + lockCountdown(lead) + '.', 'error');
+    toast('Lead claimed by ' + getLockerName(lead) + ' — expires in ' + lockCountdown(lead) + '.', 'error');
     return;
   }
   lead.lockedBy    = S.session?.userId || '';

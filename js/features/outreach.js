@@ -98,38 +98,38 @@ async function sendMessage(lead, body, opts) {
   opts = opts || {};
   if (!lead) return null;
   const channel = opts.channel || pickChannel(lead);
-  if (lead.status === 'Do Not Call') { toast('Este lead está en "Do Not Call" / opt-out — no se envía.', 'error'); return null; }
+  if (lead.status === 'Do Not Call') { toast('This lead is on "Do Not Call" / opted out — message not sent.', 'error'); return null; }
   const agent = ((S.session && S.session.userName) || '').split(' ')[0] || '';
   const text  = renderTemplate(body, lead, agent);
-  if (!text.trim()) { toast('El mensaje está vacío.', 'error'); return null; }
+  if (!text.trim()) { toast('The message is empty.', 'error'); return null; }
 
   // Resolve recipient by channel: email → lead.email; sms/whatsapp → E.164 phone.
   let phoneE164 = '', email = '', subject = '';
   if (channel === 'email') {
     email = (lead.email || '').trim();
-    if (!email) { toast('El lead no tiene email.', 'error'); return null; }
+    if (!email) { toast('This lead has no email.', 'error'); return null; }
     subject = renderTemplate(opts.subject || 'AXIUS', lead, agent) || 'AXIUS';
   } else {
     phoneE164 = toE164(lead.phone, lead.country);
-    if (!phoneE164) { toast('El número del lead no es válido para enviar.', 'error'); return null; }
+    if (!phoneE164) { toast("This lead's phone number isn't valid for sending.", 'error'); return null; }
   }
 
-  const logBody = channel === 'email' ? ('[Asunto: ' + subject + '] ' + text) : text;
+  const logBody = channel === 'email' ? ('[Subject: ' + subject + '] ' + text) : text;
   const it = addInteraction({ leadId:lead.id, leadName:lead.name, phone:lead.phone, channel, direction:'out', stepTag:opts.stepTag||'', body:logBody, status:'queued' });
   lead.lastTouchAt = new Date().toISOString();
   if (typeof pushLead === 'function') pushLead(lead);
 
   // Demo mode: local-only success (no backend), so the composer demos cleanly.
-  if (S.demoMode) { it.status = 'sent'; it.sid = 'demo'; it._synced = true; saveLocal(); toast('Mensaje enviado (demo).', 'success'); if (typeof renderAll === 'function') renderAll(); return it; }
+  if (S.demoMode) { it.status = 'sent'; it.sid = 'demo'; it._synced = true; saveLocal(); toast('Message sent (demo).', 'success'); if (typeof renderAll === 'function') renderAll(); return it; }
 
-  if (!S.config.scriptUrl) { it.status = 'failed'; it.error = 'sin conexión'; persistInteraction(it); toast('Sin Apps Script configurado: el mensaje quedó registrado pero no se envió.', 'error', 6000); return it; }
+  if (!S.config.scriptUrl) { it.status = 'failed'; it.error = 'no connection'; persistInteraction(it); toast('No Apps Script configured: the message was logged but not sent.', 'error', 6000); return it; }
 
   const req = channel === 'email'
     ? { action:'sendEmail', id:it.id, leadId:lead.id, email, subject, body:text, stepTag:it.stepTag }
     : { action:'sendMessage', id:it.id, leadId:lead.id, phoneE164, channel, body:text, stepTag:it.stepTag };
   const res = await sheetsCall(req);
-  if (res && res.success) { it.status = 'sent'; it.sid = res.sid || res.id || ''; toast('Enviado por ' + (CHANNEL_LABELS[channel] || channel) + '.', 'success'); }
-  else { it.status = 'failed'; it.error = (res && res.error) || 'sin respuesta'; toast('No se pudo enviar: ' + it.error, 'error', 6000); }
+  if (res && res.success) { it.status = 'sent'; it.sid = res.sid || res.id || ''; toast('Sent via ' + (CHANNEL_LABELS[channel] || channel) + '.', 'success'); }
+  else { it.status = 'failed'; it.error = (res && res.error) || 'no reply'; toast("Couldn't send: " + it.error, 'error', 6000); }
   persistInteraction(it);
   if (typeof renderAll === 'function') renderAll();
   return it;
@@ -154,7 +154,7 @@ function renderComposer(lead) {
   const optedOut = lead.status === 'Do Not Call';
   const note = document.getElementById('msg-optout-note');
   const btn  = document.getElementById('msg-send-btn');
-  if (note) { note.style.display = optedOut ? 'block' : 'none'; note.textContent = optedOut ? 'Lead en "Do Not Call" / opt-out — no se puede enviar.' : ''; }
+  if (note) { note.style.display = optedOut ? 'block' : 'none'; note.textContent = optedOut ? 'Lead on "Do Not Call" / opted out — cannot send.' : ''; }
   if (btn) btn.disabled = optedOut;
 }
 
@@ -164,7 +164,7 @@ function _fillComposerTemplates(lead) {
   const custom = (S.smsTemplates || []).map(t => ({ name: t.name, body: t.body }));
   _composerTpls = seeded.concat(custom);
   const sel = document.getElementById('msg-template');
-  if (sel) sel.innerHTML = '<option value="">— plantilla —</option>' + _composerTpls.map((t,i) => `<option value="${i}">${esc(t.name)}</option>`).join('');
+  if (sel) sel.innerHTML = '<option value="">— template —</option>' + _composerTpls.map((t,i) => `<option value="${i}">${esc(t.name)}</option>`).join('');
 }
 
 function applyMsgTemplate() {
@@ -179,14 +179,14 @@ function renderMsgPreview() {
   const agent = ((S.session && S.session.userName) || '').split(' ')[0] || '';
   const body = document.getElementById('msg-body')?.value || '';
   const pv = document.getElementById('msg-preview');
-  if (pv) pv.textContent = body ? renderTemplate(body, lead, agent) : 'La vista previa del mensaje aparecerá aquí.';
+  if (pv) pv.textContent = body ? renderTemplate(body, lead, agent) : 'The message preview will appear here.';
 }
 
 // Append the configured booking link to the composer body (drives toward a
 // booked discovery call — the conversion action). Templates can also use {agenda}.
 function insertBookingLink() {
   const url = (S.config && S.config.bookingUrl || '').trim();
-  if (!url) { toast('Configura tu link de agenda en Configuración primero.', 'error'); return; }
+  if (!url) { toast('Set your booking link in Settings first.', 'error'); return; }
   const body = document.getElementById('msg-body'); if (!body) return;
   const sep = (body.value && !/[\s]$/.test(body.value)) ? ' ' : '';
   body.value = body.value + sep + url;
@@ -206,7 +206,7 @@ async function sendComposer() {
   switchModalTab('timeline');
 }
 
-// ── Cadence (Secuencias) — control surface for the CRM-native engine ──────
+// ── Cadence (Sequences) — control surface for the CRM-native engine ──────
 // Pure: tally enrollment states (unit-tested).
 function sequenceCounts(seqs) {
   const c = { active:0, paused:0, replied:0, stopped:0, done:0, total:0 };
@@ -224,9 +224,9 @@ function sequenceCounts(seqs) {
 
 function seqStateLabel(st) {
   return ({
-    'active':'Activa', 'paused:claimed':'Pausada (reclamada)', 'paused:replied':'Respondió — handoff',
-    'paused:manual':'Pausada (manual)', 'stopped:closed':'Cerrada', 'stopped:optout':'Opt-out',
-    'stopped:rejected':'Rechazada', 'stopped:manual':'Retirada', 'done':'Completada',
+    'active':'Active', 'paused:claimed':'Paused (claimed)', 'paused:replied':'Replied — handoff',
+    'paused:manual':'Paused (manual)', 'stopped:closed':'Closed', 'stopped:optout':'Opt-out',
+    'stopped:rejected':'Rejected', 'stopped:manual':'Removed', 'done':'Completed',
   })[st] || st || '—';
 }
 
@@ -239,22 +239,22 @@ function renderSequences() {
   const seqs = S.sequences || [];
   const c = sequenceCounts(seqs);
   const cEl = document.getElementById('admin-seq-counts');
-  if (cEl) cEl.textContent = `${c.active} activas · ${c.paused} pausadas · ${c.replied} respondieron · ${c.stopped} detenidas · ${c.done} completadas`;
-  if (!seqs.length) { wrap.innerHTML = '<div class="notes-empty">Sin leads en secuencia.</div>'; return; }
+  if (cEl) cEl.textContent = `${c.active} active · ${c.paused} paused · ${c.replied} replied · ${c.stopped} stopped · ${c.done} completed`;
+  if (!seqs.length) { wrap.innerHTML = '<div class="notes-empty">No leads in a sequence.</div>'; return; }
   wrap.innerHTML = seqs.slice(0, 100).map(s => {
     const st = String(s.state || '');
     const stopped = st.indexOf('stopped:') === 0 || st === 'done';
     const paused  = st.indexOf('paused:') === 0;
-    const next = s.nextRunAt ? '· Próx: ' + fmtD(s.nextRunAt) : '';
+    const next = s.nextRunAt ? '· Next: ' + fmtD(s.nextRunAt) : '';
     return `<div class="team-row" style="margin-bottom:6px">
       <div class="team-info">
         <div class="team-name">${esc(_seqLeadName(s.leadId))}</div>
-        <div class="team-meta">${esc(seqStateLabel(st))} · Paso ${esc(String(s.stepIndex ?? 0))} ${esc(next)}</div>
+        <div class="team-meta">${esc(seqStateLabel(st))} · Step ${esc(String(s.stepIndex ?? 0))} ${esc(next)}</div>
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0">
-        ${paused ? `<button class="btn btn-success" style="font-size:11px;padding:4px 9px" onclick="resumeSequence('${esc(s.leadId)}')">Reanudar</button>`
-                 : (!stopped ? `<button class="btn btn-ghost" style="font-size:11px;padding:4px 9px" onclick="pauseSequence('${esc(s.leadId)}')">Pausar</button>` : '')}
-        ${!stopped ? `<button class="btn btn-danger" style="font-size:11px;padding:4px 9px" onclick="unenrollSequence('${esc(s.leadId)}')">Sacar</button>` : ''}
+        ${paused ? `<button class="btn btn-success" style="font-size:11px;padding:4px 9px" onclick="resumeSequence('${esc(s.leadId)}')">Resume</button>`
+                 : (!stopped ? `<button class="btn btn-ghost" style="font-size:11px;padding:4px 9px" onclick="pauseSequence('${esc(s.leadId)}')">Pause</button>` : '')}
+        ${!stopped ? `<button class="btn btn-danger" style="font-size:11px;padding:4px 9px" onclick="unenrollSequence('${esc(s.leadId)}')">Remove</button>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -270,9 +270,9 @@ function _updateSequence(leadId, patch) {
   if (S.config.scriptUrl) sheetsCall({ action:'saveSequence', ...s });
   renderSequences();
 }
-function pauseSequence(leadId)   { _updateSequence(leadId, { state:'paused:manual', pausedReason:'manual' }); toast('Secuencia pausada.', 'success'); }
-function resumeSequence(leadId)  { _updateSequence(leadId, { state:'active', pausedReason:'' }); toast('Secuencia reanudada.', 'success'); }
-function unenrollSequence(leadId){ if (!confirm('¿Sacar este lead de la secuencia?')) return; _updateSequence(leadId, { state:'stopped:manual', pausedReason:'manual' }); toast('Lead retirado de la secuencia.', 'success'); }
+function pauseSequence(leadId)   { _updateSequence(leadId, { state:'paused:manual', pausedReason:'manual' }); toast('Sequence paused.', 'success'); }
+function resumeSequence(leadId)  { _updateSequence(leadId, { state:'active', pausedReason:'' }); toast('Sequence resumed.', 'success'); }
+function unenrollSequence(leadId){ if (!confirm('Remove this lead from the sequence?')) return; _updateSequence(leadId, { state:'stopped:manual', pausedReason:'manual' }); toast('Lead removed from the sequence.', 'success'); }
 
 // ── Cadence engine status + editable config (the deterministic backend engine) ─
 // Reads trigger/live state + effective config from S.triggerStatus (checkTriggerStatus).
@@ -285,47 +285,47 @@ function renderCadenceEngine() {
   const v  = (x, d) => (x == null ? d : x);
   const lr = ts.lastCadenceRun;
   const modeBadge = live
-    ? `<span style="font-size:11px;font-weight:600;color:var(--pos)">● EN VIVO</span>`
-    : `<span style="font-size:11px;font-weight:600;color:var(--amber)">○ SIMULACIÓN (dry-run)</span>`;
+    ? `<span style="font-size:11px;font-weight:600;color:var(--pos)">● LIVE</span>`
+    : `<span style="font-size:11px;font-weight:600;color:var(--amber)">○ SIMULATION (dry-run)</span>`;
   const lastLine = lr && lr.ranAt
-    ? `<div style="font-size:11px;color:var(--sub);margin-top:8px">Última corrida: ${fmtD(lr.ranAt)} ${fmtT(lr.ranAt)} · ${lr.mode==='live'?'inscritos':'inscribiría'} ${lr.enrolled||0} · ${lr.mode==='live'?'enviados':'enviaría'} ${lr.sent||0}</div>`
-    : `<div style="font-size:11px;color:var(--sub);margin-top:8px">Sin corridas registradas aún.</div>`;
+    ? `<div style="font-size:11px;color:var(--sub);margin-top:8px">Last run: ${fmtD(lr.ranAt)} ${fmtT(lr.ranAt)} · ${lr.mode==='live'?'enrolled':'would enroll'} ${lr.enrolled||0} · ${lr.mode==='live'?'sent':'would send'} ${lr.sent||0}</div>`
+    : `<div style="font-size:11px;color:var(--sub);margin-top:8px">No runs recorded yet.</div>`;
   wrap.innerHTML = `
     <div class="card" style="background:var(--surface-hi);padding:12px 14px;margin-bottom:12px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <span style="font-size:13px;font-weight:600;color:var(--hl)">Motor de cadencia</span>
+        <span style="font-size:13px;font-weight:600;color:var(--hl)">Cadence engine</span>
         ${modeBadge}
-        <span style="font-size:13px;color:var(--body)">· Trigger horario:</span>
-        <span style="font-size:13px;font-weight:600;color:${active?'var(--pos)':'var(--body)'}">${active?'● Activo':'○ Inactivo'}</span>
-        <button class="btn ${active?'btn-danger':'btn-success'} btn-xs" onclick="setTrigger('runCadence',${!active})">${active?'Desactivar':'Activar'}</button>
-        <button id="run-cadence-now-btn" class="btn btn-primary btn-xs" onclick="runCadenceNow()">Ejecutar ahora</button>
+        <span style="font-size:13px;color:var(--body)">· Hourly trigger:</span>
+        <span style="font-size:13px;font-weight:600;color:${active?'var(--pos)':'var(--body)'}">${active?'● Active':'○ Inactive'}</span>
+        <button class="btn ${active?'btn-danger':'btn-success'} btn-xs" onclick="setTrigger('runCadence',${!active})">${active?'Deactivate':'Activate'}</button>
+        <button id="run-cadence-now-btn" class="btn btn-primary btn-xs" onclick="runCadenceNow()">Run now</button>
       </div>
       ${lastLine}
       <div class="form-grid" style="margin-top:12px;gap:8px">
-        <div class="field"><label>Tope diario de envíos</label><input type="number" id="cad-cap" value="${esc(String(v(c.dailyCap,200)))}" min="1"></div>
-        <div class="field"><label>Persona que firma · {agente}</label><input type="text" id="cad-agent" value="${esc(v(c.agentName,''))}" placeholder="Andrés"></div>
-        <div class="field"><label>Empresa · {empresa}</label><input type="text" id="cad-company" value="${esc(v(c.company,''))}" placeholder="AXIUS"></div>
-        <div class="field"><label>Días entre toques</label><input type="number" id="cad-gap" value="${esc(String(v(c.gapDays,2)))}" min="1"></div>
-        <div class="field"><label>Hora inicio (0–23)</label><input type="number" id="cad-qstart" value="${esc(String(v(c.quietStart,8)))}" min="0" max="23"></div>
-        <div class="field"><label>Hora fin (1–24)</label><input type="number" id="cad-qend" value="${esc(String(v(c.quietEnd,20)))}" min="1" max="24"></div>
+        <div class="field"><label>Daily send cap</label><input type="number" id="cad-cap" value="${esc(String(v(c.dailyCap,200)))}" min="1"></div>
+        <div class="field"><label>Signing person · {agente}</label><input type="text" id="cad-agent" value="${esc(v(c.agentName,''))}" placeholder="Andres"></div>
+        <div class="field"><label>Company · {empresa}</label><input type="text" id="cad-company" value="${esc(v(c.company,''))}" placeholder="AXIUS"></div>
+        <div class="field"><label>Days between touches</label><input type="number" id="cad-gap" value="${esc(String(v(c.gapDays,2)))}" min="1"></div>
+        <div class="field"><label>Start hour (0–23)</label><input type="number" id="cad-qstart" value="${esc(String(v(c.quietStart,8)))}" min="0" max="23"></div>
+        <div class="field"><label>End hour (1–24)</label><input type="number" id="cad-qend" value="${esc(String(v(c.quietEnd,20)))}" min="1" max="24"></div>
       </div>
-      <div class="field" style="margin-top:8px"><label>Dirección postal (CAN-SPAM · pie de email)</label><input type="text" id="cad-address" value="${esc(v(c.postalAddress,''))}" placeholder="AXIUS, Calle 00 #00-00, Medellín, Colombia"></div>
+      <div class="field" style="margin-top:8px"><label>Mailing address (CAN-SPAM · email footer)</label><input type="text" id="cad-address" value="${esc(v(c.postalAddress,''))}" placeholder="AXIUS, 123 Main St, Austin, TX 78701"></div>
       <label style="display:flex;align-items:flex-start;gap:8px;margin-top:10px;font-size:12px;color:var(--hl);cursor:pointer">
         <input type="checkbox" id="cad-enabled" ${live?'checked':''} style="margin-top:2px">
-        <span>Enviar mensajes reales (en vivo). Sin marcar = simulación: registra qué enviaría sin enviar nada.</span>
+        <span>Send live messages. Unchecked = simulation: logs what it would send without sending anything.</span>
       </label>
-      <div style="font-size:11px;color:var(--amber);margin-top:6px">Activa "en vivo" solo con Twilio/WhatsApp aprovisionados y aprobados, y con base legal de consentimiento. El motor respeta opt-out, horario y tope siempre.</div>
-      <button class="btn btn-primary btn-xs" style="margin-top:10px" onclick="saveCadenceConfig()">Guardar configuración</button>
+      <div style="font-size:11px;color:var(--amber);margin-top:6px">Turn on "live" only with Twilio/WhatsApp provisioned and approved, and a legal basis for consent. The engine always respects opt-outs, quiet hours, and the cap.</div>
+      <button class="btn btn-primary btn-xs" style="margin-top:10px" onclick="saveCadenceConfig()">Save configuration</button>
     </div>`;
 }
 
 // Persist the operator-tunable cadence config. Confirms before flipping to live.
 async function saveCadenceConfig() {
-  if (!S.config.scriptUrl) { toast('Configura el Apps Script URL primero.', 'error'); return; }
+  if (!S.config.scriptUrl) { toast('Set the Apps Script URL first.', 'error'); return; }
   const g = id => document.getElementById(id);
   const enabled = !!(g('cad-enabled') && g('cad-enabled').checked);
   const wasLive = !!(S.triggerStatus && S.triggerStatus.cadenceEnabled);
-  if (enabled && !wasLive && !confirm('¿Activar envíos REALES? Asegúrate de tener Twilio/WhatsApp aprovisionados y aprobados, y la base legal de consentimiento. El motor empezará a enviar en la próxima corrida.')) return;
+  if (enabled && !wasLive && !confirm('Turn on LIVE sending? Make sure Twilio/WhatsApp are provisioned and approved, and that you have a legal basis for consent. The engine will start sending on the next run.')) return;
   const config = {
     enabled,
     dailyCap:      parseInt(g('cad-cap')?.value) || 200,
@@ -341,36 +341,36 @@ async function saveCadenceConfig() {
     if (!S.triggerStatus) S.triggerStatus = {};
     S.triggerStatus.cadenceConfig = res.config;
     S.triggerStatus.cadenceEnabled = res.config.enabled;
-    toast('Configuración del motor guardada.', 'success');
+    toast('Engine configuration saved.', 'success');
     renderCadenceEngine();
   } else {
-    toast('Error al guardar la configuración del motor.', 'error', 5000);
+    toast('Error saving the engine configuration.', 'error', 5000);
   }
 }
 
 // On-demand cadence pass (dry-run while CADENCE_ENABLED=false). Previews/verifies
 // enrollment + intended sends without waiting for the hourly trigger.
 async function runCadenceNow() {
-  if (!S.config.scriptUrl) { toast('Configura el Apps Script URL primero.', 'error'); return; }
+  if (!S.config.scriptUrl) { toast('Set the Apps Script URL first.', 'error'); return; }
   const btn = document.getElementById('run-cadence-now-btn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Ejecutando...'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Running...'; }
   const res = await sheetsCall({ action:'runCadenceNow' });
-  if (btn) { btn.disabled = false; btn.textContent = 'Ejecutar ahora'; }
+  if (btn) { btn.disabled = false; btn.textContent = 'Run now'; }
   if (res?.success && res.skipped) {
-    toast('Otra corrida del motor está en progreso. Intenta de nuevo en un momento.', 'error', 5000);
+    toast('Another engine run is already in progress. Try again in a moment.', 'error', 5000);
     return;
   }
   if (res?.success) {
     if (!S.triggerStatus) S.triggerStatus = {};
     S.triggerStatus.lastCadenceRun = { ranAt: res.ranAt, mode: res.mode, enrolled: res.enrolled, sent: res.sent };
     const verb = res.mode === 'live'
-      ? `inscritos ${res.enrolled||0}, enviados ${res.sent||0}`
-      : `simulación: inscribiría ${res.enrolled||0}, enviaría ${res.sent||0}`;
-    toast('Motor de cadencia ejecutado — ' + verb + '.', 'success', 5000);
+      ? `enrolled ${res.enrolled||0}, sent ${res.sent||0}`
+      : `simulation: would enroll ${res.enrolled||0}, would send ${res.sent||0}`;
+    toast('Cadence engine run complete — ' + verb + '.', 'success', 5000);
     if (res.mode === 'live') await syncNow();   // bring newly-enrolled sequences into view
     renderCadenceEngine();
     renderSequences();
   } else {
-    toast('Error al ejecutar el motor de cadencia. Verifica el Apps Script.', 'error', 5000);
+    toast('Error running the cadence engine. Check the Apps Script.', 'error', 5000);
   }
 }

@@ -183,8 +183,8 @@ test('sequenceCounts: tallies cadence states correctly', () => {
 });
 
 test('seqStateLabel: maps states to human labels, falls back', () => {
-  eq(seqStateLabel('active'), 'Activa');
-  eq(seqStateLabel('paused:replied'), 'Respondió — handoff');
+  eq(seqStateLabel('active'), 'Active');
+  eq(seqStateLabel('paused:replied'), 'Replied — handoff');
   eq(seqStateLabel('stopped:optout'), 'Opt-out');
   eq(seqStateLabel('weird'), 'weird', 'unknown → passthrough');
 });

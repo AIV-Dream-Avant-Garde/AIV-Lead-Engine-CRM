@@ -24,10 +24,10 @@ function renderPipeline() {
     return S.leads.filter(l => l.status === 'Closed Won' && l.updatedAt && l.updatedAt.startsWith(m));
   })();
   const metricsHtml = `<div class="pipeline-metrics">
-    <div class="pipeline-metric"><strong>${openCount}</strong>Leads activos</div>
-    <div class="pipeline-metric"><strong>${fmtCOP(openValue)}</strong>Pipeline abierto</div>
-    <div class="pipeline-metric"><strong>${closedThisMonth.length}</strong>Cerrados este mes</div>
-    <div class="pipeline-metric"><strong>${fmtCOP(closedThisMonth.reduce((s,l)=>s+parseFloat(l.dealValue||0),0))}</strong>Revenue este mes</div>
+    <div class="pipeline-metric"><strong>${openCount}</strong>Active leads</div>
+    <div class="pipeline-metric"><strong>${fmtCOP(openValue)}</strong>Open pipeline</div>
+    <div class="pipeline-metric"><strong>${closedThisMonth.length}</strong>Closed this month</div>
+    <div class="pipeline-metric"><strong>${fmtCOP(closedThisMonth.reduce((s,l)=>s+parseFloat(l.dealValue||0),0))}</strong>Revenue this month</div>
   </div>`;
 
   const kb = document.getElementById('kanban');
@@ -57,9 +57,9 @@ function renderPipeline() {
       </div>`;
     }).join('') +
       (total > CAP
-        ? `<div style="font-size:11px;color:var(--body);padding:7px;text-align:center">+${total-CAP} mas</div>`
+        ? `<div style="font-size:11px;color:var(--body);padding:7px;text-align:center">+${total-CAP} more</div>`
         : total === 0
-          ? '<div style="font-size:11px;color:var(--body);padding:7px">Sin leads</div>'
+          ? '<div style="font-size:11px;color:var(--body);padding:7px">No leads</div>'
           : '');
     return `<div class="kanban-col pipeline-col" data-status="${esc(col.k)}"
         ondragover="pipelineDragOver(event)"
@@ -111,8 +111,8 @@ function pipelineDrop(e, newStatus) {
 
   // DNC — require a reason (legal record), matching the lead modal + bulk action.
   if (newStatus === 'Do Not Call') {
-    const reason = (prompt('Razón DNC (requerido como registro legal):') || '').trim();
-    if (!reason) { toast('Razón DNC requerida — no se cambió el estado.', 'error'); renderPipeline(); return; }
+    const reason = (prompt('DNC reason (required as a legal record):') || '').trim();
+    if (!reason) { toast('DNC reason required — status not changed.', 'error'); renderPipeline(); return; }
     lead.dncReason = reason;
   }
   // Closed Lost — release the closer + cancel pending commission (parity with saveLead).
@@ -140,6 +140,6 @@ function pipelineDrop(e, newStatus) {
     movedAt:     lead.updatedAt,
   });
   pushLead(lead);
-  toast('Estado actualizado: ' + newStatus, 'success');
+  toast('Status updated: ' + newStatus, 'success');
   renderPipeline();
 }
