@@ -156,7 +156,7 @@ async function confirmImport() {
       address:r.address||'N/A', website:r.website||'N/A',
       rating:r.rating||'N/A', reviews:r.reviews||'N/A',
       country, city, barrio, keyword:kw, source, sourceDetail:srcDetail,
-      status:'Nuevo', providerId, providerRate,
+      status:'New', providerId, providerRate,
       closerId:'', closerRate:0, dealValue:'',
       providerCommission:'', closerCommission:'', commissionStatus:'',
       lockedBy:'', lockedUntil:'', assignedAt:'',

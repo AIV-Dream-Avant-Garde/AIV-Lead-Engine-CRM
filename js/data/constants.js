@@ -28,8 +28,8 @@ const SOURCES = [
 ];
 
 const STATUS_CLS = {
-  'Nuevo':'new','Contactado':'contacted','Interesado':'interested',
-  'Cerrado':'closed','Negociacion fallida':'failed','No interesado':'dead','No llamar':'dnc',
+  'New':'new','Contacted':'contacted','Interested':'interested',
+  'Closed Won':'closed','Closed Lost':'failed','Not Interested':'dead','Do Not Call':'dnc',
 };
 
 const OUTCOME_LABELS = {
@@ -67,8 +67,8 @@ const SCORE_WEIGHTS = {
   ratingMid:      10,  // rating >= 3.0
   reviewsHigh:    15,  // reviews >= 50
   reviewsMid:      8,  // reviews >= 10
-  statusNuevo:    10,  // status === 'Nuevo'
-  statusContact:   5,  // status === 'Contactado'
+  statusNuevo:    10,  // status === 'New'
+  statusContact:   5,  // status === 'Contacted'
   fuOverdue:      25,  // follow-up is overdue
   fuToday:        20,  // follow-up is today
   hasWebsite:      5,  // has website

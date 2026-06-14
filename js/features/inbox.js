@@ -17,7 +17,7 @@ function leadsNeedingResponse(leads, interactions) {
       if (t > (lastOut[it.leadId] || 0)) lastOut[it.leadId] = t;
     }
   });
-  const terminal = { 'No llamar': 1, 'Cerrado': 1 };
+  const terminal = { 'Do Not Call': 1, 'Closed Won': 1 };
   return (leads || [])
     .filter(l => l && lastIn[l.id] && !terminal[l.status] && lastIn[l.id] > (lastOut[l.id] || 0))
     .map(l => ({ lead: l, repliedAt: lastIn[l.id], lastMsg: lastMsg[l.id] || '' }))

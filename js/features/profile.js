@@ -26,7 +26,7 @@ function renderPerfil() {
   // Lead stats
   const isAdmin  = role === 'admin';
   const myLeads  = isAdmin ? S.leads : S.leads.filter(l => l.closerId === uid_ || l.lockedBy === uid_ || l.providerId === uid_);
-  const myClosed = myLeads.filter(l => l.status === 'Cerrado');
+  const myClosed = myLeads.filter(l => l.status === 'Closed Won');
   const myComm   = isAdmin ? S.commissions : S.commissions.filter(c => c.closerId === uid_ || c.providerId === uid_);
   // This user's share of a commission record: closer cut if they closed it, provider cut if they sourced it
   const myShare  = c => (isAdmin ? parseFloat(c.closerAmount||0) + parseFloat(c.providerAmount||0)
@@ -81,11 +81,11 @@ function renderPerfil() {
   const funnelWrap = document.getElementById('perfil-funnel');
   if (funnelWrap && total > 0) {
     const steps = [
-      {label:'Nuevo',        count:myLeads.filter(l=>l.status==='Nuevo').length,              color:'var(--s-new)'},
-      {label:'Contactado',   count:myLeads.filter(l=>l.status==='Contactado').length,         color:'var(--s-contact)'},
-      {label:'Interesado',   count:myLeads.filter(l=>l.status==='Interesado').length,         color:'var(--s-interest)'},
-      {label:'Cerrado',      count:myLeads.filter(l=>l.status==='Cerrado').length,            color:'var(--s-closed)'},
-      {label:'Neg. fallida', count:myLeads.filter(l=>l.status==='Negociacion fallida').length,color:'var(--s-failed)'},
+      {label:'New',        count:myLeads.filter(l=>l.status==='New').length,              color:'var(--s-new)'},
+      {label:'Contacted',   count:myLeads.filter(l=>l.status==='Contacted').length,         color:'var(--s-contact)'},
+      {label:'Interested',   count:myLeads.filter(l=>l.status==='Interested').length,         color:'var(--s-interest)'},
+      {label:'Closed Won',      count:myLeads.filter(l=>l.status==='Closed Won').length,            color:'var(--s-closed)'},
+      {label:'Neg. fallida', count:myLeads.filter(l=>l.status==='Closed Lost').length,color:'var(--s-failed)'},
     ];
     funnelWrap.innerHTML = steps.map(s =>
       `<div class="funnel-row">

@@ -35,7 +35,7 @@ async function initTwilio() {
 function makeCall(leadId) {
   const l = S.leads.find(x => x.id === leadId);
   if (!l) return;
-  if (l.status === 'No llamar')              { toast('Este lead tiene estado "No llamar".', 'error'); return; }
+  if (l.status === 'Do Not Call')              { toast('Este lead tiene estado "Do Not Call".', 'error'); return; }
   if (!l.phone || l.phone === 'N/A')         { toast('Sin número de teléfono.', 'error'); return; }
   if (S.demoMode) { startDemoCall(leadId); return; }
   if (!CALL.device)                          { toast('Twilio no está conectado. Ve a Setup → Conectar Twilio.', 'error'); return; }
@@ -145,9 +145,9 @@ function onCallEnd() {
   const smsWrap = document.getElementById('cw-sms-wrap');
   if (smsWrap) smsWrap.style.display = S.config.scriptUrl && !S.demoMode ? '' : 'none';
   const l = S.leads.find(x => x.id === CALL.curLeadId);
-  // Only advance to "Contactado" if the call actually connected. Failed/rejected/
+  // Only advance to "Contacted" if the call actually connected. Failed/rejected/
   // cancelled calls all route here with 0 seconds and must not inflate contact metrics.
-  if (l && l.status === 'Nuevo' && CALL.seconds > 0) { l.status = 'Contactado'; l.updatedAt = new Date().toISOString(); pushLead(l); }
+  if (l && l.status === 'New' && CALL.seconds > 0) { l.status = 'Contacted'; l.updatedAt = new Date().toISOString(); pushLead(l); }
 }
 
 function setOutcome(val) {
@@ -263,7 +263,7 @@ function goNextLead() {
     const nextId = S.dialerQueue.shift();
     updateDialerCounter();
     const lead = S.leads.find(l => l.id === nextId);
-    if (lead && lead.status !== 'No llamar' && lead.phone && lead.phone !== 'N/A' && !isLockedByOther(lead)) {
+    if (lead && lead.status !== 'Do Not Call' && lead.phone && lead.phone !== 'N/A' && !isLockedByOther(lead)) {
       setTimeout(() => makeCall(nextId), 300);
     } else {
       goNextLead(); // skip invalid, try next
@@ -271,8 +271,8 @@ function goNextLead() {
     return;
   }
   const next = getFiltered().find(l =>
-    (l.status === 'Nuevo' || l.status === 'Contactado') &&
-    l.status !== 'No llamar' && l.phone && l.phone !== 'N/A' &&
+    (l.status === 'New' || l.status === 'Contacted') &&
+    l.status !== 'Do Not Call' && l.phone && l.phone !== 'N/A' &&
     !isLockedByOther(l)
   );
   if (next) { navigate('leads'); setTimeout(() => openLead(next.id), 150); }
@@ -283,7 +283,7 @@ function toggleDialer() {
   S.dialerMode = !S.dialerMode;
   if (S.dialerMode) {
     S.dialerQueue = getFiltered()
-      .filter(l => (l.status === 'Nuevo' || l.status === 'Contactado') && l.phone && l.phone !== 'N/A' && !isLockedByOther(l))
+      .filter(l => (l.status === 'New' || l.status === 'Contacted') && l.phone && l.phone !== 'N/A' && !isLockedByOther(l))
       .map(l => l.id);
     if (!S.dialerQueue.length) { S.dialerMode = false; toast('Sin leads disponibles para marcar con los filtros actuales.', 'error'); return; }
   } else {
@@ -408,7 +408,7 @@ async function sendPostCallSms() {
   const l    = S.leads.find(x => x.id === CALL.curLeadId);
   if (!l) { toast('Lead no encontrado.', 'error'); return; }
   // Route through the unified sender: channel-aware (Colombia→WhatsApp, US→SMS),
-  // logged as an interaction in the timeline, and opt-out / "No llamar" gated.
+  // logged as an interaction in the timeline, and opt-out / "Do Not Call" gated.
   await sendMessage(l, tpl.body, {});
 }
 

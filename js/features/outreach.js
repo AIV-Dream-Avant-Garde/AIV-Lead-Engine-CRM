@@ -98,7 +98,7 @@ async function sendMessage(lead, body, opts) {
   opts = opts || {};
   if (!lead) return null;
   const channel = opts.channel || pickChannel(lead);
-  if (lead.status === 'No llamar') { toast('Este lead está en "No llamar" / opt-out — no se envía.', 'error'); return null; }
+  if (lead.status === 'Do Not Call') { toast('Este lead está en "Do Not Call" / opt-out — no se envía.', 'error'); return null; }
   const agent = ((S.session && S.session.userName) || '').split(' ')[0] || '';
   const text  = renderTemplate(body, lead, agent);
   if (!text.trim()) { toast('El mensaje está vacío.', 'error'); return null; }
@@ -151,10 +151,10 @@ function renderComposer(lead) {
   _toggleSubject();
   _fillComposerTemplates(lead);
   renderMsgPreview();
-  const optedOut = lead.status === 'No llamar';
+  const optedOut = lead.status === 'Do Not Call';
   const note = document.getElementById('msg-optout-note');
   const btn  = document.getElementById('msg-send-btn');
-  if (note) { note.style.display = optedOut ? 'block' : 'none'; note.textContent = optedOut ? 'Lead en "No llamar" / opt-out — no se puede enviar.' : ''; }
+  if (note) { note.style.display = optedOut ? 'block' : 'none'; note.textContent = optedOut ? 'Lead en "Do Not Call" / opt-out — no se puede enviar.' : ''; }
   if (btn) btn.disabled = optedOut;
 }
 

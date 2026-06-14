@@ -42,7 +42,7 @@ test('isWeakPin: rejects repeats and sequences, allows strong', () => {
 
 // ── Lead scoring (deterministic, weight-driven) ──────────────────────
 test('scoreLead: deterministic and weight-correct', () => {
-  const strong = {phone:'+573001112222', rating:'4.5', reviews:'127', status:'Nuevo', website:'x.co', followUpDate:''};
+  const strong = {phone:'+573001112222', rating:'4.5', reviews:'127', status:'New', website:'x.co', followUpDate:''};
   const empty  = {phone:'N/A', rating:'', reviews:'', status:'', website:'N/A', followUpDate:''};
   eq(scoreLead(strong), scoreLead(strong), 'deterministic');
   // 40 phone + 20 ratingHigh + 15 reviewsHigh + 10 statusNuevo + 5 website = 90
@@ -215,24 +215,24 @@ test('cadenceResolveChannel: phone-by-country, else email, else unreachable', ()
 });
 
 test('cadenceEligible: only untouched + reachable + not-yet-enrolled', () => {
-  const ok = {status:'Nuevo', country:'Colombia', phone:'3201234567'};
+  const ok = {status:'New', country:'Colombia', phone:'3201234567'};
   assert(cadenceEligible(ok, false), 'fresh reachable lead is eligible');
   assert(!cadenceEligible(ok, true), 'already enrolled → not eligible');
-  assert(!cadenceEligible({...ok, status:'Contactado'}, false), 'worked lead → not eligible');
-  assert(!cadenceEligible({...ok, status:'No llamar'}, false), 'opted-out → not eligible');
-  assert(!cadenceEligible({status:'Nuevo', country:'Mexico', phone:'3201234567'}, false), 'no channel → not eligible');
+  assert(!cadenceEligible({...ok, status:'Contacted'}, false), 'worked lead → not eligible');
+  assert(!cadenceEligible({...ok, status:'Do Not Call'}, false), 'opted-out → not eligible');
+  assert(!cadenceEligible({status:'New', country:'Mexico', phone:'3201234567'}, false), 'no channel → not eligible');
 });
 
 test('cadenceGuard: live state → correct stop/pause', () => {
   const seq = {enrolledAt:'2026-05-01T00:00:00Z'};
-  eq(cadenceGuard({status:'Nuevo'}, seq), '', 'fresh → proceed');
-  eq(cadenceGuard({status:'No llamar'}, seq), 'stopped:optout');
-  eq(cadenceGuard({status:'Cerrado'}, seq), 'stopped:closed');
-  eq(cadenceGuard({status:'No interesado'}, seq), 'stopped:rejected');
-  eq(cadenceGuard({status:'Negociacion fallida'}, seq), 'stopped:rejected');
-  eq(cadenceGuard({status:'Nuevo', lockedBy:'agent1'}, seq), 'paused:claimed');
-  eq(cadenceGuard({status:'Contactado'}, seq), 'paused:claimed', 'human engaged');
-  eq(cadenceGuard({status:'Nuevo', lastReplyAt:'2026-05-02T00:00:00Z'}, seq), 'paused:replied');
+  eq(cadenceGuard({status:'New'}, seq), '', 'fresh → proceed');
+  eq(cadenceGuard({status:'Do Not Call'}, seq), 'stopped:optout');
+  eq(cadenceGuard({status:'Closed Won'}, seq), 'stopped:closed');
+  eq(cadenceGuard({status:'Not Interested'}, seq), 'stopped:rejected');
+  eq(cadenceGuard({status:'Closed Lost'}, seq), 'stopped:rejected');
+  eq(cadenceGuard({status:'New', lockedBy:'agent1'}, seq), 'paused:claimed');
+  eq(cadenceGuard({status:'Contacted'}, seq), 'paused:claimed', 'human engaged');
+  eq(cadenceGuard({status:'New', lastReplyAt:'2026-05-02T00:00:00Z'}, seq), 'paused:replied');
   eq(cadenceGuard(null, seq), 'stopped:rejected', 'missing lead');
 });
 
@@ -309,10 +309,10 @@ test('dailyRemaining: budget resets when the date rolls', () => {
 // ── "Responder ahora" queue — speed-to-lead (Project: conversion) ─────────
 test('leadsNeedingResponse: surfaces leads whose latest message is inbound', () => {
   const leads = [
-    {id:'A', name:'A', status:'Contactado'},
-    {id:'B', name:'B', status:'Nuevo'},
-    {id:'C', name:'C', status:'No llamar'},
-    {id:'D', name:'D', status:'Nuevo'},
+    {id:'A', name:'A', status:'Contacted'},
+    {id:'B', name:'B', status:'New'},
+    {id:'C', name:'C', status:'Do Not Call'},
+    {id:'D', name:'D', status:'New'},
   ];
   const inter = [
     {leadId:'A', direction:'out', body:'hola',        createdAt:'2026-06-01T10:00:00Z'},
@@ -329,7 +329,7 @@ test('leadsNeedingResponse: surfaces leads whose latest message is inbound', () 
 });
 
 test('leadsNeedingResponse: sorts most-recent reply first', () => {
-  const leads = [{id:'X',status:'Nuevo'},{id:'Y',status:'Nuevo'}];
+  const leads = [{id:'X',status:'New'},{id:'Y',status:'New'}];
   const inter = [
     {leadId:'X', direction:'in', createdAt:'2026-06-01T10:00:00Z'},
     {leadId:'Y', direction:'in', createdAt:'2026-06-01T12:00:00Z'},
@@ -351,10 +351,10 @@ test('waitedLabel: compact m/h/d, clamps future', () => {
 // ── Rep performance + leaderboard (motivation / recruiting) ──────────────
 test('repStats: worked/closed/conversion + earnings across both roles', () => {
   const leads = [
-    {id:'1', closerId:'me',   status:'Cerrado'},
-    {id:'2', closerId:'me',   status:'Contactado'},
-    {id:'3', providerId:'me', status:'Cerrado'},
-    {id:'4', closerId:'other',status:'Cerrado'},
+    {id:'1', closerId:'me',   status:'Closed Won'},
+    {id:'2', closerId:'me',   status:'Contacted'},
+    {id:'3', providerId:'me', status:'Closed Won'},
+    {id:'4', closerId:'other',status:'Closed Won'},
   ];
   const comms = [
     {leadId:'1', closerId:'me',   closerAmount:100000, status:'paid'},
@@ -373,7 +373,7 @@ test('repStats: worked/closed/conversion + earnings across both roles', () => {
 test('repStats: empty + cancelled-only are safe', () => {
   eq(repStats('x', [], []).total, 0, 'empty');
   eq(repStats('x', [], [{closerId:'x',closerAmount:9,status:'cancelled'}]).paid, 0, 'cancelled ignored');
-  eq(repStats('x', [{id:'1',closerId:'x',status:'Nuevo'}], []).conversion, 0, '0 closed → 0%');
+  eq(repStats('x', [{id:'1',closerId:'x',status:'New'}], []).conversion, 0, '0 closed → 0%');
 });
 
 test('teamLeaderboard: ranks active members by closed desc', () => {
@@ -383,9 +383,9 @@ test('teamLeaderboard: ranks active members by closed desc', () => {
     {id:'c', name:'C', active:'false'}, // inactive excluded
   ];
   const leads = [
-    {id:'1', closerId:'a', status:'Cerrado'},
-    {id:'2', closerId:'a', status:'Cerrado'},
-    {id:'3', closerId:'b', status:'Cerrado'},
+    {id:'1', closerId:'a', status:'Closed Won'},
+    {id:'2', closerId:'a', status:'Closed Won'},
+    {id:'3', closerId:'b', status:'Closed Won'},
   ];
   const lb = teamLeaderboard(team, leads, []);
   eq(lb.length, 2, 'only active members');

@@ -81,23 +81,23 @@ function cadenceResolveChannel(lead) {
 // Is a lead eligible to be ENROLLED? (caller supplies hasSeq = already enrolled)
 function cadenceEligible(lead, hasSeq) {
   if (!lead || hasSeq) return false;
-  if (String(lead.status || 'Nuevo') !== 'Nuevo') return false;   // untouched leads only
+  if (String(lead.status || 'New') !== 'New') return false;   // untouched leads only
   if (cadenceResolveChannel(lead) === '') return false;           // must be reachable
   return true;
 }
 
 // Why a sequence must stop/pause RIGHT NOW given the lead's live state.
 // '' = proceed. Order: terminal stops, then claimed, then replied, then any
-// non-Nuevo status (a human has engaged → hand it off).
+// non-New status (a human has engaged → hand it off).
 function cadenceGuard(lead, seq) {
   if (!lead) return 'stopped:rejected';
-  const status = String(lead.status || 'Nuevo');
-  if (status === 'No llamar')        return 'stopped:optout';
-  if (status === 'Cerrado')          return 'stopped:closed';
-  if (status === 'No interesado' || status === 'Negociacion fallida' || status === 'Negociación fallida') return 'stopped:rejected';
+  const status = String(lead.status || 'New');
+  if (status === 'Do Not Call')        return 'stopped:optout';
+  if (status === 'Closed Won')          return 'stopped:closed';
+  if (status === 'Not Interested' || status === 'Closed Lost' || status === 'Closed Lost') return 'stopped:rejected';
   if (String(lead.lockedBy || ''))   return 'paused:claimed';
   if (replyShouldPause(lead, seq))   return 'paused:replied';
-  if (status !== 'Nuevo')            return 'paused:claimed';      // Contactado/Interesado
+  if (status !== 'New')            return 'paused:claimed';      // Contacted/Interested
   return '';
 }
 

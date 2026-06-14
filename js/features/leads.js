@@ -4,7 +4,7 @@
 function isOverdue(lead) {
   if (!lead.followUpDate) return false;
   return new Date(lead.followUpDate) < new Date() &&
-    lead.status !== 'Cerrado' && lead.status !== 'No llamar';
+    lead.status !== 'Closed Won' && lead.status !== 'Do Not Call';
 }
 
 function isTodayFU(lead) {
@@ -41,8 +41,8 @@ function scoreLead(l) {
     if (rev >= 50)                                 s += W.reviewsHigh;
     else if (rev >= 10)                            s += W.reviewsMid;
   }
-  if (l.status === 'Nuevo')                        s += W.statusNuevo;
-  else if (l.status === 'Contactado')              s += W.statusContact;
+  if (l.status === 'New')                        s += W.statusNuevo;
+  else if (l.status === 'Contacted')              s += W.statusContact;
   if (isOverdue(l))                                s += W.fuOverdue;
   else if (isTodayFU(l))                           s += W.fuToday;
   if (l.website && l.website !== 'N/A')            s += W.hasWebsite;
@@ -168,7 +168,7 @@ function renderTable() {
     tbody.innerHTML = slice.map(l => {
       const sc   = STATUS_CLS[l.status] || 'new';
       const sel  = S.selected.has(l.id) ? 'selected' : '';
-      const dnc  = l.status === 'No llamar' ? 'dnc-row' : '';
+      const dnc  = l.status === 'Do Not Call' ? 'dnc-row' : '';
       const rat  = l.rating && l.rating !== 'N/A' ? '★ ' + l.rating : '--';
       const lc0  = S.calls.filter(x => x.leadId === l.id)
         .sort((a,b) => new Date(b.calledAt) - new Date(a.calledAt))[0];
@@ -188,7 +188,7 @@ function renderTable() {
         <td>${srcBadgeHTML(l.source)}</td>
         <td>${fuBadgeHTML(l)}</td>
         <td style="font-family:'DM Mono',monospace;font-size:11px">${esc(rat)}</td>
-        <td><span class="sbadge ${sc}">${esc(l.status || 'Nuevo')}</span>${l.refundedAt ? '<span style="font-size:9px;background:#c0392b;color:#fff;border-radius:3px;padding:1px 4px;margin-left:3px">Reemb.</span>' : ''}</td>
+        <td><span class="sbadge ${sc}">${esc(l.status || 'New')}</span>${l.refundedAt ? '<span style="font-size:9px;background:#c0392b;color:#fff;border-radius:3px;padding:1px 4px;margin-left:3px">Reemb.</span>' : ''}</td>
         <td style="font-size:11px">${fmtD(l.updatedAt || l.importedAt)}</td>
         <td style="font-size:11px">${lc_}</td>
         <td>${lockCell}</td>
@@ -251,10 +251,10 @@ function updateBulkBar()      {
 function applyBulkStatus() {
   const st = document.getElementById('bulk-status')?.value;
   if (!st) { toast('Selecciona un estado.', 'error'); return; }
-  // "Cerrado" must capture a deal value and create the commission record — that
+  // "Closed Won" must capture a deal value and create the commission record — that
   // only happens through the single-lead flow. Block it from the bulk path so a
   // closed-won deal can never be recorded with zero revenue.
-  if (st === 'Cerrado') { toast('Abre cada lead para cerrarlo: "Cerrado" requiere el valor del negocio.', 'error', 6000); return; }
+  if (st === 'Closed Won') { toast('Abre cada lead para cerrarlo: "Closed Won" requiere el valor del negocio.', 'error', 6000); return; }
   const n = S.selected.size;
   if (!confirm(`¿Cambiar estado de ${n} lead${n !== 1 ? 's' : ''} a "${st}"? Esta acción no se puede deshacer.`)) return;
   S.leads.forEach(l => { if (S.selected.has(l.id)) { l.status = st; l.updatedAt = new Date().toISOString(); pushLead(l); } });
@@ -301,10 +301,10 @@ function applyBulkAction() {
   } else if (act === 'dnc') {
     const reason = document.getElementById('bulk-action-text')?.value?.trim();
     if (!reason) { toast('Ingresa la razón DNC — requerido como registro legal.', 'error'); return; }
-    if (!confirm(`¿Marcar ${S.selected.size} lead(s) como "No llamar"?`)) return;
+    if (!confirm(`¿Marcar ${S.selected.size} lead(s) como "Do Not Call"?`)) return;
     S.leads.forEach(l => {
       if (S.selected.has(l.id)) {
-        l.status    = 'No llamar';
+        l.status    = 'Do Not Call';
         l.dncReason = reason;
         l.updatedAt = now;
         pushLead(l);
@@ -344,7 +344,7 @@ function openLead(id) {
   document.getElementById('m-meta').textContent =
     [l.country, l.city, l.barrio, l.keyword].filter(Boolean).join(' · ')
     + (_seq ? ' · Secuencia: ' + seqStateLabel(_seq.state) : '');
-  document.getElementById('m-status').value    = l.status     || 'Nuevo';
+  document.getElementById('m-status').value    = l.status     || 'New';
   document.getElementById('m-followup').value  = l.followUpDate || '';
 
   const dvEl = document.getElementById('m-deal-value');
@@ -352,7 +352,7 @@ function openLead(id) {
   renderDealPreview(l);
 
   const dncWrap = document.getElementById('m-dnc-wrap');
-  if (dncWrap) dncWrap.style.display = l.status === 'No llamar' ? 'block' : 'none';
+  if (dncWrap) dncWrap.style.display = l.status === 'Do Not Call' ? 'block' : 'none';
   if (l.dncReason) { const dr = document.getElementById('m-dnc-reason'); if (dr) dr.value = l.dncReason; }
 
   // Detail grid with editable phone + address
@@ -405,10 +405,10 @@ function openLead(id) {
   // Action buttons
   const addr    = l.address && l.address !== 'N/A' ? l.address : l.name;
   const mapsLink = addr ? `<a class="action-btn" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}" target="_blank"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;vertical-align:middle;margin-right:4px"><path d="M8 1a5 5 0 0 0-5 5c0 3.5 5 9 5 9s5-5.5 5-9a5 5 0 0 0-5-5z"/><circle cx="8" cy="6" r="1.5"/></svg>Maps</a>` : '';
-  const canCall  = l.status !== 'No llamar' && l.phone && l.phone !== 'N/A';
+  const canCall  = l.status !== 'Do Not Call' && l.phone && l.phone !== 'N/A';
   const callBtn  = canCall
     ? `<button class="action-btn" onclick="startCallFromModal('${l.id}')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;vertical-align:middle;margin-right:4px"><path d="M5 1.5H3.5A1.5 1.5 0 0 0 2 3C2 9.6 6.4 14 13 14a1.5 1.5 0 0 0 1.5-1.5V11l-3-1-1 1.5C9 10.7 5.3 7 4.5 5.5L6 4.5l-1-3z"/></svg>Llamar</button>`
-    : `<span class="action-btn red-btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;vertical-align:middle;margin-right:4px"><circle cx="8" cy="8" r="6.5"/><path d="M3.5 3.5l9 9"/></svg>No llamar</span>`;
+    : `<span class="action-btn red-btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;vertical-align:middle;margin-right:4px"><circle cx="8" cy="8" r="6.5"/><path d="M3.5 3.5l9 9"/></svg>Do Not Call</span>`;
   document.getElementById('m-action-btns').innerHTML = mapsLink + callBtn;
 
   renderLeadCallHistory(id);
@@ -502,7 +502,7 @@ function closeModal() {
 function onModalStatusChange() {
   const val  = document.getElementById('m-status')?.value;
   const wrap = document.getElementById('m-dnc-wrap');
-  if (wrap) wrap.style.display = val === 'No llamar' ? 'block' : 'none';
+  if (wrap) wrap.style.display = val === 'Do Not Call' ? 'block' : 'none';
 }
 
 function addNote() {
@@ -555,24 +555,24 @@ function saveLead() {
 
   const newStatus = document.getElementById('m-status')?.value;
 
-  // Intercept Cerrado — require deal value. Persist the field edits captured
+  // Intercept Closed Won — require deal value. Persist the field edits captured
   // above FIRST: the deal-value overlay can be cancelled, and without this the
   // name/phone/email/address edits would be lost (in-memory only, never saved).
-  if (newStatus === 'Cerrado' && l.status !== 'Cerrado') {
+  if (newStatus === 'Closed Won' && l.status !== 'Closed Won') {
     l.updatedAt = new Date().toISOString();
     pushLead(l);
     interceptCerrado(l.id);
     return;
   }
 
-  // Negociacion fallida — release closer, cancel pending commission
-  if (newStatus === 'Negociacion fallida' && l.status !== 'Negociacion fallida') {
+  // Closed Lost — release closer, cancel pending commission
+  if (newStatus === 'Closed Lost' && l.status !== 'Closed Lost') {
     if (!Array.isArray(l.workHistory)) l.workHistory = [];
     if (l.closerId) {
       l.workHistory.push({
         closerId:   l.closerId,
         closerName: S.team.find(m => m.id === l.closerId)?.name || l.closerId,
-        outcome:    'Negociacion fallida',
+        outcome:    'Closed Lost',
         releasedAt: new Date().toISOString(),
       });
     }
@@ -581,19 +581,19 @@ function saveLead() {
   }
 
   // DNC guard — require reason
-  if (newStatus === 'No llamar' && l.status !== 'No llamar') {
+  if (newStatus === 'Do Not Call' && l.status !== 'Do Not Call') {
     const reason = document.getElementById('m-dnc-reason')?.value?.trim();
     if (!reason) { toast('Por favor ingresa la razón DNC — requerido como registro legal.', 'error'); return; }
     l.dncReason = reason;
   }
 
-  // Assign closer at Interesado
-  if (newStatus === 'Interesado' && l.status !== 'Interesado' && !l.closerId && S.session) {
+  // Assign closer at Interested
+  if (newStatus === 'Interested' && l.status !== 'Interested' && !l.closerId && S.session) {
     l.closerId   = S.session.userId;
     l.closerRate = S.session.closerRate || 0;
     l.assignedAt = new Date().toISOString();
     l.lockedBy   = S.session.userId;
-    l.lockedUntil = ''; // permanent assignment — no 4h expiry at Interesado
+    l.lockedUntil = ''; // permanent assignment — no 4h expiry at Interested
   }
 
   l.status       = newStatus;
@@ -608,8 +608,8 @@ function saveLead() {
 function deleteLeadModal() {
   const l = S.leads.find(x => x.id === S.curLeadId);
   if (!l) return;
-  if (l.status === 'No llamar' && S.session?.role !== 'admin') {
-    toast('Solo admin puede eliminar leads marcados como "No llamar".', 'error');
+  if (l.status === 'Do Not Call' && S.session?.role !== 'admin') {
+    toast('Solo admin puede eliminar leads marcados como "Do Not Call".', 'error');
     return;
   }
   if (S.config.scriptUrl) sheetsCall({action:'delete', id:S.curLeadId});

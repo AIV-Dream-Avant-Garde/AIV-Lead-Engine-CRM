@@ -63,13 +63,13 @@ function showSignalBanner() {
     items.push(`${overdue.length} seguimiento${overdue.length !== 1 ? 's' : ''} vencido${overdue.length !== 1 ? 's' : ''}`);
 
   if (role === 'closer' || role === 'solo') {
-    const assigned = S.leads.filter(l => l.closerId === uid_ && l.status !== 'Cerrado' && l.status !== 'No llamar');
+    const assigned = S.leads.filter(l => l.closerId === uid_ && l.status !== 'Closed Won' && l.status !== 'Do Not Call');
     if (assigned.length)
       items.push(`${assigned.length} lead${assigned.length !== 1 ? 's' : ''} asignado${assigned.length !== 1 ? 's' : ''} a ti`);
   }
 
   if (role === 'solo' || role === 'admin') {
-    const myNew = S.leads.filter(l => l.providerId === uid_ && l.status === 'Nuevo');
+    const myNew = S.leads.filter(l => l.providerId === uid_ && l.status === 'New');
     if (myNew.length) items.push(`${myNew.length} de tus leads sin trabajar aun`);
   }
 
@@ -135,7 +135,7 @@ function openTeamModal(memberId) {
       document.getElementById('tm-contact').value = m.contact || '';
     }
   } else {
-    titleEl.textContent = 'Nuevo miembro del equipo';
+    titleEl.textContent = 'New miembro del equipo';
   }
   modal.classList.add('open');
 }
@@ -667,7 +667,7 @@ function renderAdmin() {
           return `<div class="team-row">
             <div class="team-info">
               <div class="team-name">${esc(l.name)}</div>
-              <div class="team-meta">${esc(l.phone||'--')} · ${esc(l.city||'')} ${esc(l.barrio||'')} · Estado: ${esc(l.status||'Nuevo')}</div>
+              <div class="team-meta">${esc(l.phone||'--')} · ${esc(l.city||'')} ${esc(l.barrio||'')} · Estado: ${esc(l.status||'New')}</div>
               <div class="team-meta" style="color:var(--amber)">Reclamado por: ${esc(lockerName)} · Expira en: ${lockCountdown(l)}</div>
             </div>
             <div style="display:flex;gap:6px;flex-shrink:0">
@@ -680,7 +680,7 @@ function renderAdmin() {
   }
 
   // DNC registry
-  const dncLeads = S.leads.filter(l => l.status === 'No llamar');
+  const dncLeads = S.leads.filter(l => l.status === 'Do Not Call');
   const dncCount = document.getElementById('admin-dnc-count');
   if (dncCount) dncCount.textContent = dncLeads.length + ' registro' + (dncLeads.length !== 1 ? 's' : '');
   const dncWrap = document.getElementById('admin-dnc-list');
@@ -695,7 +695,7 @@ function renderAdmin() {
             </div>
             <button class="btn btn-ghost" style="font-size:11px;padding:4px 9px" onclick="openLead('${l.id}')">Ver ficha</button>
           </div>`).join('')
-      : '<div class="notes-empty">Sin leads marcados como "No llamar".</div>';
+      : '<div class="notes-empty">Sin leads marcados como "Do Not Call".</div>';
   }
 
   // Performance stats by team member

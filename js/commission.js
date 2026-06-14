@@ -14,7 +14,7 @@ function repStats(userId, leads, commissions) {
   const me = String(userId || '');
   const mine = (leads || []).filter(l => String(l.closerId) === me || String(l.providerId) === me);
   const worked = mine.length;
-  const closed = mine.filter(l => l.status === 'Cerrado').length;
+  const closed = mine.filter(l => l.status === 'Closed Won').length;
   const conversion = worked ? Math.round(closed / worked * 100) : 0;
   let paid = 0, pending = 0;
   (commissions || []).forEach(c => {
@@ -116,13 +116,13 @@ function confirmCerradoWithValue(leadId, dealValue) {
   lead.closerCommission   = closerAmount.toFixed(0);
   lead.providerCommission = providerAmount.toFixed(0);
   lead.commissionStatus   = 'pending';
-  lead.status             = 'Cerrado';
+  lead.status             = 'Closed Won';
   lead.updatedAt          = new Date().toISOString();
   if (!Array.isArray(lead.workHistory)) lead.workHistory = [];
   lead.workHistory.push({
     closerId:   lead.closerId,
     closerName: S.team.find(m => m.id === lead.closerId)?.name || S.session?.userName || '',
-    outcome:    'Cerrado',
+    outcome:    'Closed Won',
     closedAt:   lead.updatedAt,
     dealValue,
   });

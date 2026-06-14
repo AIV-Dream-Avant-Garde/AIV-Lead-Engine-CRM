@@ -41,7 +41,7 @@ function populateFilters() {
 }
 
 function updateBadges() {
-  const byStatus = st => S.leads.filter(l => (l.status || 'Nuevo') === st).length;
+  const byStatus = st => S.leads.filter(l => (l.status || 'New') === st).length;
   const setEl    = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
 
   setEl('nav-leads-badge', S.leads.length);
@@ -52,10 +52,10 @@ function updateBadges() {
   const rb = document.getElementById('nav-responder-badge');
   if (rb) { rb.textContent = rc; rb.style.display = rc > 0 ? '' : 'none'; }
   setEl('st-total', S.leads.length);
-  setEl('st-new',   byStatus('Nuevo'));
-  setEl('st-cont',  byStatus('Contactado'));
-  setEl('st-int',   byStatus('Interesado'));
-  setEl('st-clos',  byStatus('Cerrado'));
+  setEl('st-new',   byStatus('New'));
+  setEl('st-cont',  byStatus('Contacted'));
+  setEl('st-int',   byStatus('Interested'));
+  setEl('st-clos',  byStatus('Closed Won'));
 }
 
 // ── renderAll — single consolidated render ─────────────────

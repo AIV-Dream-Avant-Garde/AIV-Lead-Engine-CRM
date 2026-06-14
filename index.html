@@ -150,10 +150,10 @@
   <p class="section-sub">La URL del Apps Script es todo lo que necesitas aqui. Todos los API keys viven en el servidor — nunca en el navegador.</p>
   <div class="stats-grid">
     <div class="stat-card"><div class="stat-val blue" id="st-total">0</div><div class="stat-label">Total leads</div></div>
-    <div class="stat-card"><div class="stat-val" id="st-new">0</div><div class="stat-label">Nuevo</div></div>
-    <div class="stat-card"><div class="stat-val amber" id="st-cont">0</div><div class="stat-label">Contactado</div></div>
-    <div class="stat-card"><div class="stat-val teal" id="st-int">0</div><div class="stat-label">Interesado</div></div>
-    <div class="stat-card"><div class="stat-val lime" id="st-clos">0</div><div class="stat-label">Cerrado</div></div>
+    <div class="stat-card"><div class="stat-val" id="st-new">0</div><div class="stat-label">New</div></div>
+    <div class="stat-card"><div class="stat-val amber" id="st-cont">0</div><div class="stat-label">Contacted</div></div>
+    <div class="stat-card"><div class="stat-val teal" id="st-int">0</div><div class="stat-label">Interested</div></div>
+    <div class="stat-card"><div class="stat-val lime" id="st-clos">0</div><div class="stat-label">Closed Won</div></div>
   </div>
   <div class="signal-banner" id="signal-banner"><div class="signal-banner-body"><div class="signal-banner-title" id="signal-title">—</div><div class="signal-banner-items" id="signal-items"></div></div><button class="signal-banner-dismiss" aria-label="Descartar" onclick="this.closest('.signal-banner').classList.remove('visible')">×</button></div>
   <div id="storage-warn" style="display:none;margin-bottom:14px"></div>
@@ -199,7 +199,7 @@
       <div style="font-size:11px;color:var(--body);margin:4px 0 10px">Rota el PIN de admin sin editar el código. Se guarda solo en este navegador.</div>
       <div class="form-grid">
         <div class="field"><label>PIN actual</label><input type="password" id="apin-cur" maxlength="4" placeholder="••••"></div>
-        <div class="field"><label>Nuevo PIN (4 dígitos)</label><input type="password" id="apin-new" maxlength="4" placeholder="••••"></div>
+        <div class="field"><label>New PIN (4 dígitos)</label><input type="password" id="apin-new" maxlength="4" placeholder="••••"></div>
         <div class="field"><label>Confirmar nuevo PIN</label><input type="password" id="apin-new2" maxlength="4" placeholder="••••"></div>
       </div>
       <button class="btn btn-primary" style="margin-top:10px" onclick="changeAdminPin()">Actualizar PIN</button>
@@ -215,7 +215,7 @@
   <div class="card">
     <div class="card-title">Configurar Apps Script (5 pasos)</div>
     <div class="steps-list" style="margin-top:14px">
-      <div class="step-row"><div class="step-num">1</div><div class="step-text">Ve a <strong>script.google.com</strong> → Nuevo proyecto</div></div>
+      <div class="step-row"><div class="step-num">1</div><div class="step-text">Ve a <strong>script.google.com</strong> → New proyecto</div></div>
       <div class="step-row"><div class="step-num">2</div><div class="step-text">Pega el codigo de <code>apps-script/Code.gs</code>. Rellena las constantes (API keys, Twilio, Drive, Spreadsheet ID)</div></div>
       <div class="step-row"><div class="step-num">3</div><div class="step-text"><strong>Implementar → Nueva implementacion → Aplicacion web</strong> → Ejecutar como: Yo → Acceso: Cualquier persona → Implementar → Autorizar</div></div>
       <div class="step-row"><div class="step-num">4</div><div class="step-text">Copia la URL de la aplicacion web y pegala arriba</div></div>
@@ -360,8 +360,8 @@ Content-Type: application/json
     <span class="bulk-count" id="bulk-count">0 seleccionados</span>
     <select id="bulk-status" class="filter-sel">
       <option value="">Cambiar estado...</option>
-      <option>Nuevo</option><option>Contactado</option><option>Interesado</option>
-      <option>Cerrado</option><option>Negociacion fallida</option><option>No interesado</option>
+      <option>New</option><option>Contacted</option><option>Interested</option>
+      <option>Closed Won</option><option>Closed Lost</option><option>Not Interested</option>
     </select>
     <button class="btn btn-amber btn-sm" onclick="applyBulkStatus()">Aplicar</button>
     <div class="bulk-divider"></div>
@@ -370,7 +370,7 @@ Content-Type: application/json
       <option value="followup">Fijar seguimiento</option>
       <option value="source">Cambiar fuente</option>
       <option value="closer">Asignar cerrador (yo)</option>
-      <option value="dnc">Marcar No llamar</option>
+      <option value="dnc">Marcar Do Not Call</option>
     </select>
     <input type="date" id="bulk-action-date" style="display:none;font-size:12px;padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--hl)">
     <input type="text" id="bulk-action-text" style="display:none;font-size:12px;padding:4px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--hl);width:140px" placeholder="">
@@ -386,8 +386,8 @@ Content-Type: application/json
     <select class="filter-sel" id="f-source" onchange="renderTable()"><option value="">Todas las fuentes</option></select>
     <select class="filter-sel" id="f-status" onchange="renderTable()">
       <option value="">Todos los estados</option>
-      <option>Nuevo</option><option>Contactado</option><option>Interesado</option>
-      <option>Cerrado</option><option>Negociacion fallida</option><option>No interesado</option><option>No llamar</option>
+      <option>New</option><option>Contacted</option><option>Interested</option>
+      <option>Closed Won</option><option>Closed Lost</option><option>Not Interested</option><option>Do Not Call</option>
     </select>
     <select class="filter-sel" id="f-mine" onchange="renderTable()"><option value="">Pool completo</option><option value="mine">Mis leads</option></select>
     <select class="filter-sel" id="f-followup" onchange="renderTable()">
@@ -577,10 +577,10 @@ Content-Type: application/json
   <!-- DNC registry -->
   <div class="admin-section">
     <div class="admin-section-title">
-      <span>Registro No llamar (DNC)</span>
+      <span>Registro Do Not Call (DNC)</span>
       <span id="admin-dnc-count" style="font-size:11px;color:var(--body);font-weight:400"></span>
     </div>
-    <div id="admin-dnc-list"><div class="notes-empty">Sin leads marcados como No llamar.</div></div>
+    <div id="admin-dnc-list"><div class="notes-empty">Sin leads marcados como Do Not Call.</div></div>
   </div>
 
   <!-- Scheduled scraper jobs -->
@@ -713,7 +713,7 @@ Content-Type: application/json
   <div class="card">
     <div class="card-title">Filtros</div>
     <div class="form-grid" style="margin-top:14px">
-      <div class="field"><label>Estado</label><select id="ex-st"><option value="">Todos</option><option>Nuevo</option><option>Contactado</option><option>Interesado</option><option>Cerrado</option><option>Negociacion fallida</option><option>No interesado</option><option>No llamar</option></select></div>
+      <div class="field"><label>Estado</label><select id="ex-st"><option value="">Todos</option><option>New</option><option>Contacted</option><option>Interested</option><option>Closed Won</option><option>Closed Lost</option><option>Not Interested</option><option>Do Not Call</option></select></div>
       <div class="field"><label>País</label><select id="ex-country"><option value="">Todos</option></select></div>
       <div class="field"><label>Ciudad</label><select id="ex-city"><option value="">Todas</option></select></div>
       <div class="field"><label>Barrio</label><select id="ex-barrio"><option value="">Todos</option></select></div>
@@ -755,8 +755,8 @@ Content-Type: application/json
       <div class="form-grid" style="margin-bottom:14px">
         <div class="field"><label>Estado</label>
           <select id="m-status" onchange="onModalStatusChange()">
-            <option>Nuevo</option><option>Contactado</option><option>Interesado</option>
-            <option>Cerrado</option><option>Negociacion fallida</option><option>No interesado</option><option>No llamar</option>
+            <option>New</option><option>Contacted</option><option>Interested</option>
+            <option>Closed Won</option><option>Closed Lost</option><option>Not Interested</option><option>Do Not Call</option>
           </select>
         </div>
         <div class="field"><label>Fecha de seguimiento</label>
@@ -771,7 +771,7 @@ Content-Type: application/json
         </div>
       </div>
       <div id="m-dnc-wrap" style="display:none">
-        <div class="field" style="margin-bottom:14px"><label>Razon "No llamar" (requerido — registro legal)</label><input type="text" id="m-dnc-reason" placeholder="Ej: Solicito no ser contactado el 15/03/2025"></div>
+        <div class="field" style="margin-bottom:14px"><label>Razon "Do Not Call" (requerido — registro legal)</label><input type="text" id="m-dnc-reason" placeholder="Ej: Solicito no ser contactado el 15/03/2025"></div>
       </div>
       <div class="field" id="m-deal-wrap" style="margin-bottom:14px">
         <label>Valor del negocio (COP)</label>
@@ -854,7 +854,7 @@ Content-Type: application/json
 <!-- TEAM MEMBER MODAL -->
 <div class="tm-modal-overlay" id="tm-modal" role="dialog" aria-modal="true" aria-labelledby="tm-modal-title">
   <div class="tm-modal-card">
-    <div class="tm-modal-title" id="tm-modal-title">Nuevo miembro del equipo</div>
+    <div class="tm-modal-title" id="tm-modal-title">New miembro del equipo</div>
     <input type="hidden" id="tm-id">
     <div class="form-grid">
       <div class="field"><label>Nombre completo</label><input type="text" id="tm-name" placeholder="Ana Gomez"></div>
