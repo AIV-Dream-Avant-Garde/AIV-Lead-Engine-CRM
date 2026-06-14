@@ -14,18 +14,18 @@ function renderPipeline() {
     {k:'Do Not Call',           c:'var(--s-dnc)'},
   ];
 
-  // Pipeline metrics bar
-  const openValue = S.leads
-    .filter(l => ['New','Contacted','Interested'].includes(l.status || 'New') && l.dealValue)
-    .reduce((s, l) => s + parseFloat(l.dealValue), 0);
+  // Pipeline metrics bar. NOTE: deal value only exists once a lead is Closed Won,
+  // so an "open pipeline $" would always read ~$0 — we show real won revenue
+  // instead. "This month" is keyed off the actual close date (leadClosedAt),
+  // not last-edited, so editing an old deal doesn't move it into this month.
   const openCount = S.leads.filter(l => ['New','Contacted','Interested'].includes(l.status || 'New')).length;
-  const closedThisMonth = (() => {
-    const m = new Date().toISOString().slice(0,7);
-    return S.leads.filter(l => l.status === 'Closed Won' && l.updatedAt && l.updatedAt.startsWith(m));
-  })();
+  const wonAll    = S.leads.filter(l => l.status === 'Closed Won');
+  const wonAllValue = wonAll.reduce((s, l) => s + parseFloat(l.dealValue || 0), 0);
+  const m = new Date().toISOString().slice(0,7);
+  const closedThisMonth = wonAll.filter(l => (leadClosedAt(l) || '').startsWith(m));
   const metricsHtml = `<div class="pipeline-metrics">
     <div class="pipeline-metric"><strong>${openCount}</strong>Active leads</div>
-    <div class="pipeline-metric"><strong>${fmtUSD(openValue)}</strong>Open pipeline</div>
+    <div class="pipeline-metric"><strong>${fmtUSD(wonAllValue)}</strong>Won (all-time)</div>
     <div class="pipeline-metric"><strong>${closedThisMonth.length}</strong>Closed this month</div>
     <div class="pipeline-metric"><strong>${fmtUSD(closedThisMonth.reduce((s,l)=>s+parseFloat(l.dealValue||0),0))}</strong>Revenue this month</div>
   </div>`;
