@@ -504,9 +504,9 @@ function doPost(e) {
         .forEach(t => ScriptApp.deleteTrigger(t));
       if (b.enabled) {
         if (fn === 'runScheduledScrapes') {
-          ScriptApp.newTrigger(fn).timeBased().everyDays(1).atHour(6).inTimezone('America/Bogota').create();
+          ScriptApp.newTrigger(fn).timeBased().everyDays(1).atHour(6).inTimezone('America/New_York').create();
         } else if (fn === 'sendWeeklyReport') {
-          ScriptApp.newTrigger(fn).timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(8).inTimezone('America/Bogota').create();
+          ScriptApp.newTrigger(fn).timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(8).inTimezone('America/New_York').create();
         } else if (fn === 'runCadence') {
           ScriptApp.newTrigger(fn).timeBased().everyHours(1).create();
         }
@@ -989,7 +989,7 @@ function runCadence() {
     const interactions = toObjs(getSheet(SHEETS.interactions, INTERACTION_HDR));
 
     let counter = {}; try { counter = JSON.parse(cfgGet('cadenceSentToday') || '{}'); } catch (e) {}
-    const todayKey = Utilities.formatDate(now, 'America/Bogota', 'yyyy-MM-dd');
+    const todayKey = Utilities.formatDate(now, 'America/New_York', 'yyyy-MM-dd');
     let remaining = dailyRemaining(counter, cfg.dailyCap, todayKey);
 
     // ── Pass 1: enroll eligible, not-yet-enrolled leads (batched append) ──
