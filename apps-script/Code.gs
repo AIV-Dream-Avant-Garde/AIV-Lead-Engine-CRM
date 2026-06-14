@@ -479,12 +479,13 @@ function doPost(e) {
       const {keyword,lat,lng,radius,maxResults,region} = b;
       const url='https://places.googleapis.com/v1/places:searchText';
       const hdr={'Content-Type':'application/json','X-Goog-Api-Key':PLACES_API_KEY,'X-Goog-FieldMask':'places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount,nextPageToken'};
-      let body={textQuery:keyword,locationBias:{circle:{center:{latitude:parseFloat(lat),longitude:parseFloat(lng)},radius:parseFloat(radius)}},maxResultCount:20};
-      if(region)body.regionCode=region;
+      const baseBody={textQuery:keyword,locationBias:{circle:{center:{latitude:parseFloat(lat),longitude:parseFloat(lng)},radius:parseFloat(radius)}},maxResultCount:20};
+      if(region)baseBody.regionCode=region;
       const MAX_API_CALLS = 15; // Guard against quota exhaustion
       let leads=[],token=null,tries=0,apiCalls=0;
       while(leads.length<(maxResults||100)&&tries<10&&apiCalls<MAX_API_CALLS){
-        if(token)body={textQuery:keyword,pageToken:token};
+        // Paging requests must repeat ALL original params + the pageToken (Places API New rule)
+        const body = token ? {...baseBody, pageToken:token} : baseBody;
         const r=UrlFetchApp.fetch(url,{method:'post',headers:hdr,payload:JSON.stringify(body),muteHttpExceptions:true});
         apiCalls++;
         const d=JSON.parse(r.getContentText());
@@ -685,9 +686,9 @@ function runScheduledScrapes() {
     let leads = [], token = null, tries = 0;
     const max = parseInt(job.maxResults) || 50;
     while (leads.length < max && tries < 10) {
-      const body = token
-        ? {textQuery:job.keyword, pageToken:token}
-        : {textQuery:job.keyword, locationBias:{circle:{center:{latitude:parseFloat(job.lat),longitude:parseFloat(job.lng)},radius:parseFloat(job.radius||1000)}},maxResultCount:20, ...(job.region?{regionCode:job.region}:{})};
+      // Paging requests must repeat ALL original params + the pageToken (Places API New rule)
+      const baseBody = {textQuery:job.keyword, locationBias:{circle:{center:{latitude:parseFloat(job.lat),longitude:parseFloat(job.lng)},radius:parseFloat(job.radius||1000)}},maxResultCount:20, ...(job.region?{regionCode:job.region}:{})};
+      const body = token ? {...baseBody, pageToken:token} : baseBody;
       const r = UrlFetchApp.fetch(url,{method:'post',headers:hdr,payload:JSON.stringify(body),muteHttpExceptions:true});
       const d = JSON.parse(r.getContentText());
       (d.places||[]).forEach(p => {
