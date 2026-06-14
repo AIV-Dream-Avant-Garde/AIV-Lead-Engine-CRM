@@ -680,7 +680,8 @@ function runScheduledScrapes() {
 
   const url = 'https://places.googleapis.com/v1/places:searchText';
   const hdr = {'Content-Type':'application/json','X-Goog-Api-Key':PLACES_API_KEY,
-    'X-Goog-FieldMask':'places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount'};
+    'X-Goog-FieldMask':'places.displayName,places.formattedAddress,places.addressComponents,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount,nextPageToken'};
+  const comp_=(p,types)=>{ const c=(p.addressComponents||[]).find(x=>(x.types||[]).some(t=>types.indexOf(t)>=0)); return c?(c.longText||c.shortText||''):''; };
 
   const now = new Date().toISOString();
   let totalAdded = 0;
@@ -688,17 +689,18 @@ function runScheduledScrapes() {
   jobs.filter(j => j.active).forEach(job => {
     let leads = [], token = null, tries = 0;
     const max = parseInt(job.maxResults) || 50;
+    const baseBody = {textQuery:job.keyword, locationBias:{circle:{center:{latitude:parseFloat(job.lat),longitude:parseFloat(job.lng)},radius:parseFloat(job.radius||1000)}},maxResultCount:20, ...(job.region?{regionCode:job.region}:{})};
     while (leads.length < max && tries < 10) {
-      const body = token
-        ? {textQuery:job.keyword, pageToken:token}
-        : {textQuery:job.keyword, locationBias:{circle:{center:{latitude:parseFloat(job.lat),longitude:parseFloat(job.lng)},radius:parseFloat(job.radius||1000)}},maxResultCount:20, ...(job.region?{regionCode:job.region}:{})};
+      // Paging requests must repeat ALL original params + the pageToken (Places API New rule)
+      const body = token ? {...baseBody, pageToken:token} : baseBody;
       const r = UrlFetchApp.fetch(url,{method:'post',headers:hdr,payload:JSON.stringify(body),muteHttpExceptions:true});
       const d = JSON.parse(r.getContentText());
       (d.places||[]).forEach(p => {
         if(leads.length < max) leads.push({
           name:p.displayName?.text||'N/A', phone:p.nationalPhoneNumber||'N/A',
           address:p.formattedAddress||'N/A', website:p.websiteUri||'N/A',
-          rating:p.rating||'N/A', reviews:p.userRatingCount||'N/A'
+          rating:p.rating||'N/A', reviews:p.userRatingCount||'N/A',
+          neighborhood:comp_(p,['neighborhood','sublocality','sublocality_level_1']), cityReal:comp_(p,['locality','postal_town'])
         });
       });
       token = d.nextPageToken; tries++;
@@ -711,7 +713,7 @@ function runScheduledScrapes() {
       if (phone && phone !== 'N/A' && key && !existing.has(key)) {
         const lead = {
           id:Utilities.getUuid(), name:l.name, phone, address:l.address, website:l.website,
-          rating:l.rating, reviews:l.reviews, country:job.country||'', city:job.city||'', barrio:job.barrio||'',
+          rating:l.rating, reviews:l.reviews, country:job.country||'', city:(l.cityReal||job.city||''), barrio:(l.neighborhood||''),
           keyword:job.keyword, source:job.source||'Scraper (auto)', sourceDetail:'',
           status:'New', dncReason:'', followUpDate:'', notes:JSON.stringify([]),
           providerId:'', providerRate:0, closerId:'', closerRate:0,

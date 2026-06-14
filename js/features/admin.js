@@ -466,6 +466,36 @@ function addScheduledJob() {
   renderScheduledJobs();
 }
 
+// Bulk-add: create a city-level scheduled job for EVERY keyword in the selected
+// category, so you pick an industry once instead of adding keywords one by one.
+// City-level (not neighborhood) because Google now labels each lead's real
+// neighborhood anyway, and it keeps the daily job count manageable.
+function addCategoryJobs() {
+  const country = document.getElementById('sj-country')?.value || DEFAULT_COUNTRY;
+  const city    = document.getElementById('sj-city')?.value || '';
+  const cat     = document.getElementById('sj-cat')?.value || '';
+  const radius  = document.getElementById('sj-radius')?.value || '5000';
+  const max     = parseInt(document.getElementById('sj-max')?.value || '60');
+  const cityLoc = LOCATIONS[country]?.[city];
+  if (!city || !cityLoc) { toast('Select a city first.', 'error'); return; }
+  const kws = (KEYWORDS[country]?.[cat]) || [];
+  if (!kws.length) { toast('Select a category first.', 'error'); return; }
+  if (!Array.isArray(S.scheduledJobs)) S.scheduledJobs = [];
+  const has = new Set(S.scheduledJobs.map(j => (j.keyword + '|' + j.city).toLowerCase()));
+  let added = 0;
+  kws.forEach(keyword => {
+    const k = (keyword + '|' + city).toLowerCase();
+    if (has.has(k)) return;
+    has.add(k);
+    S.scheduledJobs.push({keyword, country, city, barrio:'', lat:cityLoc.lat, lng:cityLoc.lng, radius, maxResults:max, region:COUNTRY_REGION[country]||'', source:'Scraper (auto)', active:true});
+    added++;
+  });
+  saveLocal();
+  if (S.config.scriptUrl) sheetsCall({action:'saveScheduledJobs', jobs:S.scheduledJobs});
+  renderScheduledJobs();
+  toast(added ? `Added ${added} job${added!==1?'s':''} — ${cat} in ${city}.` : 'Those jobs already exist.', added ? 'success' : 'info');
+}
+
 function toggleScheduledJob(idx) {
   if (!S.scheduledJobs?.[idx]) return;
   S.scheduledJobs[idx].active = !S.scheduledJobs[idx].active;
