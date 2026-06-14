@@ -478,18 +478,22 @@ function doPost(e) {
     if (a === 'scrape') {
       const {keyword,lat,lng,radius,maxResults,region} = b;
       const url='https://places.googleapis.com/v1/places:searchText';
-      const hdr={'Content-Type':'application/json','X-Goog-Api-Key':PLACES_API_KEY,'X-Goog-FieldMask':'places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount,nextPageToken'};
-      let body={textQuery:keyword,locationBias:{circle:{center:{latitude:parseFloat(lat),longitude:parseFloat(lng)},radius:parseFloat(radius)}},maxResultCount:20};
-      if(region)body.regionCode=region;
+      const hdr={'Content-Type':'application/json','X-Goog-Api-Key':PLACES_API_KEY,'X-Goog-FieldMask':'places.displayName,places.formattedAddress,places.addressComponents,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount,nextPageToken'};
+      const baseBody={textQuery:keyword,locationBias:{circle:{center:{latitude:parseFloat(lat),longitude:parseFloat(lng)},radius:parseFloat(radius)}},maxResultCount:20};
+      if(region)baseBody.regionCode=region;
       const MAX_API_CALLS = 15; // Guard against quota exhaustion
+      // Pull the REAL neighborhood + city from each place's address components so
+      // the stored label is where the business actually is, not the searched area.
+      const comp_=(p,types)=>{ const c=(p.addressComponents||[]).find(x=>(x.types||[]).some(t=>types.indexOf(t)>=0)); return c?(c.longText||c.shortText||''):''; };
       let leads=[],token=null,tries=0,apiCalls=0;
       while(leads.length<(maxResults||100)&&tries<10&&apiCalls<MAX_API_CALLS){
-        if(token)body={textQuery:keyword,pageToken:token};
+        // Paging requests must repeat ALL original params + the pageToken (Places API New rule)
+        const body = token ? {...baseBody, pageToken:token} : baseBody;
         const r=UrlFetchApp.fetch(url,{method:'post',headers:hdr,payload:JSON.stringify(body),muteHttpExceptions:true});
         apiCalls++;
         const d=JSON.parse(r.getContentText());
         if(d.error)return err_(d.error.message);
-        (d.places||[]).forEach(p=>{ if(leads.length<maxResults)leads.push({name:p.displayName?.text||'N/A',phone:p.nationalPhoneNumber||'N/A',address:p.formattedAddress||'N/A',website:p.websiteUri||'N/A',rating:p.rating||'N/A',reviews:p.userRatingCount||'N/A'}); });
+        (d.places||[]).forEach(p=>{ if(leads.length<maxResults)leads.push({name:p.displayName?.text||'N/A',phone:p.nationalPhoneNumber||'N/A',address:p.formattedAddress||'N/A',website:p.websiteUri||'N/A',rating:p.rating||'N/A',reviews:p.userRatingCount||'N/A',neighborhood:comp_(p,['neighborhood','sublocality','sublocality_level_1']),cityReal:comp_(p,['locality','postal_town'])}); });
         token=d.nextPageToken; tries++;
         if(!token)break;
         Utilities.sleep(2000);
