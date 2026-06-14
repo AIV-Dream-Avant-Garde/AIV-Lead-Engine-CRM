@@ -270,7 +270,7 @@ async function bulkMarkPaid() {
 function promptAdjustCollected(leadId) {
   const lead = S.leads.find(l => l.id === leadId);
   if (!lead) return;
-  const raw = prompt(`How much was actually collected? (COP)\nContracted value: ${fmtCOP(lead.dealValue)}`, lead.collectedAmount || lead.dealValue || '');
+  const raw = prompt(`How much was actually collected? (COP)\nContracted value: ${fmtUSD(lead.dealValue)}`, lead.collectedAmount || lead.dealValue || '');
   if (raw === null) return;
   const reason = prompt('Reason for the adjustment (optional):') || '';
   adjustCollectedAmount(leadId, raw, reason);
@@ -616,7 +616,7 @@ function renderAdmin() {
           const paidInfo  = c.status === 'paid' ? ` · ${esc(c.paidBy||'')} · ${esc(c.paymentRef||'')}` : '';
           const refundInfo = (c.refundReason && c.status !== 'paid') ? ` · Reason: ${esc(c.refundReason)}` : '';
           const collInfo  = c.collectedAmount && parseFloat(c.collectedAmount) !== parseFloat(c.dealValue)
-            ? ` · Collected: ${fmtCOP(c.collectedAmount)}`
+            ? ` · Collected: ${fmtUSD(c.collectedAmount)}`
             : '';
           const amtStyle  = isClawback ? 'color:#c0392b;' : '';
           const actions   = c.status === 'pending'
@@ -629,9 +629,9 @@ function renderAdmin() {
           return `<div class="admin-comm-row">
             <div class="admin-comm-info">
               <div class="admin-comm-lead">${esc(c.leadName||'--')}</div>
-              <div class="admin-comm-detail">Contracted: ${fmtCOP(c.dealValue)}${collInfo} · Closer: ${esc(c.closerName||'--')} ${fmtCOP(c.closerAmount)}${provAmt ? ' · Provider: ' + esc(c.providerName||'--') + ' ' + fmtCOP(c.providerAmount) : ''} · ${fmtD(c.createdAt)}${paidInfo}${refundInfo}</div>
+              <div class="admin-comm-detail">Contracted: ${fmtUSD(c.dealValue)}${collInfo} · Closer: ${esc(c.closerName||'--')} ${fmtUSD(c.closerAmount)}${provAmt ? ' · Provider: ' + esc(c.providerName||'--') + ' ' + fmtUSD(c.providerAmount) : ''} · ${fmtD(c.createdAt)}${paidInfo}${refundInfo}</div>
             </div>
-            <span class="admin-comm-amount" style="${amtStyle}">${fmtCOP(totalAmt)}</span>
+            <span class="admin-comm-amount" style="${amtStyle}">${fmtUSD(totalAmt)}</span>
             <span class="comm-status-badge ${statusCls}">${statusLbl}</span>
             ${actions}
           </div>`;
@@ -725,7 +725,7 @@ function renderAdmin() {
             <span class="pill" style="font-family:'DM Mono',monospace;flex-shrink:0">#${i+1}</span>
             <div class="team-avatar">${esc(initials)}</div>
             <div style="flex:1;min-width:0"><div class="team-name">${esc(m.name)}</div><div class="team-meta">${m.role}${m.contact?' · '+esc(m.contact):''}</div></div>
-            ${entry.pending>0?`<span style="font-size:11px;color:var(--amber);font-family:'DM Mono',monospace">${fmtCOP(entry.pending)} pending</span>`:''}
+            ${entry.pending>0?`<span style="font-size:11px;color:var(--amber);font-family:'DM Mono',monospace">${fmtUSD(entry.pending)} pending</span>`:''}
           </div>
           <div class="perf-grid">
             <div class="perf-stat"><div class="perf-val">${mCalls.length}</div><div class="perf-lbl">Calls</div></div>
@@ -736,7 +736,7 @@ function renderAdmin() {
           <div class="perf-bar-wrap" style="margin-top:8px">
             <div class="perf-bar-label">Total earned</div>
             <div class="perf-bar-track"><div class="perf-bar-fill" style="background:var(--pos);width:${topTotal?Math.min(100,Math.round(entry.total/topTotal*100)):0}%"></div></div>
-            <div class="perf-bar-val">${fmtCOP(entry.total)}</div>
+            <div class="perf-bar-val">${fmtUSD(entry.total)}</div>
           </div>
         </div>`;
       }).join('') || '<div class="notes-empty">No activity in this period.</div>';

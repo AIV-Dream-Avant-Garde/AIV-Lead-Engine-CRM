@@ -39,10 +39,10 @@ function renderPerfil() {
   const setEl = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
   setEl('pst-leads',   myLeads.length);
   setEl('pst-closed',  myClosed.length);
-  setEl('pst-earned',  fmtCOP(totalPaid));
-  setEl('pst-pending', fmtCOP(totalPending));
+  setEl('pst-earned',  fmtUSD(totalPaid));
+  setEl('pst-pending', fmtUSD(totalPending));
   setEl('pst-rate',    (myLeads.length ? Math.round(myClosed.length / myLeads.length * 100) : 0) + '%');
-  setEl('pst-total',   fmtCOP(totalPaid + totalPending));
+  setEl('pst-total',   fmtUSD(totalPaid + totalPending));
 
   // Call stats
   const myCalls  = isAdmin ? S.calls : S.calls.filter(c => {
@@ -108,9 +108,9 @@ function renderPerfil() {
           return `<div class="comm-item">
             <div class="comm-info">
               <div class="comm-lead">${esc(c.leadName||'--')}</div>
-              <div class="comm-detail">Deal: ${fmtCOP(c.dealValue)} · ${fmtD(c.createdAt)}</div>
+              <div class="comm-detail">Deal: ${fmtUSD(c.dealValue)} · ${fmtD(c.createdAt)}</div>
             </div>
-            <span class="comm-amount">${fmtCOP(amt)}</span>
+            <span class="comm-amount">${fmtUSD(amt)}</span>
             <span class="comm-status-badge ${statusCls}">${statusLbl}</span>
           </div>`;
         }).join('')

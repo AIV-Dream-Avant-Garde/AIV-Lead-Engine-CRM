@@ -30,8 +30,8 @@ function renderAnalyticsKPIs() {
 
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
   set('kpi-deals',      closedThisMonth.length);
-  set('kpi-revenue',    fmtCOP(revenueThisMonth));
-  set('kpi-paid-comm',  fmtCOP(paidComm));
+  set('kpi-revenue',    fmtUSD(revenueThisMonth));
+  set('kpi-paid-comm',  fmtUSD(paidComm));
   set('kpi-close-rate', closeRate + '%');
 }
 
@@ -84,7 +84,7 @@ function renderSourceROI() {
         <td>${r.total}</td>
         <td>${r.closed}</td>
         <td>${r.rate}%</td>
-        <td>${fmtCOP(r.revenue)}</td>
+        <td>${fmtUSD(r.revenue)}</td>
       </tr>`).join('')
     : '<tr><td colspan="5" class="notes-empty">No data</td></tr>';
 }
@@ -107,7 +107,7 @@ function renderLeaderboard() {
         <td><strong>${esc(m.name)}</strong></td>
         <td><span class="source-badge src-default">${esc(ROLE_LABELS[m.role] || m.role)}</span></td>
         <td>${m.deals}</td>
-        <td>${fmtCOP(m.revenue)}</td>
+        <td>${fmtUSD(m.revenue)}</td>
         <td>${m.calls}</td>
       </tr>`).join('')
     : '<tr><td colspan="6" class="notes-empty">No active members</td></tr>';

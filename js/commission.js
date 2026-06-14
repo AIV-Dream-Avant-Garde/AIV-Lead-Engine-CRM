@@ -1,10 +1,10 @@
 /* ── Commission calculations & deal value flow ────────────── */
 
-function fmtCOP(n) {
+function fmtUSD(n) {
   if (!n && n !== 0) return '--';
   const num = parseFloat(n);
   if (isNaN(num)) return '--';
-  return new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0}).format(num);
+  return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(num);
 }
 
 // Per-rep performance + earnings. Pure (unit-tested). A rep's earnings = closer
@@ -61,7 +61,7 @@ function updateDealPreview() {
   const closerMember = S.team.find(m => m.id === (lead.closerId || S.session?.userId));
   document.getElementById('dp-closer-label').textContent =
     (closerMember ? closerMember.name.split(' ')[0] : 'Closer') + ' (' + closRate + '%):';
-  document.getElementById('dp-closer-amt').textContent = fmtCOP(closerAmount);
+  document.getElementById('dp-closer-amt').textContent = fmtUSD(closerAmount);
 
   const provRow = document.getElementById('dp-provider-row');
   if (provRow) {
@@ -69,13 +69,13 @@ function updateDealPreview() {
       const providerMember = S.team.find(m => m.id === lead.providerId);
       document.getElementById('dp-provider-label').textContent =
         (providerMember ? providerMember.name.split(' ')[0] : 'Provider') + ' (' + provRate + '%):';
-      document.getElementById('dp-provider-amt').textContent = fmtCOP(providerAmount);
+      document.getElementById('dp-provider-amt').textContent = fmtUSD(providerAmount);
       provRow.style.display = '';
     } else {
       provRow.style.display = 'none';
     }
   }
-  document.getElementById('dp-total').textContent = fmtCOP(closerAmount + providerAmount);
+  document.getElementById('dp-total').textContent = fmtUSD(closerAmount + providerAmount);
   preview.style.display = 'block';
 }
 
@@ -160,7 +160,7 @@ function adjustCollectedAmount(leadId, collectedRaw, reason) {
   if (!lead) return;
   const collected = parseFloat(collectedRaw);
   if (isNaN(collected) || collected < 0 || collected > parseFloat(lead.dealValue || 0)) {
-    toast('Invalid amount. Must be between 0 and ' + fmtCOP(lead.dealValue) + '.', 'error'); return;
+    toast('Invalid amount. Must be between 0 and ' + fmtUSD(lead.dealValue) + '.', 'error'); return;
   }
   // Adjusting collected only rescales *pending* commissions. If a commission for
   // this lead was already paid, lowering the collected amount here would leave the
@@ -187,7 +187,7 @@ function adjustCollectedAmount(leadId, collectedRaw, reason) {
   pushLead(lead);
   if (S.config.scriptUrl) sheetsCall({action:'adjustCollected', leadId, collected, reason: reason || '', adjustedBy: S.session?.userName || 'Admin'});
   saveLocal();
-  auditLog('adjustCollected', leadId, `${lead.name} → ${fmtCOP(collected)}`);
+  auditLog('adjustCollected', leadId, `${lead.name} → ${fmtUSD(collected)}`);
   toast('Collected amount updated', 'success');
   renderAll();
 }
