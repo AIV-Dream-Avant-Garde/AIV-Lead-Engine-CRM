@@ -1,8 +1,8 @@
 /* ── DATA: App-wide constants ─────────────────────────────── */
 
 // ── Outreach: channel routing, dialing codes, opt-out detection ──
-const CHANNEL_BY_COUNTRY = { 'Estados Unidos': 'sms', 'Colombia': 'whatsapp' }; // else → email
-const COUNTRY_DIAL       = { 'Colombia': '57', 'Estados Unidos': '1' };
+const CHANNEL_BY_COUNTRY = { 'United States': 'sms' }; // else → email
+const COUNTRY_DIAL       = { 'United States': '1' };
 const CHANNEL_LABELS     = { sms: 'SMS', whatsapp: 'WhatsApp', email: 'Email' };
 
 // Carrier-mandated opt-out keywords (always honored). Whole-message or leading token.

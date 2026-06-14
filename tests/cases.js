@@ -139,30 +139,28 @@ test('phoneKey: too-short / junk → empty (never dedups spuriously)', () => {
 });
 
 // ── Outreach pure logic (Project A slice 1) ────────────────────────────
-test('pickChannel: US→sms, Colombia→whatsapp, else→email', () => {
-  eq(pickChannel({country:'Estados Unidos'}), 'sms');
-  eq(pickChannel({country:'Colombia'}), 'whatsapp');
-  eq(pickChannel({country:'Brasil'}), 'email', 'unknown country → email');
+test('pickChannel: US→sms, unknown→email', () => {
+  eq(pickChannel({country:'United States'}), 'sms');
+  eq(pickChannel({country:'Brazil'}), 'email', 'unknown country → email');
   eq(pickChannel({}), 'email', 'no country → email');
 });
 
-test('toE164: formats CO/US, respects existing +/country code, junk→empty', () => {
-  eq(toE164('320 123 4567', 'Colombia'), '+573201234567', 'CO 10-digit gets +57');
-  eq(toE164('+57 320 123 4567', 'Colombia'), '+573201234567', 'already + kept');
-  eq(toE164('573201234567', 'Colombia'), '+573201234567', 'already has country code');
-  eq(toE164('(305) 555-0199', 'Estados Unidos'), '+13055550199', 'US 10-digit gets +1');
-  eq(toE164('', 'Colombia'), '', 'empty → empty');
-  eq(toE164('abc', 'Colombia'), '', 'junk → empty');
+test('toE164: formats US, respects existing +/country code, junk→empty', () => {
+  eq(toE164('(305) 555-0199', 'United States'), '+13055550199', 'US 10-digit gets +1');
+  eq(toE164('+1 305 555 0199', 'United States'), '+13055550199', 'already + kept');
+  eq(toE164('13055550199', 'United States'), '+13055550199', 'already has country code');
+  eq(toE164('', 'United States'), '', 'empty → empty');
+  eq(toE164('abc', 'United States'), '', 'junk → empty');
 });
 
 test('renderTemplate: rich tokens resolve; unknown/empty degrade gracefully', () => {
-  const lead = {name:'Café Aroma', city:'Medellín', keyword:'Cafetería'};
-  const out = renderTemplate('Hola, soy {agente} de {empresa}. Vi {negocio} en {ciudad}.', lead, 'Andrés');
-  assert(out.includes('Café Aroma') && out.includes('Medellín') && out.includes('Andrés'), 'tokens merged');
+  const lead = {name:'Brickell Coffee', city:'Miami', keyword:'Cafe'};
+  const out = renderTemplate('Hi, this is {agent} with {company}. I saw {business} in {city}.', lead, 'Andres');
+  assert(out.includes('Brickell Coffee') && out.includes('Miami') && out.includes('Andres'), 'tokens merged');
   assert(out.indexOf('{') === -1, 'no literal tokens left');
-  // empty token collapses without leaving "{barrio}" or double spaces
-  const out2 = renderTemplate('{negocio} {barrio} cierra', {name:'X'}, '');
-  eq(out2, 'X cierra', 'empty token + whitespace tidied');
+  // empty token collapses without leaving "{neighborhood}" or double spaces
+  const out2 = renderTemplate('{business} {neighborhood} closing', {name:'X'}, '');
+  eq(out2, 'X closing', 'empty token + whitespace tidied');
 });
 
 test('isOptOut: keywords + natural language YES; neutral replies NO', () => {
@@ -190,32 +188,31 @@ test('seqStateLabel: maps states to human labels, falls back', () => {
 });
 
 test('OUTREACH_TEMPLATES: seeded per country×channel, on-voice (no emoji)', () => {
-  assert(OUTREACH_TEMPLATES['Colombia'].whatsapp.length >= 1, 'CO whatsapp seeded');
-  assert(OUTREACH_TEMPLATES['Estados Unidos'].sms.length >= 1, 'US sms seeded');
+  assert(OUTREACH_TEMPLATES['United States'].sms.length >= 1, 'US sms seeded');
+  assert(OUTREACH_TEMPLATES['United States'].email.length >= 1, 'US email seeded');
   const all = JSON.stringify(OUTREACH_TEMPLATES);
   assert(!/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(all), 'no emoji in seed templates');
-  assert(all.includes('{agente}') && all.includes('{negocio}'), 'templates use merge tokens');
+  assert(all.includes('{agent}') && all.includes('{business}'), 'templates use merge tokens');
 });
 
 // ── Cadence engine: pure decision core (Motor de Secuencias) ─────────────
 test('cadenceChannel: country → channel routing', () => {
-  eq(cadenceChannel('Colombia'), 'whatsapp');
-  eq(cadenceChannel('Estados Unidos'), 'sms');
-  eq(cadenceChannel('estados unidos'), 'sms', 'case-insensitive');
+  eq(cadenceChannel('United States'), 'sms');
+  eq(cadenceChannel('united states'), 'sms', 'case-insensitive');
+  eq(cadenceChannel('USA'), 'sms', 'alias');
   eq(cadenceChannel('Mexico'), '', 'unknown country → no channel');
   eq(cadenceChannel(''), '', 'empty → no channel');
 });
 
 test('cadenceResolveChannel: phone-by-country, else email, else unreachable', () => {
-  eq(cadenceResolveChannel({country:'Colombia', phone:'320 123 4567'}), 'whatsapp');
-  eq(cadenceResolveChannel({country:'Estados Unidos', phone:'(415) 555 1234'}), 'sms');
-  eq(cadenceResolveChannel({country:'Colombia', phone:'N/A', email:'a@b.co'}), 'email', 'no usable phone → email');
+  eq(cadenceResolveChannel({country:'United States', phone:'(415) 555 1234'}), 'sms');
+  eq(cadenceResolveChannel({country:'United States', phone:'N/A', email:'a@b.co'}), 'email', 'no usable phone → email');
   eq(cadenceResolveChannel({country:'', email:'a@b.co'}), 'email', 'no country but email');
-  eq(cadenceResolveChannel({country:'Colombia', phone:'123'}), '', 'junk phone, no email → unreachable');
+  eq(cadenceResolveChannel({country:'United States', phone:'123'}), '', 'junk phone, no email → unreachable');
 });
 
 test('cadenceEligible: only untouched + reachable + not-yet-enrolled', () => {
-  const ok = {status:'New', country:'Colombia', phone:'3201234567'};
+  const ok = {status:'New', country:'United States', phone:'3055550199'};
   assert(cadenceEligible(ok, false), 'fresh reachable lead is eligible');
   assert(!cadenceEligible(ok, true), 'already enrolled → not eligible');
   assert(!cadenceEligible({...ok, status:'Contacted'}, false), 'worked lead → not eligible');
@@ -267,10 +264,10 @@ test('cadenceJitterMinutes: deterministic, within bound', () => {
 });
 
 test('cadenceMessage: renders an on-voice, token-filled, emoji-free message', () => {
-  const lead = {id:'L1', country:'Colombia', phone:'3201234567', name:'Café Aroma', city:'Medellín', keyword:'Cafetería'};
-  const msg = cadenceMessage(lead, 0, 'AXIUS', 'Andrés');
-  assert(msg.includes('Café Aroma') && msg.includes('Medellín'), 'tokens filled');
-  assert(msg.includes('AXIUS') && msg.includes('Andrés'), 'company + agent filled');
+  const lead = {id:'L1', country:'United States', phone:'3055550199', name:'Brickell Coffee', city:'Miami', keyword:'Cafe'};
+  const msg = cadenceMessage(lead, 0, 'AXIUS', 'Andres');
+  assert(msg.includes('Brickell Coffee') && msg.includes('Miami'), 'tokens filled');
+  assert(msg.includes('AXIUS') && msg.includes('Andres'), 'company + agent filled');
   assert(!msg.includes('{'), 'no leftover tokens');
   assert(!/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(msg), 'no emoji');
   eq(cadenceMessage(lead, 9, 'AXIUS', 'Andrés'), '', 'out-of-range step → empty');
@@ -419,8 +416,8 @@ test('getSorted: blank/non-numeric deal values sort below real numbers', () => {
 });
 
 // ── Phone normalization (dialing + dedup depend on it) ───────────────
-test('normalizePhone: Colombian + US formats normalize to E.164-ish', () => {
-  eq(normalizePhone('300 123 4567'), '+573001234567', 'CO mobile gets +57');
-  eq(normalizePhone('573001234567'), '+573001234567', 'CO with country code');
+test('normalizePhone: US formats normalize to E.164', () => {
+  eq(normalizePhone('(305) 555-0100'), '+13055550100', 'US 10-digit gets +1 (305 area code, not +57)');
+  eq(normalizePhone('13055550100'), '+13055550100', 'US with leading 1 gets +');
   eq(normalizePhone('+1 (305) 555-0100'), '+13055550100', 'US keeps + and strips punctuation');
 });

@@ -634,8 +634,8 @@ function setFuQuick(days) {
 
 function normalizePhone(raw) {
   let p = String(raw || '').replace(/[\s\-\(\)\.]/g, '');
-  if (/^3\d{9}$/.test(p))   p = '+57' + p;  // Colombian mobile: 3xxxxxxxxx
-  if (/^57\d{10}$/.test(p)) p = '+' + p;    // 573xxxxxxxxx
+  if (/^\d{10}$/.test(p))   p = '+1' + p;   // US 10-digit → +1 (e.g. 3055550199)
+  if (/^1\d{10}$/.test(p))  p = '+' + p;    // 1xxxxxxxxxx → +1xxxxxxxxxx
   return p;
 }
 

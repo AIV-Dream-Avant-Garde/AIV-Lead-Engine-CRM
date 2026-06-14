@@ -10,48 +10,29 @@
    VOICE (non-negotiable): confident, capable, genuinely in the lead's interest;
    sincere but never weak or subservient; no emojis, no pleading, no false
    availability. 2–3 variants per step keep a deterministic engine from reading
-   like a bot. Tokens: {negocio} {ciudad} {barrio} {categoria} {nombre}
-   {empresa} {agente}.                                                          */
+   like a bot. Tokens: {business} {city} {neighborhood} {category} {name}
+   {company} {agent}.                                                          */
 
 // ── Multi-step cadence content, by country × channel ──────────────────────
 // Each step has 2–3 on-voice variants; the engine picks one per lead by stable
 // hash so different leads get different phrasing and a lead stays consistent.
 const CADENCE_STEPS = {
-  'Colombia': {            // WhatsApp — conversational, warm, assured
-    whatsapp: [
-      { variants: [
-        "Hi, this is {agente} with {empresa}. I came across {negocio} in {ciudad} and it looks like you're doing things right. We work with businesses like yours to bring in customers consistently, and I think we can add real value. Do you have a minute for me to share how?",
-        "Hi, this is {agente} with {empresa}. I found {negocio} in {ciudad} and liked what I saw. We help businesses like yours attract customers more consistently, and I think there's a real opportunity here. Would it be alright if I explained briefly?",
-        "Hi, this is {agente} with {empresa}. I came across {negocio} in {ciudad} and wanted to reach out directly: what we do is a great fit for a {categoria} like yours for bringing in more customers. Do you have a moment for me to show you how?",
-      ] },
-      { variants: [
-        "Hi again, this is {agente} with {empresa}. I'm reaching out because what we do is a great fit for a {categoria} like {negocio}. If you're interested, I can show you exactly what results we could drive. If now isn't the right time, I completely understand.",
-        "Hi, {agente} from {empresa} again. I didn't want to let {negocio} slip by: I have a clear sense of what we could achieve together and I'd love to show you concretely. If you'd rather talk down the road, no problem at all — just let me know.",
-      ] },
-    ],
-    email: [
-      { variants: [
-        "Hi, this is {agente} with {empresa}. I saw the work {negocio} is doing in {ciudad} and I think we can help you attract customers more consistently. I'd love to show you exactly what results we could drive together. Do you have 15 minutes this week for a quick call?\n\nBest,\n{agente} — {empresa}",
-        "Hi, this is {agente} with {empresa}. I came across {negocio} in {ciudad} and I see a clear opportunity to help you reach more customers consistently. I'd be glad to show you on a quick call what we could achieve together. Does this week work for you?\n\nBest,\n{agente} — {empresa}",
-      ] },
-    ],
-  },
-  'Estados Unidos': {      // SMS — brief, respectful, one clear ask
+  'United States': {      // SMS — brief, respectful, one clear ask
     sms: [
       { variants: [
-        "Hi, this is {agente} with {empresa}. I came across {negocio} in {ciudad} — impressive work. We help businesses like yours bring in customers consistently, and I think we'd add real value. Open to a quick chat?",
-        "Hi, {agente} from {empresa} here. {negocio} in {ciudad} caught my eye — you're clearly doing things right. We help businesses like yours win customers more consistently, and I think there's a real fit. Worth a quick chat?",
-        "Hello, this is {agente} with {empresa}. I noticed {negocio} in {ciudad} and wanted to reach out directly: what we do fits a {categoria} like yours well for bringing in more customers. Open to a short conversation?",
+        "Hi, this is {agent} with {company}. I came across {business} in {city} — impressive work. We help businesses like yours bring in customers consistently, and I think we'd add real value. Open to a quick chat?",
+        "Hi, {agent} from {company} here. {business} in {city} caught my eye — you're clearly doing things right. We help businesses like yours win customers more consistently, and I think there's a real fit. Worth a quick chat?",
+        "Hello, this is {agent} with {company}. I noticed {business} in {city} and wanted to reach out directly: what we do fits a {category} like yours well for bringing in more customers. Open to a short conversation?",
       ] },
       { variants: [
-        "Hi, {agente} from {empresa} again. What we do fits a {categoria} like {negocio} well — happy to show you exactly what results we could drive. If now isn't the time, no problem at all.",
-        "Hi, this is {agente} with {empresa}. Following up on {negocio} — I can show you concretely what results we'd aim for together. If the timing's off, just say the word and I'll step back.",
+        "Hi, {agent} from {company} again. What we do fits a {category} like {business} well — happy to show you exactly what results we could drive. If now isn't the time, no problem at all.",
+        "Hi, this is {agent} with {company}. Following up on {business} — I can show you concretely what results we'd aim for together. If the timing's off, just say the word and I'll step back.",
       ] },
     ],
     email: [
       { variants: [
-        "Hi, I'm {agente} with {empresa}. I came across {negocio} in {ciudad} and think we can help you bring in customers more consistently. I'd love to show you exactly what results we could drive together — do you have 15 minutes this week for a quick call?\n\nBest,\n{agente} — {empresa}",
-        "Hi, this is {agente} with {empresa}. {negocio} in {ciudad} stood out to me, and I see a clear way to help you reach more customers consistently. Could I show you what we'd aim for on a short call this week?\n\nBest,\n{agente} — {empresa}",
+        "Hi, I'm {agent} with {company}. I came across {business} in {city} and think we can help you bring in customers more consistently. I'd love to show you exactly what results we could drive together — do you have 15 minutes this week for a quick call?\n\nBest,\n{agent} — {company}",
+        "Hi, this is {agent} with {company}. {business} in {city} stood out to me, and I see a clear way to help you reach more customers consistently. Could I show you what we'd aim for on a short call this week?\n\nBest,\n{agent} — {company}",
       ] },
     ],
   },
@@ -60,11 +41,10 @@ const CADENCE_STEPS = {
 // ── Phone key (mirror of phoneKey): last 10 digits, '' if fewer. ───────────
 function cadencePhoneKey(p) { const d = String(p || '').replace(/\D/g, ''); return d.length >= 10 ? d.slice(-10) : ''; }
 
-// Phone channel for a country. Colombia → whatsapp, US → sms, else ''. ──────
+// Phone channel for a country. US → sms, else ''. ───────────────────────────
 function cadenceChannel(country) {
   const c = String(country || '').trim().toLowerCase();
-  if (c === 'colombia') return 'whatsapp';
-  if (c === 'estados unidos' || c === 'estados unidos de america' || c === 'estados unidos de américa' || c === 'usa' || c === 'united states') return 'sms';
+  if (c === 'united states' || c === 'usa' || c === 'us' || c === 'united states of america') return 'sms';
   return '';
 }
 
@@ -139,18 +119,18 @@ function cadenceJitterMinutes(leadId, maxMinutes) {
 function cadenceSteps(lead) {
   const ch = cadenceResolveChannel(lead);
   if (!ch) return [];
-  const country = (lead && CADENCE_STEPS[lead.country]) ? lead.country : (ch === 'sms' ? 'Estados Unidos' : 'Colombia');
+  const country = (lead && CADENCE_STEPS[lead.country]) ? lead.country : 'United States';
   return (CADENCE_STEPS[country] || {})[ch] || [];
 }
 
 // Fill personalization tokens (mirror of renderTemplate). Empty tokens degrade
-// gracefully (never a literal "{ciudad}"); whitespace tidied. Pure.
+// gracefully (never a literal "{city}"); whitespace tidied. Pure.
 function cadenceRender(body, lead, company, agent) {
   lead = lead || {};
   const map = {
-    negocio: lead.name || '', ciudad: lead.city || '', barrio: lead.barrio || '',
-    categoria: lead.keyword || '', nombre: lead.contactName || lead.name || '',
-    empresa: company || 'AXIUS', agente: agent || '',
+    business: lead.name || '', city: lead.city || '', neighborhood: lead.barrio || '',
+    category: lead.keyword || '', name: lead.contactName || lead.name || '',
+    company: company || 'AXIUS', agent: agent || '',
   };
   return String(body || '')
     .replace(/\{(\w+)\}/g, (m, k) => (k in map ? map[k] : ''))

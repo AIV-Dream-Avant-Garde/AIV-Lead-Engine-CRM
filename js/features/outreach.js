@@ -2,7 +2,7 @@
    Slice 1 = pure logic only (no DOM, no network) so it is fully unit-tested.
    The manual composer + sendMessage (DOM/backend) arrive in a later slice.     */
 
-// Which channel to use for a lead, by country. US → SMS, Colombia → WhatsApp,
+// Which channel to use for a lead, by country. US → SMS,
 // anything else → email (Project C). Pure.
 function pickChannel(lead) {
   return CHANNEL_BY_COUNTRY[(lead && lead.country) || ''] || 'email';
@@ -22,20 +22,20 @@ function toE164(phone, country) {
 }
 
 // Merge rich, human personalization tokens. Unknown/empty tokens degrade
-// gracefully (never leave a literal "{ciudad}"); whitespace is tidied. Pure.
+// gracefully (never leave a literal "{city}"); whitespace is tidied. Pure.
 function renderTemplate(body, lead, agent) {
   lead = lead || {};
   const company = (typeof S !== 'undefined' && S.config && S.config.companyName) ? S.config.companyName : 'AXIUS';
   const map = {
-    negocio:   lead.name    || '',
-    ciudad:    lead.city    || '',
-    barrio:    lead.barrio  || '',
-    categoria: lead.keyword || '',
-    nombre:    lead.contactName || lead.name || '',
-    empresa:   company,
-    agente:    agent || '',
-    agenda:    (typeof S !== 'undefined' && S.config && S.config.bookingUrl) || '',
-    seguimiento: lead.followUpDate ? (typeof fmtD === 'function' ? fmtD(lead.followUpDate) : String(lead.followUpDate)) : '',
+    business:  lead.name    || '',
+    city:      lead.city    || '',
+    neighborhood: lead.barrio || '',
+    category:  lead.keyword || '',
+    name:      lead.contactName || lead.name || '',
+    company:   company,
+    agent:     agent || '',
+    booking:   (typeof S !== 'undefined' && S.config && S.config.bookingUrl) || '',
+    followup:  lead.followUpDate ? (typeof fmtD === 'function' ? fmtD(lead.followUpDate) : String(lead.followUpDate)) : '',
   };
   return String(body || '')
     .replace(/\{(\w+)\}/g, (m, k) => (k in map ? map[k] : ''))
@@ -183,7 +183,7 @@ function renderMsgPreview() {
 }
 
 // Append the configured booking link to the composer body (drives toward a
-// booked discovery call — the conversion action). Templates can also use {agenda}.
+// booked discovery call — the conversion action). Templates can also use {booking}.
 function insertBookingLink() {
   const url = (S.config && S.config.bookingUrl || '').trim();
   if (!url) { toast('Set your booking link in Settings first.', 'error'); return; }
@@ -303,8 +303,8 @@ function renderCadenceEngine() {
       ${lastLine}
       <div class="form-grid" style="margin-top:12px;gap:8px">
         <div class="field"><label>Daily send cap</label><input type="number" id="cad-cap" value="${esc(String(v(c.dailyCap,200)))}" min="1"></div>
-        <div class="field"><label>Signing person · {agente}</label><input type="text" id="cad-agent" value="${esc(v(c.agentName,''))}" placeholder="Andres"></div>
-        <div class="field"><label>Company · {empresa}</label><input type="text" id="cad-company" value="${esc(v(c.company,''))}" placeholder="AXIUS"></div>
+        <div class="field"><label>Signing person · {agent}</label><input type="text" id="cad-agent" value="${esc(v(c.agentName,''))}" placeholder="Andres"></div>
+        <div class="field"><label>Company · {company}</label><input type="text" id="cad-company" value="${esc(v(c.company,''))}" placeholder="AXIUS"></div>
         <div class="field"><label>Days between touches</label><input type="number" id="cad-gap" value="${esc(String(v(c.gapDays,2)))}" min="1"></div>
         <div class="field"><label>Start hour (0–23)</label><input type="number" id="cad-qstart" value="${esc(String(v(c.quietStart,8)))}" min="0" max="23"></div>
         <div class="field"><label>End hour (1–24)</label><input type="number" id="cad-qend" value="${esc(String(v(c.quietEnd,20)))}" min="1" max="24"></div>
