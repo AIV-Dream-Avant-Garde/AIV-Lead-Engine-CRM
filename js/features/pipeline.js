@@ -5,36 +5,36 @@ function renderPipeline() {
   const fc  = document.getElementById('kb-city')?.value  || '';
   const CAP = 60;
   const cols = [
-    {k:'Nuevo',               c:'var(--s-new)'},
-    {k:'Contactado',          c:'var(--s-contact)'},
-    {k:'Interesado',          c:'var(--s-interest)'},
-    {k:'Cerrado',             c:'var(--s-closed)'},
-    {k:'Negociacion fallida', c:'var(--s-failed)'},
-    {k:'No interesado',       c:'var(--s-dead)'},
-    {k:'No llamar',           c:'var(--s-dnc)'},
+    {k:'New',               c:'var(--s-new)'},
+    {k:'Contacted',          c:'var(--s-contact)'},
+    {k:'Interested',          c:'var(--s-interest)'},
+    {k:'Closed Won',             c:'var(--s-closed)'},
+    {k:'Closed Lost', c:'var(--s-failed)'},
+    {k:'Not Interested',       c:'var(--s-dead)'},
+    {k:'Do Not Call',           c:'var(--s-dnc)'},
   ];
 
   // Pipeline metrics bar
   const openValue = S.leads
-    .filter(l => ['Nuevo','Contactado','Interesado'].includes(l.status || 'Nuevo') && l.dealValue)
+    .filter(l => ['New','Contacted','Interested'].includes(l.status || 'New') && l.dealValue)
     .reduce((s, l) => s + parseFloat(l.dealValue), 0);
-  const openCount = S.leads.filter(l => ['Nuevo','Contactado','Interesado'].includes(l.status || 'Nuevo')).length;
+  const openCount = S.leads.filter(l => ['New','Contacted','Interested'].includes(l.status || 'New')).length;
   const closedThisMonth = (() => {
     const m = new Date().toISOString().slice(0,7);
-    return S.leads.filter(l => l.status === 'Cerrado' && l.updatedAt && l.updatedAt.startsWith(m));
+    return S.leads.filter(l => l.status === 'Closed Won' && l.updatedAt && l.updatedAt.startsWith(m));
   })();
   const metricsHtml = `<div class="pipeline-metrics">
-    <div class="pipeline-metric"><strong>${openCount}</strong>Leads activos</div>
-    <div class="pipeline-metric"><strong>${fmtCOP(openValue)}</strong>Pipeline abierto</div>
-    <div class="pipeline-metric"><strong>${closedThisMonth.length}</strong>Cerrados este mes</div>
-    <div class="pipeline-metric"><strong>${fmtCOP(closedThisMonth.reduce((s,l)=>s+parseFloat(l.dealValue||0),0))}</strong>Revenue este mes</div>
+    <div class="pipeline-metric"><strong>${openCount}</strong>Active leads</div>
+    <div class="pipeline-metric"><strong>${fmtCOP(openValue)}</strong>Open pipeline</div>
+    <div class="pipeline-metric"><strong>${closedThisMonth.length}</strong>Closed this month</div>
+    <div class="pipeline-metric"><strong>${fmtCOP(closedThisMonth.reduce((s,l)=>s+parseFloat(l.dealValue||0),0))}</strong>Revenue this month</div>
   </div>`;
 
   const kb = document.getElementById('kanban');
   if (!kb) return;
 
   const columnsHtml = cols.map(col => {
-    let cards = S.leads.filter(l => (l.status || 'Nuevo') === col.k);
+    let cards = S.leads.filter(l => (l.status || 'New') === col.k);
     if (fc) cards = cards.filter(l => l.city === fc);
     if (q)  cards = cards.filter(l => `${l.name} ${l.phone} ${l.barrio}`.toLowerCase().includes(q));
     const total = cards.length;
@@ -44,7 +44,7 @@ function renderPipeline() {
       const ageBadge = ageDays > 0
         ? `<span style="font-size:10px;background:var(--surface-hi);border-radius:4px;padding:1px 5px;margin-left:4px;color:var(--sub)">${ageDays}d</span>`
         : '';
-      const dealChip = col.k === 'Cerrado' && l.dealValue
+      const dealChip = col.k === 'Closed Won' && l.dealValue
         ? `<div style="font-size:10px;color:var(--green);font-weight:600;margin-top:3px">${fmtCOP(l.dealValue)}</div>`
         : '';
       return `<div class="kanban-card pipeline-card" draggable="true"
@@ -57,9 +57,9 @@ function renderPipeline() {
       </div>`;
     }).join('') +
       (total > CAP
-        ? `<div style="font-size:11px;color:var(--body);padding:7px;text-align:center">+${total-CAP} mas</div>`
+        ? `<div style="font-size:11px;color:var(--body);padding:7px;text-align:center">+${total-CAP} more</div>`
         : total === 0
-          ? '<div style="font-size:11px;color:var(--body);padding:7px">Sin leads</div>'
+          ? '<div style="font-size:11px;color:var(--body);padding:7px">No leads</div>'
           : '');
     return `<div class="kanban-col pipeline-col" data-status="${esc(col.k)}"
         ondragover="pipelineDragOver(event)"
@@ -106,22 +106,22 @@ function pipelineDrop(e, newStatus) {
   const col = e.currentTarget.closest('.pipeline-col');
   col?.classList.remove('drop-target');
   const lead = S.leads.find(l => l.id === leadId);
-  if (!lead || (lead.status || 'Nuevo') === newStatus) return;
-  if (newStatus === 'Cerrado') { interceptCerrado(leadId); return; }
+  if (!lead || (lead.status || 'New') === newStatus) return;
+  if (newStatus === 'Closed Won') { interceptCerrado(leadId); return; }
 
   // DNC — require a reason (legal record), matching the lead modal + bulk action.
-  if (newStatus === 'No llamar') {
-    const reason = (prompt('Razón DNC (requerido como registro legal):') || '').trim();
-    if (!reason) { toast('Razón DNC requerida — no se cambió el estado.', 'error'); renderPipeline(); return; }
+  if (newStatus === 'Do Not Call') {
+    const reason = (prompt('DNC reason (required as a legal record):') || '').trim();
+    if (!reason) { toast('DNC reason required — status not changed.', 'error'); renderPipeline(); return; }
     lead.dncReason = reason;
   }
-  // Negociacion fallida — release the closer + cancel pending commission (parity with saveLead).
-  if (newStatus === 'Negociacion fallida') {
+  // Closed Lost — release the closer + cancel pending commission (parity with saveLead).
+  if (newStatus === 'Closed Lost') {
     if (!Array.isArray(lead.workHistory)) lead.workHistory = [];
     if (lead.closerId) lead.workHistory.push({
       closerId: lead.closerId,
       closerName: S.team.find(m => m.id === lead.closerId)?.name || lead.closerId,
-      outcome: 'Negociacion fallida', releasedAt: new Date().toISOString(),
+      outcome: 'Closed Lost', releasedAt: new Date().toISOString(),
     });
     if (lead.commissionStatus === 'pending') lead.commissionStatus = 'cancelled';
     lead.closerId = ''; lead.lockedBy = ''; lead.lockedUntil = ''; lead.assignedAt = '';
@@ -130,13 +130,16 @@ function pipelineDrop(e, newStatus) {
   lead.status    = newStatus;
   lead.updatedAt = new Date().toISOString();
   if (!Array.isArray(lead.workHistory)) lead.workHistory = [];
+  // A drag is a status move, not a close. Record who *moved* it (movedBy) rather
+  // than overwriting closer attribution — an admin dragging another rep's card
+  // must not be stamped as that lead's closer.
   lead.workHistory.push({
-    closerId:  S.session?.userId || '',
-    closerName: S.session?.userName || '',
-    outcome:   newStatus,
-    closedAt:  lead.updatedAt,
+    movedBy:     S.session?.userId || '',
+    movedByName: S.session?.userName || '',
+    outcome:     newStatus,
+    movedAt:     lead.updatedAt,
   });
   pushLead(lead);
-  toast('Estado actualizado: ' + newStatus, 'success');
+  toast('Status updated: ' + newStatus, 'success');
   renderPipeline();
 }

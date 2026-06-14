@@ -21,20 +21,20 @@ const OPT_OUT_PHRASES = [
 const SOURCES = [
   {val:'Google Maps',cls:'src-maps'},{val:'LinkedIn',cls:'src-linkedin'},
   {val:'Instagram',cls:'src-instagram'},{val:'Facebook',cls:'src-facebook'},
-  {val:'TikTok',cls:'src-default'},{val:'Feria / Evento',cls:'src-default'},
-  {val:'Referido',cls:'src-referral'},{val:'WhatsApp',cls:'src-default'},
-  {val:'Base de datos',cls:'src-default'},{val:'Web',cls:'src-default'},
-  {val:'Manual',cls:'src-default'},{val:'Otro',cls:'src-default'},
+  {val:'TikTok',cls:'src-default'},{val:'Trade Show / Event',cls:'src-default'},
+  {val:'Referral',cls:'src-referral'},{val:'WhatsApp',cls:'src-default'},
+  {val:'Database',cls:'src-default'},{val:'Web',cls:'src-default'},
+  {val:'Manual',cls:'src-default'},{val:'Other',cls:'src-default'},
 ];
 
 const STATUS_CLS = {
-  'Nuevo':'new','Contactado':'contacted','Interesado':'interested',
-  'Cerrado':'closed','Negociacion fallida':'failed','No interesado':'dead','No llamar':'dnc',
+  'New':'new','Contacted':'contacted','Interested':'interested',
+  'Closed Won':'closed','Closed Lost':'failed','Not Interested':'dead','Do Not Call':'dnc',
 };
 
 const OUTCOME_LABELS = {
-  answered:'Contesto',noanswer:'No contesto',voicemail:'Buzon',
-  busy:'Ocupado',callback:'Devolver llamada',wrong:'Numero equivocado',other:'Otro',
+  answered:'Answered',noanswer:'No answer',voicemail:'Voicemail',
+  busy:'Busy',callback:'Call back',wrong:'Wrong number',other:'Other',
 };
 
 // SHA-256 of admin PIN "2819"
@@ -50,14 +50,14 @@ const GET_ACTIONS = new Set(['ping','pull','getToken','twiml','checkTriggers']);
 
 // Fields from scraped/imported lead data used for CSV mapping
 const CRM_FIELDS      = ['name','phone','email','address','website','rating','reviews','calendarEventId'];
-const CRM_FIELD_LABELS = {name:'Nombre',phone:'Telefono',email:'Email',address:'Direccion',website:'Website',rating:'Rating',reviews:'Resenas'};
+const CRM_FIELD_LABELS = {name:'Name',phone:'Phone',email:'Email',address:'Address',website:'Website',rating:'Rating',reviews:'Reviews'};
 
 const SCRIPT_STAGES = {
-  opening:    'Apertura',
+  opening:    'Opening',
   pitch:      'Pitch',
-  objections: 'Objeciones',
-  close:      'Cierre',
-  rebuttals:  'Respuestas rápidas',
+  objections: 'Objections',
+  close:      'Close',
+  rebuttals:  'Quick rebuttals',
 };
 
 // Lead priority scoring weights (tunable)
@@ -67,8 +67,8 @@ const SCORE_WEIGHTS = {
   ratingMid:      10,  // rating >= 3.0
   reviewsHigh:    15,  // reviews >= 50
   reviewsMid:      8,  // reviews >= 10
-  statusNuevo:    10,  // status === 'Nuevo'
-  statusContact:   5,  // status === 'Contactado'
+  statusNuevo:    10,  // status === 'New'
+  statusContact:   5,  // status === 'Contacted'
   fuOverdue:      25,  // follow-up is overdue
   fuToday:        20,  // follow-up is today
   hasWebsite:      5,  // has website

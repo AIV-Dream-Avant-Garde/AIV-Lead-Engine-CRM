@@ -1,11 +1,11 @@
-/* ── FEATURE: Mi Perfil section ──────────────────────────── */
+/* ── FEATURE: My Profile section ──────────────────────────── */
 
 // renderPerfil — consolidated (base stats + call stats + funnel + solo split)
 function renderPerfil() {
   if (!S.session) return;
   const user   = S.session;
   const uid_   = user.userId;
-  const role   = user.role;
+  const role   = ({admin:'Admin', closer:'Closer', solo:'Solo Operator'})[user.role] || user.role;
   const initials = user.userName.split(' ').map(w => w[0] || '').join('').toUpperCase().slice(0,2);
 
   // Header
@@ -18,7 +18,7 @@ function renderPerfil() {
         <div class="profile-role-label">${role}</div>
         <div class="profile-rates">
           ${user.closerRate > 0 ? `<span class="rate-badge rate-closer">Closer: ${user.closerRate}%</span>` : ''}
-          ${user.providerRate > 0 ? `<span class="rate-badge rate-provider">Proveedor: ${user.providerRate}%</span>` : ''}
+          ${user.providerRate > 0 ? `<span class="rate-badge rate-provider">Provider: ${user.providerRate}%</span>` : ''}
         </div>
       </div>
     </div>`;
@@ -26,7 +26,7 @@ function renderPerfil() {
   // Lead stats
   const isAdmin  = role === 'admin';
   const myLeads  = isAdmin ? S.leads : S.leads.filter(l => l.closerId === uid_ || l.lockedBy === uid_ || l.providerId === uid_);
-  const myClosed = myLeads.filter(l => l.status === 'Cerrado');
+  const myClosed = myLeads.filter(l => l.status === 'Closed Won');
   const myComm   = isAdmin ? S.commissions : S.commissions.filter(c => c.closerId === uid_ || c.providerId === uid_);
   // This user's share of a commission record: closer cut if they closed it, provider cut if they sourced it
   const myShare  = c => (isAdmin ? parseFloat(c.closerAmount||0) + parseFloat(c.providerAmount||0)
@@ -71,9 +71,9 @@ function renderPerfil() {
             <div style="font-size:13px;font-weight:500;color:var(--hl);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l.name)}</div>
             <div style="font-size:11px;color:var(--body)">${esc(l.phone)} · ${esc(l.city||'')} ${esc(l.barrio||'')}</div>
           </div>
-          <span class="fu-badge fu-overdue">Vencido ${fmtD(l.followUpDate)}</span>
+          <span class="fu-badge fu-overdue">Overdue ${fmtD(l.followUpDate)}</span>
         </div>`).join('')
-      : '<div class="notes-empty">Sin seguimientos vencidos. Bien hecho.</div>';
+      : '<div class="notes-empty">No overdue follow-ups. Well done.</div>';
   }
 
   // Funnel
@@ -81,11 +81,11 @@ function renderPerfil() {
   const funnelWrap = document.getElementById('perfil-funnel');
   if (funnelWrap && total > 0) {
     const steps = [
-      {label:'Nuevo',        count:myLeads.filter(l=>l.status==='Nuevo').length,              color:'var(--s-new)'},
-      {label:'Contactado',   count:myLeads.filter(l=>l.status==='Contactado').length,         color:'var(--s-contact)'},
-      {label:'Interesado',   count:myLeads.filter(l=>l.status==='Interesado').length,         color:'var(--s-interest)'},
-      {label:'Cerrado',      count:myLeads.filter(l=>l.status==='Cerrado').length,            color:'var(--s-closed)'},
-      {label:'Neg. fallida', count:myLeads.filter(l=>l.status==='Negociacion fallida').length,color:'var(--s-failed)'},
+      {label:'New',        count:myLeads.filter(l=>l.status==='New').length,              color:'var(--s-new)'},
+      {label:'Contacted',   count:myLeads.filter(l=>l.status==='Contacted').length,         color:'var(--s-contact)'},
+      {label:'Interested',   count:myLeads.filter(l=>l.status==='Interested').length,         color:'var(--s-interest)'},
+      {label:'Closed Won',      count:myLeads.filter(l=>l.status==='Closed Won').length,            color:'var(--s-closed)'},
+      {label:'Closed Lost', count:myLeads.filter(l=>l.status==='Closed Lost').length,color:'var(--s-failed)'},
     ];
     funnelWrap.innerHTML = steps.map(s =>
       `<div class="funnel-row">
@@ -104,17 +104,17 @@ function renderPerfil() {
       ? myComm.slice(0,20).map(c => {
           const amt = myShare(c);
           const statusCls = {pending:'comm-pending', paid:'comm-paid', cancelled:'comm-cancelled', clawback:'comm-cancelled'}[c.status] || 'comm-pending';
-          const statusLbl = {pending:'Pendiente', paid:'Pagado', cancelled:'Cancelado', clawback:'Reembolso'}[c.status] || c.status;
+          const statusLbl = {pending:'Pending', paid:'Paid', cancelled:'Cancelled', clawback:'Refund'}[c.status] || c.status;
           return `<div class="comm-item">
             <div class="comm-info">
               <div class="comm-lead">${esc(c.leadName||'--')}</div>
-              <div class="comm-detail">Negocio: ${fmtCOP(c.dealValue)} · ${fmtD(c.createdAt)}</div>
+              <div class="comm-detail">Deal: ${fmtCOP(c.dealValue)} · ${fmtD(c.createdAt)}</div>
             </div>
             <span class="comm-amount">${fmtCOP(amt)}</span>
             <span class="comm-status-badge ${statusCls}">${statusLbl}</span>
           </div>`;
         }).join('')
-      : '<div class="notes-empty">Sin comisiones registradas aun.</div>';
+      : '<div class="notes-empty">No commissions recorded yet.</div>';
   }
 }
 

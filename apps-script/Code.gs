@@ -1,5 +1,5 @@
 // AXIUS CRM — Apps Script v4
-// Rellena TODAS las constantes antes de deployar
+// Fill in ALL the constants before deploying
 
 const SHEET_ID           = 'TU_SPREADSHEET_ID';
 const PLACES_API_KEY     = 'TU_GOOGLE_PLACES_API_KEY';
@@ -17,13 +17,13 @@ const RESEND_FROM        = 'AXIUS <hola@axius.tech>';      // verified sending d
 const TELEGRAM_ALERT_BOT_TOKEN = 'TU_TELEGRAM_BOT_TOKEN';  // founder alerts — @BotFather token
 const TELEGRAM_ALERT_CHAT_ID   = 'TU_TELEGRAM_CHAT_ID';    // your personal chat id (from getUpdates)
 
-// ── CADENCE ENGINE config (Motor de Secuencias) ────────────────────────────
+// ── CADENCE ENGINE config (Cadence Engine) ────────────────────────────
 // Autonomous templated outreach (deterministic; no LLM). SAFETY: inert until
 // CADENCE_ENABLED = true. While false the engine DRY-RUNS — it logs what it
 // WOULD enroll/send (Logger + Config 'lastCadenceRun') but writes NO sequence
 // rows and sends NOTHING. Go live AFTER provisioning (10DLC / WhatsApp
 // templates): set CADENCE_ENABLED = true AND enable the hourly trigger for
-// runCadence (CRM Admin → Secuencias automáticas, or Triggers → runCadence).
+// runCadence (CRM Admin → Automated sequences, or Triggers → runCadence).
 const CADENCE_ENABLED          = false;   // master switch (false = dry-run, sends nothing)
 const CADENCE_COMPANY          = 'AXIUS'; // {empresa} token
 const CADENCE_AGENT_NAME       = 'Andrés';// {agente} token — the sending persona name
@@ -76,7 +76,7 @@ function leadOptedOut(leadId){
   const ss=SpreadsheetApp.openById(SHEET_ID), s=ss.getSheetByName(SHEETS.leads);
   if(!s) return false;
   const rows=s.getDataRange().getValues(), h=rows[0]||LEAD_HDR, ic=h.indexOf('id'), stc=h.indexOf('status');
-  for(let i=1;i<rows.length;i++){ if(String(rows[i][ic])===String(leadId)) return String(rows[i][stc])==='No llamar'; }
+  for(let i=1;i<rows.length;i++){ if(String(rows[i][ic])===String(leadId)) return String(rows[i][stc])==='Do Not Call'; }
   return false;
 }
 
@@ -183,31 +183,36 @@ function doPost(e) {
         if (rc>=0) ls.getRange(row+1, rc+1).setValue(now);
         if (uc>=0) ls.getRange(row+1, uc+1).setValue(now); // bump updatedAt so the reply/opt-out surfaces in since-filtered pulls
         if (optOut) {
-          if (stc>=0) ls.getRange(row+1, stc+1).setValue('No llamar');
+          if (stc>=0) ls.getRange(row+1, stc+1).setValue('Do Not Call');
           if (dc>=0)  ls.getRange(row+1, dc+1).setValue('opt-out ('+channel+')');
           if (channel==='whatsapp' && cwa>=0) ls.getRange(row+1, cwa+1).setValue(false);
           if (channel==='sms' && csms>=0)     ls.getRange(row+1, csms+1).setValue(false);
         }
       });
       const who = leadName || from;
-      if (isOptOutGs(text)) notifyTelegram('Opt-out — ' + who + ' (' + channel + ') pidió no recibir más mensajes.');
-      else notifyTelegram('Respuesta de ' + who + ' (' + channel + '): ' + text);
+      if (isOptOutGs(text)) notifyTelegram('Opt-out — ' + who + ' (' + channel + ') asked to stop receiving messages.');
+      else notifyTelegram('Reply from ' + who + ' (' + channel + '): ' + text);
       return ContentService.createTextOutput('<?xml version="1.0"?><Response></Response>').setMimeType(ContentService.MimeType.XML);
     }
 
     const b = JSON.parse((e.postData && e.postData.contents) || '{}');
     if (b._secret !== CRM_SECRET) {
-      return err_('Unauthorized — configura CRM_SECRET en Code.gs con el valor de Setup.');
+      return err_('Unauthorized — set CRM_SECRET in Code.gs to the value from Setup.');
     }
     if (a === 'push') {
+      // Dedup by id (the lead's stable unique key), NOT by phone. Phone-keying
+      // silently dropped every lead with a blank/'N/A' phone — they all collide
+      // on '' — losing them permanently. The client already dedups by phone at
+      // import, so the server only needs to avoid inserting the same id twice.
       const s=getSheet(SHEETS.leads,LEAD_HDR),rows=s.getDataRange().getValues();
-      const ph=rows[0]||LEAD_HDR, pc=ph.indexOf('phone');
-      const ex=rows.slice(1).map(r=>String(r[pc]).trim());
+      const hh=rows[0]||LEAD_HDR, ic=hh.indexOf('id');
+      const ex=new Set(rows.slice(1).map(r=>String(r[ic]).trim()));
       let added=0;
       (b.data||[]).forEach(l=>{
-        if(!ex.includes(String(l.phone||'').trim())){
+        const id=String(l.id||'').trim();
+        if(id && !ex.has(id)){
           s.appendRow(LEAD_HDR.map(h=>(h==='notes'||h==='workHistory')?JSON.stringify(l[h]||[]):(l[h]??'')));
-          ex.push(String(l.phone).trim()); added++;
+          ex.add(id); added++;
         }
       });
       return ok({added});
@@ -223,7 +228,7 @@ function doPost(e) {
               const calIdCol=h.indexOf('calendarEventId');
               const oldCalId=calIdCol>=0?String(rows[i][calIdCol]||''):'';
               const evDate=new Date(b.followUpDate);
-              const title='Seguimiento: '+(b.name||'Lead');
+              const title='Follow-up: '+(b.name||'Lead');
               let calEventId=oldCalId;
               if(calEventId){
                 try{
@@ -274,15 +279,21 @@ function doPost(e) {
       return ok({saved:true,updated:found});
     }
     if (a === 'saveCommission') {
-      const s=getSheet(SHEETS.commissions,COMM_HDR),rows=s.getDataRange().getValues();
-      const h=rows[0]||COMM_HDR,lc=h.indexOf('leadId');
-      // Allow clawback records even when a commission for the same lead already exists
-      if(!b.isClawback){
-        const exists=rows.slice(1).some(r=>String(r[lc])===String(b.leadId));
-        if(exists)return ok({saved:false,duplicate:true});
-      }
-      s.appendRow(COMM_HDR.map(col=>b[col]??''));
-      return ok({saved:true,duplicate:false});
+      // Lock the read-check-append so two simultaneous "mark closed" actions on
+      // the same lead can't both pass the dup check and write two payout rows.
+      const lock=LockService.getScriptLock();
+      try{ lock.waitLock(10000); }catch(e){ return err_('busy'); }
+      try{
+        const s=getSheet(SHEETS.commissions,COMM_HDR),rows=s.getDataRange().getValues();
+        const h=rows[0]||COMM_HDR,lc=h.indexOf('leadId');
+        // Allow clawback records even when a commission for the same lead already exists
+        if(!b.isClawback){
+          const exists=rows.slice(1).some(r=>String(r[lc])===String(b.leadId));
+          if(exists)return ok({saved:false,duplicate:true});
+        }
+        s.appendRow(COMM_HDR.map(col=>b[col]??''));
+        return ok({saved:true,duplicate:false});
+      } finally { lock.releaseLock(); }
     }
     if (a === 'cancelCommission') {
       const s=getSheet(SHEETS.commissions,COMM_HDR),rows=s.getDataRange().getValues(),h=rows[0];
@@ -522,15 +533,15 @@ function doPost(e) {
       if(duplicate) return ok({added:false,duplicate:true});
       const now=new Date().toISOString();
       const firstMsg=String(b.message||'').trim();
-      const notes=firstMsg?[{date:now,text:'Mensaje inicial ('+(b.source||'Inbound')+'): '+firstMsg}]:[];
+      const notes=firstMsg?[{date:now,text:'Initial message ('+(b.source||'Inbound')+'): '+firstMsg}]:[];
       const lead={
         id:b.id||Utilities.getUuid(),
-        name:b.name||'Sin nombre',phone:phone||'N/A',email,externalId:extId,
+        name:b.name||'No name',phone:phone||'N/A',email,externalId:extId,
         address:b.address||'N/A',website:b.website||'N/A',
         rating:'N/A',reviews:'N/A',
         country:b.country||'',city:b.city||'',barrio:b.barrio||'',keyword:b.keyword||'',
         source:b.source||'Inbound',sourceDetail:b.sourceDetail||'',
-        status:b.status||'Nuevo',dncReason:'',followUpDate:'',
+        status:b.status||'New',dncReason:'',followUpDate:'',
         notes:JSON.stringify(notes),
         providerId:b.providerId||'',providerRate:b.providerRate||0,
         closerId:b.closerId||'',closerRate:b.closerRate||0,
@@ -540,7 +551,7 @@ function doPost(e) {
         importedAt:now,updatedAt:now,
       };
       s.appendRow(LEAD_HDR.map(h=>lead[h]??''));
-      notifyTelegram('Nuevo lead — ' + (lead.name||'Sin nombre') + ' · ' + (lead.source||'Inbound') + (lead.city?(' · '+lead.city):'') + (firstMsg?('\n"'+firstMsg.slice(0,200)+'"'):''));
+      notifyTelegram('New lead — ' + (lead.name||'No name') + ' · ' + (lead.source||'Inbound') + (lead.city?(' · '+lead.city):'') + (firstMsg?('\n"'+firstMsg.slice(0,200)+'"'):''));
       return ok({added:true,duplicate:false,id:lead.id});
     }
     return ok({received:true});
@@ -560,7 +571,10 @@ function saveToDrive(recUrl,callSid){
   const auth=Utilities.base64Encode(TWILIO_ACCOUNT_SID+':'+TWILIO_AUTH_TOKEN);
   const res=UrlFetchApp.fetch(recUrl+'.mp3',{headers:{Authorization:'Basic '+auth},muteHttpExceptions:true});
   const f=DriveApp.getFolderById(DRIVE_FOLDER_ID).createFile(callSid+'.mp3',res.getBlob().setName(callSid+'.mp3'));
-  f.setSharing(DriveApp.Access.ANYONE_WITH_LINK,DriveApp.Permission.VIEW);
+  // Call recordings are consent/PII audio — do NOT make them world-readable.
+  // They stay private to the script owner; to let reps listen, share the Drive
+  // folder (DRIVE_FOLDER_ID) with their Google accounts instead.
+  f.setSharing(DriveApp.Access.PRIVATE,DriveApp.Permission.VIEW);
   return 'https://drive.google.com/uc?export=preview&id='+f.getId();
 }
 
@@ -591,9 +605,9 @@ function sendWeeklyReport() {
   const newLeads   = leads.filter(l => new Date(l.importedAt) >= weekAgo).length;
   const weekCalls  = calls.filter(c => new Date(c.calledAt)  >= weekAgo);
   const answered   = weekCalls.filter(c => c.outcome === 'answered').length;
-  const closedAll  = leads.filter(l => l.status === 'Cerrado').length;
-  const interAll   = leads.filter(l => l.status === 'Interesado').length;
-  const dncAll     = leads.filter(l => l.status === 'No llamar').length;
+  const closedAll  = leads.filter(l => l.status === 'Closed Won').length;
+  const interAll   = leads.filter(l => l.status === 'Interested').length;
+  const dncAll     = leads.filter(l => l.status === 'Do Not Call').length;
   const ansRate    = weekCalls.length ? Math.round(answered / weekCalls.length * 100) : 0;
   const byStatus   = {};
   leads.forEach(l => { byStatus[l.status] = (byStatus[l.status]||0) + 1; });
@@ -601,39 +615,39 @@ function sendWeeklyReport() {
   const html = `
 <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#1a1a2e">
   <div style="background:linear-gradient(135deg,#0f0f23,#1a1a2e);padding:28px 32px;border-radius:12px 12px 0 0">
-    <h2 style="color:#fff;margin:0;font-size:20px">AXIUS CRM — Reporte Semanal</h2>
-    <p style="color:rgba(255,255,255,.6);margin:6px 0 0;font-size:13px">${now.toLocaleDateString('es-CO',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
+    <h2 style="color:#fff;margin:0;font-size:20px">AXIUS CRM — Weekly Report</h2>
+    <p style="color:rgba(255,255,255,.6);margin:6px 0 0;font-size:13px">${now.toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
   </div>
   <div style="background:#f9f9fb;padding:24px 32px;border-radius:0 0 12px 12px">
-    <h3 style="font-size:14px;color:#888;text-transform:uppercase;letter-spacing:.8px;margin:0 0 16px">Esta semana</h3>
+    <h3 style="font-size:14px;color:#888;text-transform:uppercase;letter-spacing:.8px;margin:0 0 16px">This week</h3>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px">
       <div style="background:#fff;border-radius:8px;padding:14px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.06)">
         <div style="font-size:28px;font-weight:700;color:#4b72ff">${newLeads}</div>
-        <div style="font-size:11px;color:#888;margin-top:4px">Leads nuevos</div>
+        <div style="font-size:11px;color:#888;margin-top:4px">New leads</div>
       </div>
       <div style="background:#fff;border-radius:8px;padding:14px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.06)">
         <div style="font-size:28px;font-weight:700;color:#2dd4bf">${weekCalls.length}</div>
-        <div style="font-size:11px;color:#888;margin-top:4px">Llamadas</div>
+        <div style="font-size:11px;color:#888;margin-top:4px">Calls</div>
       </div>
       <div style="background:#fff;border-radius:8px;padding:14px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.06)">
         <div style="font-size:28px;font-weight:700;color:#22c55e">${ansRate}%</div>
-        <div style="font-size:11px;color:#888;margin-top:4px">Tasa respuesta</div>
+        <div style="font-size:11px;color:#888;margin-top:4px">Answer rate</div>
       </div>
     </div>
-    <h3 style="font-size:14px;color:#888;text-transform:uppercase;letter-spacing:.8px;margin:0 0 12px">Acumulado total</h3>
+    <h3 style="font-size:14px;color:#888;text-transform:uppercase;letter-spacing:.8px;margin:0 0 12px">All-time totals</h3>
     <table style="width:100%;border-collapse:collapse;font-size:13px">
       <tr style="background:#f0f0f5"><td style="padding:8px 12px;border-radius:6px">Total leads</td><td style="padding:8px 12px;text-align:right;font-weight:600">${leads.length}</td></tr>
-      <tr><td style="padding:8px 12px">Cerrados</td><td style="padding:8px 12px;text-align:right;font-weight:600;color:#22c55e">${closedAll}</td></tr>
-      <tr style="background:#f0f0f5"><td style="padding:8px 12px;border-radius:6px">Interesados</td><td style="padding:8px 12px;text-align:right;font-weight:600;color:#2dd4bf">${interAll}</td></tr>
-      <tr><td style="padding:8px 12px">No llamar</td><td style="padding:8px 12px;text-align:right;color:#888">${dncAll}</td></tr>
+      <tr><td style="padding:8px 12px">Closed Won</td><td style="padding:8px 12px;text-align:right;font-weight:600;color:#22c55e">${closedAll}</td></tr>
+      <tr style="background:#f0f0f5"><td style="padding:8px 12px;border-radius:6px">Interested</td><td style="padding:8px 12px;text-align:right;font-weight:600;color:#2dd4bf">${interAll}</td></tr>
+      <tr><td style="padding:8px 12px">Do Not Call</td><td style="padding:8px 12px;text-align:right;color:#888">${dncAll}</td></tr>
     </table>
   </div>
-  <p style="font-size:11px;color:#aaa;text-align:center;margin-top:16px">Generado automaticamente por AXIUS CRM</p>
+  <p style="font-size:11px;color:#aaa;text-align:center;margin-top:16px">Automatically generated by AXIUS CRM</p>
 </div>`;
 
   MailApp.sendEmail({
     to: recipientEmail,
-    subject: 'AXIUS CRM — Reporte semanal ' + now.toLocaleDateString('es-CO'),
+    subject: 'AXIUS CRM — Weekly report ' + now.toLocaleDateString('en-US'),
     htmlBody: html,
   });
   Logger.log('Weekly report sent to ' + recipientEmail);
@@ -695,7 +709,7 @@ function runScheduledScrapes() {
           id:Utilities.getUuid(), name:l.name, phone, address:l.address, website:l.website,
           rating:l.rating, reviews:l.reviews, country:job.country||'', city:job.city||'', barrio:job.barrio||'',
           keyword:job.keyword, source:job.source||'Scraper (auto)', sourceDetail:'',
-          status:'Nuevo', dncReason:'', followUpDate:'', notes:JSON.stringify([]),
+          status:'New', dncReason:'', followUpDate:'', notes:JSON.stringify([]),
           providerId:'', providerRate:0, closerId:'', closerRate:0,
           dealValue:'', providerCommission:'', closerCommission:'', commissionStatus:'',
           lockedBy:'', lockedUntil:'', assignedAt:'', workHistory:JSON.stringify([]),
@@ -747,7 +761,7 @@ function resendSend_(email, subject, body) {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   CADENCE ENGINE — "Motor de Secuencias" (time-triggered, deterministic)
+   CADENCE ENGINE — "Cadence Engine" (time-triggered, deterministic)
    Autonomous templated outreach. Enrolls eligible leads, advances each through
    the multi-step cadence, honoring opt-out / quiet hours / claim / reply /
    daily cap. Inert until CADENCE_ENABLED = true (dry-runs otherwise).
@@ -814,19 +828,19 @@ function cadenceResolveChannel(lead) {
 }
 function cadenceEligible(lead, hasSeq) {
   if (!lead || hasSeq) return false;
-  if (String(lead.status || 'Nuevo') !== 'Nuevo') return false;
+  if (String(lead.status || 'New') !== 'New') return false;
   if (cadenceResolveChannel(lead) === '') return false;
   return true;
 }
 function cadenceGuard(lead, seq) {
   if (!lead) return 'stopped:rejected';
-  const status = String(lead.status || 'Nuevo');
-  if (status === 'No llamar')        return 'stopped:optout';
-  if (status === 'Cerrado')          return 'stopped:closed';
-  if (status === 'No interesado' || status === 'Negociacion fallida' || status === 'Negociación fallida') return 'stopped:rejected';
+  const status = String(lead.status || 'New');
+  if (status === 'Do Not Call')        return 'stopped:optout';
+  if (status === 'Closed Won')          return 'stopped:closed';
+  if (status === 'Not Interested' || status === 'Closed Lost' || status === 'Closed Lost') return 'stopped:rejected';
   if (String(lead.lockedBy || ''))   return 'paused:claimed';
   if (replyShouldPause(lead, seq))   return 'paused:replied';
-  if (status !== 'Nuevo')            return 'paused:claimed';
+  if (status !== 'New')            return 'paused:claimed';
   return '';
 }
 function replyShouldPause(lead, seq) {
@@ -1042,11 +1056,11 @@ function runCadence() {
       }
 
       // Re-check opt-out FRESH at send time: a reply/opt-out (inboundMsg flips status
-      // to 'No llamar') may have landed since the snapshot read. Mirrors the manual
+      // to 'Do Not Call') may have landed since the snapshot read. Mirrors the manual
       // send handlers' leadOptedOut safety net — one cell read, capped at the daily cap.
       if (statusCol >= 0 && leadRowOf[String(lead.id)]) {
         const freshStatus = String(leadsSheet.getRange(leadRowOf[String(lead.id)], statusCol + 1).getValue());
-        if (freshStatus === 'No llamar') {
+        if (freshStatus === 'Do Not Call') {
           seq.state = 'stopped:optout'; seq.pausedReason = 'stopped:optout'; seq.updatedAt = now.toISOString();
           writeSeqRow_(seqsSheet, rowOf[String(seq.leadId)], seq, sh);
           return;

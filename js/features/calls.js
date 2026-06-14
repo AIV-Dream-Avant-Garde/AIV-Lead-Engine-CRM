@@ -2,32 +2,32 @@
 
 // ── initTwilio — single consolidated handler ───────────────
 async function initTwilio() {
-  if (!S.config.scriptUrl) { toast('Configura el Apps Script URL primero.', 'error'); return; }
-  setSyncUI('syncing','Conectando Twilio...');
+  if (!S.config.scriptUrl) { toast('Configure the Apps Script URL first.', 'error'); return; }
+  setSyncUI('syncing','Connecting Twilio...');
   try {
     const res = await sheetsCall({action:'getToken', identity:'agent'});
     if (!res || !res.token) {
-      setSyncUI('error','Token fallido');
-      toast('Error al obtener token Twilio. Verifica las credenciales en el Apps Script.', 'error', 5000);
+      setSyncUI('error','Token failed');
+      toast('Failed to get Twilio token. Check the credentials in the Apps Script.', 'error', 5000);
       return;
     }
     if (CALL.device) CALL.device.destroy();
     CALL.device = new Twilio.Device(res.token, {logLevel:1, codecPreferences:['opus','pcmu']});
-    CALL.device.on('registered', () => { setSyncUI('ok','Twilio listo'); toast('Twilio conectado. Ya puedes hacer llamadas desde el CRM.', 'success'); });
-    CALL.device.on('error',      err => { setSyncUI('error','Error Twilio'); console.error(err); });
+    CALL.device.on('registered', () => { setSyncUI('ok','Twilio ready'); toast('Twilio connected. You can now make calls from the CRM.', 'success'); });
+    CALL.device.on('error',      err => { setSyncUI('error','Twilio error'); console.error(err); });
     // Single incoming handler — both banner + CALL.incomingCall state
     CALL.device.on('incoming', call => {
       CALL.incomingCall = call;
-      const from  = call.parameters?.From || 'Desconocido';
+      const from  = call.parameters?.From || 'Unknown';
       const lead  = S.leads.find(l => l.phone && from.includes(l.phone.replace(/[^0-9]/g,'')));
-      document.getElementById('ib-name').textContent  = lead?.name || 'Numero desconocido';
+      document.getElementById('ib-name').textContent  = lead?.name || 'Unknown number';
       document.getElementById('ib-phone').textContent = from;
       document.getElementById('incoming-banner').classList.add('visible');
     });
     await CALL.device.register();
   } catch(e) {
     setSyncUI('error','Error');
-    toast('Error Twilio: ' + e.message, 'error', 5000);
+    toast('Twilio error: ' + e.message, 'error', 5000);
   }
 }
 
@@ -35,10 +35,10 @@ async function initTwilio() {
 function makeCall(leadId) {
   const l = S.leads.find(x => x.id === leadId);
   if (!l) return;
-  if (l.status === 'No llamar')              { toast('Este lead tiene estado "No llamar".', 'error'); return; }
-  if (!l.phone || l.phone === 'N/A')         { toast('Sin número de teléfono.', 'error'); return; }
+  if (l.status === 'Do Not Call')              { toast('This lead has the "Do Not Call" status.', 'error'); return; }
+  if (!l.phone || l.phone === 'N/A')         { toast('No phone number.', 'error'); return; }
   if (S.demoMode) { startDemoCall(leadId); return; }
-  if (!CALL.device)                          { toast('Twilio no está conectado. Ve a Setup → Conectar Twilio.', 'error'); return; }
+  if (!CALL.device)                          { toast('Twilio is not connected. Go to Setup → Connect Twilio.', 'error'); return; }
 
   // Auto-claim if unclaimed
   if (S.session && !isLockedByMe(l) && !isLockedByOther(l)) {
@@ -70,7 +70,7 @@ function makeCall(leadId) {
 
   const cb = document.getElementById('cw-consent-btn');
   cb.className  = 'cw-consent-btn';
-  cb.textContent = 'Informado al prospecto — conectar llamada';
+  cb.textContent = 'Informed the prospect — connect call';
 
   // Load talking-points panel
   const panel = document.getElementById('cw-script-panel');
@@ -85,27 +85,27 @@ function makeCall(leadId) {
   const skipBtn = document.getElementById('cw-skip-btn');
   if (skipBtn) skipBtn.style.display = S.dialerMode ? '' : 'none';
   populateSmsTemplates();
-  setCWStatus('ringing','Informa al prospecto primero');
+  setCWStatus('ringing','Inform the prospect first');
   document.getElementById('call-widget').classList.add('visible');
 }
 
 async function confirmConsentAndCall() {
   if (S.demoMode) { runSimulatedCall(); return; }
-  if (!CALL.device) { toast('Twilio no está conectado.', 'error'); return; }
+  if (!CALL.device) { toast('Twilio is not connected.', 'error'); return; }
   CALL.consentConfirmed = true;
   const cb = document.getElementById('cw-consent-btn');
   cb.className   = 'cw-consent-btn confirmed';
-  cb.textContent = '✓ Consentimiento confirmado';
+  cb.textContent = '✓ Consent confirmed';
   document.getElementById('cw-consent').style.display   = 'none';
   document.getElementById('cw-controls').style.display  = 'flex';
-  setCWStatus('ringing','Llamando...');
+  setCWStatus('ringing','Calling...');
   const l = S.leads.find(x => x.id === CALL.curLeadId);
   if (!l) return;
   try {
-    CALL.activeCall = await CALL.device.connect({params:{To: l.phone}});
+    CALL.activeCall = await CALL.device.connect({params:{To: normalizePhone(l.phone)}});
     CALL.activeCall.on('accept', call => {
       CALL.callSid = call.parameters.CallSid;
-      setCWStatus('connected','Conectado');
+      setCWStatus('connected','Connected');
       CALL.timer = setInterval(() => {
         CALL.seconds++;
         document.getElementById('cw-timer').textContent = fmtSec(CALL.seconds);
@@ -135,17 +135,19 @@ function toggleMute() {
   CALL.muted = !CALL.muted;
   CALL.activeCall.mute(CALL.muted);
   document.getElementById('cw-mute-btn').classList.toggle('active', CALL.muted);
-  document.getElementById('cw-mute-label').textContent = CALL.muted ? 'Reanudar' : 'Silenciar';
+  document.getElementById('cw-mute-label').textContent = CALL.muted ? 'Resume' : 'Mute';
 }
 
 function onCallEnd() {
   if (CALL.timer) { clearInterval(CALL.timer); CALL.timer = null; }
-  setCWStatus('ended','Llamada terminada · ' + fmtSec(CALL.seconds));
+  setCWStatus('ended','Call ended · ' + fmtSec(CALL.seconds));
   document.getElementById('cw-post').classList.add('visible');
   const smsWrap = document.getElementById('cw-sms-wrap');
   if (smsWrap) smsWrap.style.display = S.config.scriptUrl && !S.demoMode ? '' : 'none';
   const l = S.leads.find(x => x.id === CALL.curLeadId);
-  if (l && l.status === 'Nuevo') { l.status = 'Contactado'; l.updatedAt = new Date().toISOString(); pushLead(l); }
+  // Only advance to "Contacted" if the call actually connected. Failed/rejected/
+  // cancelled calls all route here with 0 seconds and must not inflate contact metrics.
+  if (l && l.status === 'New' && CALL.seconds > 0) { l.status = 'Contacted'; l.updatedAt = new Date().toISOString(); pushLead(l); }
 }
 
 function setOutcome(val) {
@@ -156,7 +158,7 @@ function setOutcome(val) {
 
 // saveCallLog — consolidated (goNext support, call note auto-added)
 async function saveCallLog(goNext) {
-  if (!CALL.outcome) { toast('Selecciona el resultado de la llamada.', 'error'); return; }
+  if (!CALL.outcome) { toast('Select the call outcome.', 'error'); return; }
   const l   = S.leads.find(x => x.id === CALL.curLeadId);
   const rec = {
     id:uid(), leadId:CALL.curLeadId, leadName:l?.name||'', phone:l?.phone||'',
@@ -174,7 +176,7 @@ async function saveCallLog(goNext) {
     if (!Array.isArray(l.notes)) l.notes = [];
     l.notes.push({
       date: rec.calledAt,
-      text: 'Llamada: ' + (OUTCOME_LABELS[CALL.outcome] || CALL.outcome) + ' · ' + fmtSec(CALL.seconds) + (rec.notes ? ' · ' + rec.notes : ''),
+      text: 'Call: ' + (OUTCOME_LABELS[CALL.outcome] || CALL.outcome) + ' · ' + fmtSec(CALL.seconds) + (rec.notes ? ' · ' + rec.notes : ''),
     });
     l.updatedAt = rec.calledAt;
     pushLead(l);
@@ -220,7 +222,7 @@ function renderCallsSection() {
       ? `<audio class="call-audio" controls src="${esc(c.driveUrl)}"></audio>`
       : c.recordingUrl
         ? `<audio class="call-audio" controls src="${esc(c.recordingUrl)}"></audio>` : '';
-    const consent = c.consentConfirmed ? '<span class="consent-tag">✓ Consentimiento</span>' : '';
+    const consent = c.consentConfirmed ? '<span class="consent-tag">✓ Consent</span>' : '';
     return `<div class="call-entry">
       <div class="call-entry-top">
         <span class="call-outcome-badge ${oc2}">${OUTCOME_LABELS[oc2]||oc2}</span>
@@ -230,7 +232,7 @@ function renderCallsSection() {
       ${c.notes ? `<div class="call-notes-text">${esc(c.notes)}</div>` : ''}
       ${audio}
     </div>`;
-  }).join('') : '<div style="text-align:center;padding:40px;color:var(--body);font-size:13px">Sin llamadas registradas.</div>';
+  }).join('') : '<div style="text-align:center;padding:40px;color:var(--body);font-size:13px">No calls recorded.</div>';
 }
 
 function renderLeadCallHistory(leadId) {
@@ -253,7 +255,7 @@ function renderLeadCallHistory(leadId) {
       ${c.notes ? `<div class="call-notes-text">${esc(c.notes)}</div>` : ''}
       ${audio}
     </div>`;
-  }).join('') : '<div class="notes-empty">Sin llamadas previas.</div>';
+  }).join('') : '<div class="notes-empty">No previous calls.</div>';
 }
 
 function goNextLead() {
@@ -261,7 +263,7 @@ function goNextLead() {
     const nextId = S.dialerQueue.shift();
     updateDialerCounter();
     const lead = S.leads.find(l => l.id === nextId);
-    if (lead && lead.status !== 'No llamar' && lead.phone && lead.phone !== 'N/A' && !isLockedByOther(lead)) {
+    if (lead && lead.status !== 'Do Not Call' && lead.phone && lead.phone !== 'N/A' && !isLockedByOther(lead)) {
       setTimeout(() => makeCall(nextId), 300);
     } else {
       goNextLead(); // skip invalid, try next
@@ -269,21 +271,21 @@ function goNextLead() {
     return;
   }
   const next = getFiltered().find(l =>
-    (l.status === 'Nuevo' || l.status === 'Contactado') &&
-    l.status !== 'No llamar' && l.phone && l.phone !== 'N/A' &&
+    (l.status === 'New' || l.status === 'Contacted') &&
+    l.status !== 'Do Not Call' && l.phone && l.phone !== 'N/A' &&
     !isLockedByOther(l)
   );
   if (next) { navigate('leads'); setTimeout(() => openLead(next.id), 150); }
-  else       { toast('Sin más leads disponibles. ¡Buen trabajo!', 'success'); navigate('leads'); }
+  else       { toast('No more leads available. Nice work!', 'success'); navigate('leads'); }
 }
 
 function toggleDialer() {
   S.dialerMode = !S.dialerMode;
   if (S.dialerMode) {
     S.dialerQueue = getFiltered()
-      .filter(l => (l.status === 'Nuevo' || l.status === 'Contactado') && l.phone && l.phone !== 'N/A' && !isLockedByOther(l))
+      .filter(l => (l.status === 'New' || l.status === 'Contacted') && l.phone && l.phone !== 'N/A' && !isLockedByOther(l))
       .map(l => l.id);
-    if (!S.dialerQueue.length) { S.dialerMode = false; toast('Sin leads disponibles para marcar con los filtros actuales.', 'error'); return; }
+    if (!S.dialerQueue.length) { S.dialerMode = false; toast('No leads available to dial with the current filters.', 'error'); return; }
   } else {
     S.dialerQueue = [];
   }
@@ -296,13 +298,13 @@ function updateDialerCounter() {
   const count = document.getElementById('dialer-queue-count');
   if (btn) {
     btn.innerHTML = S.dialerMode
-      ? `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;vertical-align:middle;margin-right:5px"><rect x="3.5" y="3.5" width="9" height="9" rx="1"/></svg>Detener marcador (${S.dialerQueue.length})`
-      : `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;vertical-align:middle;margin-right:5px"><path d="M5 3.5l7 4.5-7 4.5z"/></svg>Marcador automatico`;
+      ? `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;vertical-align:middle;margin-right:5px"><rect x="3.5" y="3.5" width="9" height="9" rx="1"/></svg>Stop dialer (${S.dialerQueue.length})`
+      : `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;vertical-align:middle;margin-right:5px"><path d="M5 3.5l7 4.5-7 4.5z"/></svg>Auto-dialer`;
     btn.classList.toggle('btn-danger', S.dialerMode);
     btn.classList.toggle('btn-primary', !S.dialerMode);
   }
   if (count) {
-    count.textContent = S.dialerMode ? S.dialerQueue.length + ' en cola' : '';
+    count.textContent = S.dialerMode ? S.dialerQueue.length + ' in queue' : '';
     count.style.display = S.dialerMode ? '' : 'none';
   }
 }
@@ -312,7 +314,7 @@ function skipDialerLead() {
   S.dialerQueue.shift();
   updateDialerCounter();
   if (S.dialerQueue.length) goNextLead();
-  else { S.dialerMode = false; updateDialerCounter(); toast('Cola terminada. Todos los leads trabajados.', 'success'); navigate('leads'); }
+  else { S.dialerMode = false; updateDialerCounter(); toast('Queue finished. All leads worked.', 'success'); navigate('leads'); }
 }
 
 function answerIncoming() {
@@ -324,14 +326,14 @@ function answerIncoming() {
   const from = CALL.activeCall.parameters?.From || '';
   const lead = S.leads.find(l => l.phone && from.includes(l.phone.replace(/[^0-9]/g,'')));
   CALL.curLeadId = lead?.id || null;
-  document.getElementById('cw-lead-name').textContent = lead?.name || 'Numero desconocido';
+  document.getElementById('cw-lead-name').textContent = lead?.name || 'Unknown number';
   document.getElementById('cw-phone').textContent     = lead?.phone || from;
   document.getElementById('cw-consent').style.display  = 'none';
   document.getElementById('cw-controls').style.display = 'flex';
   document.getElementById('cw-post').classList.remove('visible');
   document.getElementById('cw-timer').textContent = '0:00';
   document.getElementById('call-widget').classList.add('visible');
-  setCWStatus('connected','Llamada entrante conectada');
+  setCWStatus('connected','Incoming call connected');
   CALL.seconds = 0;
   CALL.timer   = setInterval(() => { CALL.seconds++; document.getElementById('cw-timer').textContent = fmtSec(CALL.seconds); }, 1000);
   CALL.activeCall.on('disconnect', () => onCallEnd());
@@ -356,10 +358,10 @@ function cwTab(tab) {
   }
   const fallbacks = {
     opening:    getCallScript(),
-    pitch:      S.config.pitchScript      || 'Sin pitch configurado. Ve a Setup → Guion.',
-    objections: S.config.objectionsScript || 'Sin objeciones configuradas.',
-    close:      S.config.closeScript      || 'Sin guion de cierre configurado.',
-    rebuttals:  'Sin respuestas rápidas configuradas. Agrega una en Admin → Guiones.',
+    pitch:      S.config.pitchScript      || 'No pitch configured. Go to Setup → Script.',
+    objections: S.config.objectionsScript || 'No objections configured.',
+    close:      S.config.closeScript      || 'No closing script configured.',
+    rebuttals:  'No quick rebuttals configured. Add one in Admin → Scripts.',
   };
   el.textContent = fallbacks[tab] || '';
 }
@@ -373,7 +375,7 @@ function saveCallScript() {
   S.config.closeScript      = document.getElementById('cfg-close')?.value?.trim()      || '';
   saveLocal();
   previewScript();
-  toast('Guion guardado', 'success');
+  toast('Script saved', 'success');
 }
 
 function previewScript() {
@@ -394,19 +396,19 @@ function populateSmsTemplates() {
   if (!sel) return;
   const templates = S.smsTemplates || [];
   sel.innerHTML = templates.length
-    ? `<option value="">Selecciona plantilla...</option>` + templates.map((t,i) => `<option value="${i}">${esc(t.name)}</option>`).join('')
-    : `<option value="">Sin plantillas — agrega en Admin</option>`;
+    ? `<option value="">Select a template...</option>` + templates.map((t,i) => `<option value="${i}">${esc(t.name)}</option>`).join('')
+    : `<option value="">No templates — add in Admin</option>`;
 }
 
 async function sendPostCallSms() {
   const idx = document.getElementById('cw-sms-tpl')?.value;
-  if (idx === '' || idx === undefined) { toast('Selecciona una plantilla.', 'error'); return; }
+  if (idx === '' || idx === undefined) { toast('Select a template.', 'error'); return; }
   const tpl  = (S.smsTemplates||[])[parseInt(idx)];
-  if (!tpl)  { toast('Plantilla no encontrada.', 'error'); return; }
+  if (!tpl)  { toast('Template not found.', 'error'); return; }
   const l    = S.leads.find(x => x.id === CALL.curLeadId);
-  if (!l) { toast('Lead no encontrado.', 'error'); return; }
+  if (!l) { toast('Lead not found.', 'error'); return; }
   // Route through the unified sender: channel-aware (Colombia→WhatsApp, US→SMS),
-  // logged as an interaction in the timeline, and opt-out / "No llamar" gated.
+  // logged as an interaction in the timeline, and opt-out / "Do Not Call" gated.
   await sendMessage(l, tpl.body, {});
 }
 
@@ -436,7 +438,7 @@ function startDemoCall(leadId) {
 
   const cb = document.getElementById('cw-consent-btn');
   cb.className   = 'cw-consent-btn';
-  cb.textContent = 'Informado al prospecto — conectar llamada';
+  cb.textContent = 'Informed the prospect — connect call';
 
   document.querySelectorAll('.outcome-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('cw-notes').value = '';
@@ -445,7 +447,7 @@ function startDemoCall(leadId) {
   if (skipBtn) skipBtn.style.display = S.dialerMode ? '' : 'none';
 
   populateSmsTemplates();
-  setCWStatus('ringing', 'Informa al prospecto primero');
+  setCWStatus('ringing', 'Inform the prospect first');
   document.getElementById('call-widget').classList.add('visible');
 }
 
@@ -458,10 +460,10 @@ function runSimulatedCall() {
   document.getElementById('cw-consent').style.display  = 'none';
   document.getElementById('cw-controls').style.display = 'flex';
 
-  setCWStatus('ringing', 'Marcando…');
+  setCWStatus('ringing', 'Dialing…');
 
   setTimeout(() => {
-    setCWStatus('connected', 'Conectado');
+    setCWStatus('connected', 'Connected');
     CALL.timer = setInterval(() => {
       CALL.seconds++;
       const t = document.getElementById('cw-timer');
@@ -472,7 +474,7 @@ function runSimulatedCall() {
 
 function getCallScript() {
   const company = S.config.companyName || '[empresa]';
-  return (S.config.callScript || '"Hola, le llamo de [empresa]. Esta llamada puede ser grabada con fines de calidad. ¿Es un buen momento para hablar?"')
+  return (S.config.callScript || '"Hi, I\'m calling from [empresa]. This call may be recorded for quality purposes. Is now a good time to talk?"')
     .replace(/\[empresa\]/gi, company)
     .replace(/\[tu empresa\]/gi, company);
 }

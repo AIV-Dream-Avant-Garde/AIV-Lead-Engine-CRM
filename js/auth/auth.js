@@ -70,7 +70,7 @@ async function tryLogin() {
   if (failedAttempts >= MAX_FAIL_ATTEMPTS) {
     pinLockedUntil = Date.now() + LOCKOUT_MS;
     const el = document.getElementById('login-lockout');
-    if (el) { el.style.display = 'block'; el.textContent = 'Demasiados intentos. Bloqueado 15 minutos.'; }
+    if (el) { el.style.display = 'block'; el.textContent = 'Too many attempts. Locked out for 15 minutes.'; }
     const np = document.querySelector('.numpad');
     if (np) np.style.opacity = '0.35';
     setTimeout(() => {
@@ -81,15 +81,15 @@ async function tryLogin() {
       if (np2) np2.style.opacity = '1';
       updatePinDots();
       const hint = document.getElementById('login-hint');
-      if (hint) hint.textContent = 'Ingresa tu PIN para acceder';
+      if (hint) hint.textContent = 'Enter your PIN to sign in';
     }, LOCKOUT_MS);
   } else {
     const hint = document.getElementById('login-hint');
-    if (hint) hint.textContent = 'PIN incorrecto. ' + (MAX_FAIL_ATTEMPTS - failedAttempts) + ' intentos restantes.';
+    if (hint) hint.textContent = 'Incorrect PIN. ' + (MAX_FAIL_ATTEMPTS - failedAttempts) + ' attempts remaining.';
     setTimeout(() => {
       updatePinDots();
       const h = document.getElementById('login-hint');
-      if (h) h.textContent = 'Ingresa tu PIN para acceder';
+      if (h) h.textContent = 'Enter your PIN to sign in';
     }, 900);
   }
 }
@@ -174,7 +174,7 @@ function logout() {
   failedAttempts = 0;
   updatePinDots();
   const hint = document.getElementById('login-hint');
-  if (hint) hint.textContent = 'Ingresa tu PIN para acceder';
+  if (hint) hint.textContent = 'Enter your PIN to sign in';
   const lockout = document.getElementById('login-lockout');
   if (lockout) lockout.style.display = 'none';
   document.getElementById('login-overlay').classList.remove('hidden');
@@ -200,7 +200,7 @@ function resetSessionTimer() {
   }, SESSION_TIMEOUT_MS - 2 * 60 * 1000);
 
   sessionTimer = setTimeout(() => {
-    if (S.session) { toast('Sesión cerrada por inactividad.', 'warning'); logout(); }
+    if (S.session) { toast('Session ended due to inactivity.', 'warning'); logout(); }
   }, SESSION_TIMEOUT_MS);
 }
 
@@ -242,7 +242,7 @@ function startDemo() {
   S.calls       = DEMO_DATA.calls.map(c => ({...c}));
   S.team        = DEMO_DATA.team.map(m => ({...m}));
   S.commissions = DEMO_DATA.commissions.map(c => ({...c}));
-  const user    = {userId:'demo-admin', userName:'Demo Usuario', role:'admin', closerRate:12};
+  const user    = {userId:'demo-admin', userName:'Demo User', role:'admin', closerRate:12};
   S.session     = user;
   // Demo is in-memory only — don't persist a session token (a refresh returns
   // cleanly to the PIN screen rather than restoring an empty, purged demo).
@@ -278,6 +278,6 @@ function updateSidebarUser(user) {
   const nm = document.getElementById('sb-user-name');
   if (nm) nm.textContent = user.userName;
   const rl = document.getElementById('sb-user-role');
-  const labels = {admin:'Administrador', closer:'Closer', solo:'Solo Operator'};
+  const labels = {admin:'Administrator', closer:'Closer', solo:'Solo Operator'};
   if (rl) rl.textContent = labels[user.role] || user.role;
 }

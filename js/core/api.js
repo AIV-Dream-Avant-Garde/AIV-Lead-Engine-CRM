@@ -38,12 +38,12 @@ function setLastSynced() {
 }
 
 async function syncNow() {
-  if (!S.config.scriptUrl) { setSyncUI('','Conecta Apps Script en Setup'); return; }
+  if (!S.config.scriptUrl) { setSyncUI('','Connect Apps Script in Setup'); return; }
   if (S.isSyncing) return; // prevent concurrent syncs
   S.isSyncing = true;
   const syncBtn = document.getElementById('sync-btn');
   if (syncBtn) { syncBtn.disabled = true; syncBtn.setAttribute('aria-busy','true'); }
-  setSyncUI('syncing','Sincronizando...');
+  setSyncUI('syncing','Syncing...');
   setProgress(5);
 
   // Push new (never-synced) leads in batches; update edited synced leads.
@@ -121,7 +121,7 @@ async function syncNow() {
     // Near-real-time: alert the rep to fresh replies (skipped on the first sync,
     // which loads history). Speed-to-lead is the #1 conversion lever.
     if (freshInbound.length && typeof notifyNewReplies === 'function') notifyNewReplies(freshInbound);
-    // Reflect inbound replies onto the lead so the "Respondió" badge works frontend-side
+    // Reflect inbound replies onto the lead so the "Replied" badge works frontend-side
     // regardless of whether the backend stamped lastReplyAt.
     (S.interactions || []).filter(i => i.direction === 'in' && i.leadId).forEach(i => {
       const l = S.leads.find(x => x.id === i.leadId);
@@ -143,10 +143,10 @@ async function syncNow() {
     S._syncedOnce = true;   // first sync loads history silently; later syncs alert on fresh replies
     saveLocal();
     if (failed > 0) {
-      setSyncUI('error', failed + ' sin sincronizar — reintentar');
-      toast(failed + ' registro(s) no se guardaron en el servidor' + (authError ? ' (autenticación: revisa CRM_SECRET)' : '') + '. Se reintentarán en el próximo sync.', 'error', 7000);
+      setSyncUI('error', failed + ' not synced — retry');
+      toast(failed + ' record(s) failed to save to the server' + (authError ? ' (authentication: check CRM_SECRET)' : '') + '. They will be retried on the next sync.', 'error', 7000);
     } else {
-      setSyncUI('ok','Sincronizado');
+      setSyncUI('ok','Synced');
       setLastSynced();
       setTimeout(showSignalBanner, 200);
     }
@@ -154,7 +154,7 @@ async function syncNow() {
     // Pull failed: keep all dirty/unsynced state for retry; persist push progress.
     saveLocal();
     const isAuth = (res && /unauthorized/i.test(String(res.error||''))) || authError;
-    setSyncUI('error', isAuth ? 'No autorizado — revisa CRM_SECRET' : (res?.error ? 'Error: ' + String(res.error).slice(0,30) : 'Sin conexión — se reintentará'));
+    setSyncUI('error', isAuth ? 'Unauthorized — check CRM_SECRET' : (res?.error ? 'Error: ' + String(res.error).slice(0,30) : 'Not connected — will retry'));
   }
 
   setProgress(100);
@@ -166,21 +166,21 @@ async function syncNow() {
 
 async function testConn() {
   const url = document.getElementById('cfg-url')?.value?.trim();
-  if (!url) { toast('Ingresa la URL primero.', 'error'); return; }
-  setSyncUI('syncing','Probando...');
+  if (!url) { toast('Enter the URL first.', 'error'); return; }
+  setSyncUI('syncing','Testing...');
   try {
     const r = await fetch(url + '?action=ping', {redirect:'follow'});
     const d = await r.json();
     if (d.ping || d.success) {
-      setSyncUI('ok','Conexion OK');
-      toast('Apps Script conectado — ' + d.serverTime, 'success', 5000);
+      setSyncUI('ok','Connection OK');
+      toast('Apps Script connected — ' + d.serverTime, 'success', 5000);
     } else {
       setSyncUI('error','Error');
       toast('Error: ' + JSON.stringify(d), 'error');
     }
   } catch(e) {
     setSyncUI('error','Error');
-    toast('Error: ' + e.message + ' — Verifica el deploy del Apps Script.', 'error', 6000);
+    toast('Error: ' + e.message + ' — Check the Apps Script deployment.', 'error', 6000);
   }
 }
 
@@ -188,18 +188,18 @@ function saveConfig() {
   S.config.scriptUrl = document.getElementById('cfg-url')?.value?.trim() || '';
   saveLocal();
   if (S.config.scriptUrl) {
-    setSyncUI('','Configurado');
+    setSyncUI('','Configured');
     const webhookEl = document.getElementById('webhook-url-display');
     if (webhookEl) webhookEl.value = S.config.scriptUrl;
   }
-  toast('Configuración guardada', 'success');
+  toast('Configuration saved', 'success');
 }
 
 function saveReportEmail() {
   const email = document.getElementById('cfg-report-email')?.value?.trim();
-  if (!email) { toast('Ingresa un correo válido.', 'error'); return; }
-  if (!S.config.scriptUrl) { toast('Configura el Apps Script URL primero.', 'error'); return; }
-  sheetsCall({action:'saveReportEmail', email}).then(() => toast('Correo de reporte guardado', 'success'));
+  if (!email) { toast('Enter a valid email.', 'error'); return; }
+  if (!S.config.scriptUrl) { toast('Set the Apps Script URL first.', 'error'); return; }
+  sheetsCall({action:'saveReportEmail', email}).then(() => toast('Report email saved', 'success'));
 }
 
 async function pushLead(lead) {

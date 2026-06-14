@@ -16,46 +16,46 @@ function populateFilters() {
   };
 
   // Leads table: country filter + city list narrowed to the selected country
-  fillSel('f-country', countries, 'Todos los países');
+  fillSel('f-country', countries, 'All countries');
   const fcountry = document.getElementById('f-country')?.value || '';
   const fCities  = fcountry
     ? [...new Set(S.leads.filter(l => l.country === fcountry).map(l => l.city).filter(Boolean))].sort()
     : cities;
-  fillSel('f-city',    fCities, 'Todas las ciudades');
+  fillSel('f-city',    fCities, 'All cities');
 
-  fillSel('f-barrio',  barrios, 'Todos los barrios');
-  fillSel('f-source',  sources, 'Todas las fuentes');
-  fillSel('kb-city',   cities,  'Todas las ciudades');
-  fillSel('ex-country', countries, 'Todos');
-  fillSel('ex-city',   cities,  'Todas');
-  fillSel('ex-barrio', barrios, 'Todos');
-  fillSel('ex-source', sources, 'Todas');
+  fillSel('f-barrio',  barrios, 'All neighborhoods');
+  fillSel('f-source',  sources, 'All sources');
+  fillSel('kb-city',   cities,  'All cities');
+  fillSel('ex-country', countries, 'All');
+  fillSel('ex-city',   cities,  'All');
+  fillSel('ex-barrio', barrios, 'All');
+  fillSel('ex-source', sources, 'All');
 
   const cp = document.getElementById('admin-comm-person');
   if (cp) {
     const cv = cp.value;
-    cp.innerHTML = '<option value="">Todos los miembros</option>' +
+    cp.innerHTML = '<option value="">All members</option>' +
       (S.team||[]).map(m => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');
     if (cv) cp.value = cv;
   }
 }
 
 function updateBadges() {
-  const byStatus = st => S.leads.filter(l => (l.status || 'Nuevo') === st).length;
+  const byStatus = st => S.leads.filter(l => (l.status || 'New') === st).length;
   const setEl    = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
 
   setEl('nav-leads-badge', S.leads.length);
   setEl('tb-leads-pill',   S.leads.length + ' leads');
   setEl('nav-calls-badge', S.calls.length);
-  // "Responder ahora" urgency badge — only shows when leads are waiting.
+  // "Respond now" urgency badge — only shows when leads are waiting.
   const rc = (typeof responderCount === 'function') ? responderCount() : 0;
   const rb = document.getElementById('nav-responder-badge');
   if (rb) { rb.textContent = rc; rb.style.display = rc > 0 ? '' : 'none'; }
   setEl('st-total', S.leads.length);
-  setEl('st-new',   byStatus('Nuevo'));
-  setEl('st-cont',  byStatus('Contactado'));
-  setEl('st-int',   byStatus('Interesado'));
-  setEl('st-clos',  byStatus('Cerrado'));
+  setEl('st-new',   byStatus('New'));
+  setEl('st-cont',  byStatus('Contacted'));
+  setEl('st-int',   byStatus('Interested'));
+  setEl('st-clos',  byStatus('Closed Won'));
 }
 
 // ── renderAll — single consolidated render ─────────────────
@@ -88,9 +88,9 @@ function navigate(id) {
   document.querySelector(`.nav-item[data-sec="${id}"]`)?.classList.add('active');
 
   const labels = {
-    setup:'Configuración', scraper:'Scraper', import:'Importar', responder:'Responder ahora', leads:'Leads',
-    pipeline:'Pipeline', llamadas:'Llamadas', export:'Exportar',
-    perfil:'Mi Perfil', admin:'Admin', analytics:'Analytics',
+    setup:'Setup', scraper:'Scraper', import:'Import', responder:'Respond Now', leads:'Leads',
+    pipeline:'Pipeline', llamadas:'Calls', export:'Export',
+    perfil:'My Profile', admin:'Admin', analytics:'Analytics',
   };
   const el = document.getElementById('tb-section');
   if (el) el.textContent = labels[id] || id;
@@ -102,7 +102,7 @@ function navigate(id) {
   if (id === 'llamadas')  renderCallsSection();
   if (id === 'perfil')    renderPerfil();
   if (id === 'admin') {
-    if (S.session?.role !== 'admin') { toast('Acceso restringido.', 'error'); navigate('leads'); return; }
+    if (S.session?.role !== 'admin') { toast('Access restricted.', 'error'); navigate('leads'); return; }
     renderAdmin();
   }
   if (id === 'scraper') {
@@ -157,13 +157,13 @@ function showShortcutsModal() {
   el.id = 'shortcuts-modal';
   el.className = 'shortcuts-modal';
   el.innerHTML = `<div class="shortcuts-inner">
-    <div class="shortcuts-title">Atajos de teclado <span class="shortcuts-close" onclick="this.closest('#shortcuts-modal').remove()">×</span></div>
+    <div class="shortcuts-title">Keyboard shortcuts <span class="shortcuts-close" onclick="this.closest('#shortcuts-modal').remove()">×</span></div>
     <table class="shortcuts-table">
-      <tr><td><kbd>?</kbd></td><td>Mostrar / ocultar este panel</td></tr>
-      <tr><td><kbd>N</kbd></td><td>Siguiente lead disponible</td></tr>
-      <tr><td><kbd>S</kbd></td><td>Sincronizar con Google Sheets</td></tr>
-      <tr><td><kbd>Esc</kbd></td><td>Cerrar modal / overlay</td></tr>
-      <tr><td><kbd>Ctrl+Enter</kbd></td><td>Guardar lead (dentro del modal)</td></tr>
+      <tr><td><kbd>?</kbd></td><td>Show / hide this panel</td></tr>
+      <tr><td><kbd>N</kbd></td><td>Next available lead</td></tr>
+      <tr><td><kbd>S</kbd></td><td>Sync with Google Sheets</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>Close modal / overlay</td></tr>
+      <tr><td><kbd>Ctrl+Enter</kbd></td><td>Save lead (inside the modal)</td></tr>
     </table>
   </div>`;
   document.body.appendChild(el);
@@ -185,7 +185,7 @@ function showShortcutsModal() {
   // 3. Populate Setup UI
   const cfgUrlEl = document.getElementById('cfg-url');
   if (cfgUrlEl && S.config.scriptUrl) cfgUrlEl.value = S.config.scriptUrl;
-  setSyncUI('', S.config.scriptUrl ? 'Listo para sincronizar' : 'Conecta Apps Script en Setup');
+  setSyncUI('', S.config.scriptUrl ? 'Ready to sync' : 'Connect Apps Script in Setup');
 
   const secretEl = document.getElementById('crm-secret-display');
   if (secretEl && S.config.crmSecret) secretEl.textContent = S.config.crmSecret;

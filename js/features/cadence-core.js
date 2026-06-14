@@ -1,6 +1,6 @@
 /* ── FEATURE: Cadence engine — pure decision core ──────────────────────────
-   Deterministic helpers for the CRM-native outreach engine ("Motor de
-   Secuencias"). EVERYTHING here is PURE: no DOM, no Apps Script, no Date.now()
+   Deterministic helpers for the CRM-native outreach engine ("Sequence
+   Engine"). EVERYTHING here is PURE: no DOM, no Apps Script, no Date.now()
    / Math.random() (callers pass `now` and derive variety from stable hashes).
 
    This file is the unit-tested source of truth (tests/cases.js) and is MIRRORED
@@ -20,19 +20,19 @@ const CADENCE_STEPS = {
   'Colombia': {            // WhatsApp — conversational, warm, assured
     whatsapp: [
       { variants: [
-        'Hola, soy {agente} de {empresa}. Vi {negocio} en {ciudad} y me parece que están haciendo las cosas bien. Trabajamos con negocios como el suyo para conseguir más clientes de forma constante, y creo que les podemos aportar. ¿Tiene un minuto para que le cuente cómo?',
-        'Hola, le escribe {agente} de {empresa}. Conocí {negocio} en {ciudad} y me gustó lo que vi. Ayudamos a negocios como el suyo a atraer clientes de manera más constante, y creo que hay una buena oportunidad aquí. ¿Le viene bien que le explique en corto?',
-        'Buenas, soy {agente} de {empresa}. Me encontré con {negocio} en {ciudad} y quería escribirle directo: lo que hacemos encaja muy bien con un {categoria} como el suyo para traer más clientes. ¿Tiene un momento para que le muestre cómo?',
+        "Hi, this is {agente} with {empresa}. I came across {negocio} in {ciudad} and it looks like you're doing things right. We work with businesses like yours to bring in customers consistently, and I think we can add real value. Do you have a minute for me to share how?",
+        "Hi, this is {agente} with {empresa}. I found {negocio} in {ciudad} and liked what I saw. We help businesses like yours attract customers more consistently, and I think there's a real opportunity here. Would it be alright if I explained briefly?",
+        "Hi, this is {agente} with {empresa}. I came across {negocio} in {ciudad} and wanted to reach out directly: what we do is a great fit for a {categoria} like yours for bringing in more customers. Do you have a moment for me to show you how?",
       ] },
       { variants: [
-        'Hola de nuevo, soy {agente} de {empresa}. Le escribo porque lo que hacemos encaja muy bien con un {categoria} como {negocio}. Si le interesa, le muestro en concreto qué resultados podríamos lograr. Si por ahora no es el momento, lo entiendo perfectamente.',
-        'Hola, {agente} de {empresa} otra vez. No quería dejar pasar lo de {negocio}: tengo claro qué podríamos lograr juntos y me gustaría mostrárselo en concreto. Si prefiere que hablemos más adelante, sin problema, usted me dice.',
+        "Hi again, this is {agente} with {empresa}. I'm reaching out because what we do is a great fit for a {categoria} like {negocio}. If you're interested, I can show you exactly what results we could drive. If now isn't the right time, I completely understand.",
+        "Hi, {agente} from {empresa} again. I didn't want to let {negocio} slip by: I have a clear sense of what we could achieve together and I'd love to show you concretely. If you'd rather talk down the road, no problem at all — just let me know.",
       ] },
     ],
     email: [
       { variants: [
-        'Hola, soy {agente} de {empresa}. Vi el trabajo de {negocio} en {ciudad} y creo que podemos ayudarles a atraer clientes de forma más constante. Me encantaría mostrarles, en concreto, qué resultados podríamos lograr juntos. ¿Tienen 15 minutos esta semana para una llamada corta?\n\nUn saludo,\n{agente} — {empresa}',
-        'Hola, le escribe {agente} de {empresa}. Conocí {negocio} en {ciudad} y veo una oportunidad clara para que lleguen a más clientes de manera constante. Con gusto les muestro en una llamada corta qué podríamos lograr juntos. ¿Les viene bien esta semana?\n\nUn saludo,\n{agente} — {empresa}',
+        "Hi, this is {agente} with {empresa}. I saw the work {negocio} is doing in {ciudad} and I think we can help you attract customers more consistently. I'd love to show you exactly what results we could drive together. Do you have 15 minutes this week for a quick call?\n\nBest,\n{agente} — {empresa}",
+        "Hi, this is {agente} with {empresa}. I came across {negocio} in {ciudad} and I see a clear opportunity to help you reach more customers consistently. I'd be glad to show you on a quick call what we could achieve together. Does this week work for you?\n\nBest,\n{agente} — {empresa}",
       ] },
     ],
   },
@@ -81,23 +81,23 @@ function cadenceResolveChannel(lead) {
 // Is a lead eligible to be ENROLLED? (caller supplies hasSeq = already enrolled)
 function cadenceEligible(lead, hasSeq) {
   if (!lead || hasSeq) return false;
-  if (String(lead.status || 'Nuevo') !== 'Nuevo') return false;   // untouched leads only
+  if (String(lead.status || 'New') !== 'New') return false;   // untouched leads only
   if (cadenceResolveChannel(lead) === '') return false;           // must be reachable
   return true;
 }
 
 // Why a sequence must stop/pause RIGHT NOW given the lead's live state.
 // '' = proceed. Order: terminal stops, then claimed, then replied, then any
-// non-Nuevo status (a human has engaged → hand it off).
+// non-New status (a human has engaged → hand it off).
 function cadenceGuard(lead, seq) {
   if (!lead) return 'stopped:rejected';
-  const status = String(lead.status || 'Nuevo');
-  if (status === 'No llamar')        return 'stopped:optout';
-  if (status === 'Cerrado')          return 'stopped:closed';
-  if (status === 'No interesado' || status === 'Negociacion fallida' || status === 'Negociación fallida') return 'stopped:rejected';
+  const status = String(lead.status || 'New');
+  if (status === 'Do Not Call')        return 'stopped:optout';
+  if (status === 'Closed Won')          return 'stopped:closed';
+  if (status === 'Not Interested' || status === 'Closed Lost' || status === 'Closed Lost') return 'stopped:rejected';
   if (String(lead.lockedBy || ''))   return 'paused:claimed';
   if (replyShouldPause(lead, seq))   return 'paused:replied';
-  if (status !== 'Nuevo')            return 'paused:claimed';      // Contactado/Interesado
+  if (status !== 'New')            return 'paused:claimed';      // Contacted/Interested
   return '';
 }
 

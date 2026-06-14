@@ -20,18 +20,18 @@ function getExportLeads() {
 
 function previewExport() {
   const leads = getExportLeads();
-  if (!leads.length) { toast('Sin leads con estos filtros.', 'error'); return; }
+  if (!leads.length) { toast('No leads match these filters.', 'error'); return; }
   const hdrs  = ['name','phone','email','address','website','rating','country','city','barrio','keyword','source','sourceDetail','status','followUpDate'];
   const lines = [
     hdrs.join(','),
     ...leads.slice(0,5).map(l => hdrs.map(h => `"${(l[h]||'').toString().replace(/"/g,'""')}"`).join(',')),
   ];
-  if (leads.length > 5) lines.push('... y ' + (leads.length - 5) + ' mas');
+  if (leads.length > 5) lines.push('... and ' + (leads.length - 5) + ' more');
   const ep = document.getElementById('ex-preview');
   if (ep) ep.textContent = lines.join('\n');
   document.getElementById('ex-wrap').style.display = 'block';
   const db = document.getElementById('ex-dl-btn');
-  if (db) db.textContent = 'Descargar ' + leads.length + ' leads (CSV)';
+  if (db) db.textContent = 'Download ' + leads.length + ' leads (CSV)';
 }
 
 function doExport() {
@@ -44,16 +44,19 @@ function doExport() {
   const csv   = [
     hdrs.join(','),
     ...leads.map(l => {
-      const {closerAmount, providerAmount} = l.dealValue ? calcCommissions(l, parseFloat(l.dealValue)) : {closerAmount:0, providerAmount:0};
+      // Emit the commission amounts recorded on the lead at close time — NOT a
+      // live recompute. Rates can change after a deal closes, and a recompute
+      // would make the export disagree with what was actually recorded and paid.
       const enriched = {
         ...l,
-        providerCommission: providerAmount || '',
-        closerCommission: closerAmount || '',
         providerName: S.team.find(m => m.id === l.providerId)?.name || '',
         closerName:  S.team.find(m => m.id === l.closerId)?.name || '',
         callCount:   S.calls.filter(c => c.leadId === l.id).length,
       };
-      return hdrs.map(h => `"${(enriched[h]||'').toString().replace(/"/g,'""')}"`).join(',');
+      return hdrs.map(h => {
+        const v = enriched[h];                              // preserve a literal 0
+        return `"${(v == null ? '' : v).toString().replace(/"/g,'""')}"`;
+      }).join(',');
     }),
   ].join('\n');
   const a = document.createElement('a');
@@ -63,7 +66,7 @@ function doExport() {
 }
 
 function exportCommissions() {
-  if (!S.commissions.length) { toast('Sin comisiones registradas.', 'error'); return; }
+  if (!S.commissions.length) { toast('No commissions recorded.', 'error'); return; }
   const hdrs = ['leadName','dealValue','collectedAmount',
                  'providerName','providerAmount','closerName','closerAmount','status','createdAt','paidAt','paidBy','paymentRef',
                  'refundReason','adjustedBy','adjustedAt'];
@@ -79,12 +82,12 @@ function exportCommissions() {
   ].join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'}));
-  a.download = 'axius_comisiones_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.download = 'axius_commissions_' + new Date().toISOString().slice(0,10) + '.csv';
   a.click();
 }
 
 function exportCalls() {
-  if (!S.calls.length) { toast('Sin llamadas registradas.', 'error'); return; }
+  if (!S.calls.length) { toast('No calls recorded.', 'error'); return; }
   const hdrs = ['leadName','phone','outcome','duration','notes','calledAt','consentConfirmed','callSid'];
   const csv = [
     hdrs.join(','),
@@ -92,25 +95,25 @@ function exportCalls() {
   ].join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'}));
-  a.download = 'axius_llamadas_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.download = 'axius_calls_' + new Date().toISOString().slice(0,10) + '.csv';
   a.click();
 }
 
 function copyCrmSecret() {
   const s = S.config.crmSecret || '';
-  if (!s) { toast('Secreto no generado aún. Recarga la página.', 'error'); return; }
+  if (!s) { toast('Secret not generated yet. Reload the page.', 'error'); return; }
   navigator.clipboard.writeText(s).then(() => {
     const el = document.getElementById('crm-secret-display');
-    if (el) { const orig = el.textContent; el.textContent = 'Copiado!'; setTimeout(() => el.textContent = orig, 2000); }
+    if (el) { const orig = el.textContent; el.textContent = 'Copied!'; setTimeout(() => el.textContent = orig, 2000); }
   });
 }
 
 function copyWebhookUrl() {
   const url = S.config.scriptUrl || '';
-  if (!url) { toast('Guarda la URL del Apps Script primero.', 'error'); return; }
+  if (!url) { toast('Save the Apps Script URL first.', 'error'); return; }
   navigator.clipboard.writeText(url).then(() => {
     const btn = document.querySelector('[onclick="copyWebhookUrl()"]');
-    if (btn) { btn.textContent = 'Copiado!'; setTimeout(() => btn.textContent = 'Copiar URL', 2000); }
+    if (btn) { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy URL', 2000); }
   });
 }
 
@@ -119,8 +122,8 @@ function copyEl(elId, btnId, label) {
   navigator.clipboard.writeText(t).then(() => {
     const b = document.getElementById(btnId);
     if (!b) return;
-    b.textContent = 'Copiado!';
+    b.textContent = 'Copied!';
     b.classList.add('copied');
-    setTimeout(() => { b.textContent = label || 'Copiar'; b.classList.remove('copied'); }, 2500);
+    setTimeout(() => { b.textContent = label || 'Copy'; b.classList.remove('copied'); }, 2500);
   });
 }

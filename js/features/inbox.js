@@ -1,4 +1,4 @@
-/* ── FEATURE: "Responder ahora" — leads awaiting a human reply ──────────────
+/* ── FEATURE: "Reply now" — leads awaiting a human reply ──────────────
    Speed-to-lead queue. Surfaces every lead whose latest message is INBOUND
    (the ball is in our court) so a rep answers fast. Responding quickly is the
    single biggest conversion lever in outreach. The pure selectors at the top
@@ -17,7 +17,7 @@ function leadsNeedingResponse(leads, interactions) {
       if (t > (lastOut[it.leadId] || 0)) lastOut[it.leadId] = t;
     }
   });
-  const terminal = { 'No llamar': 1, 'Cerrado': 1 };
+  const terminal = { 'Do Not Call': 1, 'Closed Won': 1 };
   return (leads || [])
     .filter(l => l && lastIn[l.id] && !terminal[l.status] && lastIn[l.id] > (lastOut[l.id] || 0))
     .map(l => ({ lead: l, repliedAt: lastIn[l.id], lastMsg: lastMsg[l.id] || '' }))
@@ -59,9 +59,9 @@ function notifyNewReplies(items) {
   if (!Array.isArray(items) || !items.length) return;
   _replyBeep();
   const n = items.length, first = items[0] || {};
-  const who   = first.leadName || 'Un lead';
-  const title = n === 1 ? 'Nueva respuesta — ' + who : n + ' respuestas nuevas';
-  const body  = n === 1 ? String(first.body || '').slice(0, 120) : 'Ábrelas en "Responder ahora".';
+  const who   = first.leadName || 'A lead';
+  const title = n === 1 ? 'New reply — ' + who : n + ' new replies';
+  const body  = n === 1 ? String(first.body || '').slice(0, 120) : 'Open them in "Reply now".';
   try {
     if (window.Notification && Notification.permission === 'granted') {
       const note = new Notification(title, { body, tag: 'aiv-reply' });
@@ -78,22 +78,22 @@ function renderResponder() {
   const items = leadsNeedingResponse(S.leads, S.interactions);
   const cEl = document.getElementById('responder-count');
   if (cEl) cEl.textContent = items.length
-    ? items.length + (items.length === 1 ? ' lead espera respuesta' : ' leads esperan respuesta')
+    ? items.length + (items.length === 1 ? ' lead waiting for a reply' : ' leads waiting for a reply')
     : '';
   if (!items.length) {
-    wrap.innerHTML = '<div class="notes-empty">Nadie espera respuesta ahora mismo. En cuanto un lead conteste, aparece aquí para que lo atiendas de inmediato. Responder rápido es lo que más sube la conversión.</div>';
+    wrap.innerHTML = '<div class="notes-empty">No one is waiting for a reply right now. As soon as a lead responds, they show up here so you can jump on it immediately. Replying fast is the single biggest lever for conversion.</div>';
     return;
   }
   const now = Date.now();
   wrap.innerHTML = items.map(({ lead, repliedAt, lastMsg }) => `
     <div class="team-row" style="margin-bottom:6px;cursor:pointer" onclick="openLead('${esc(lead.id)}')">
       <div class="team-info" style="min-width:0">
-        <div class="team-name">${esc(lead.name || 'Sin nombre')}<span class="pill" style="margin-left:8px">${esc(waitedLabel(repliedAt, now))} esperando</span></div>
+        <div class="team-name">${esc(lead.name || 'No name')}<span class="pill" style="margin-left:8px">${esc(waitedLabel(repliedAt, now))} waiting</span></div>
         <div class="team-meta" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52ch">${esc((lastMsg || '').slice(0, 100)) || '—'}</div>
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0">
-        ${(lead.phone && lead.phone !== 'N/A') ? `<button class="btn btn-success btn-xs" onclick="event.stopPropagation();makeCall('${esc(lead.id)}')">Llamar</button>` : ''}
-        <button class="btn btn-primary btn-xs" onclick="event.stopPropagation();openLead('${esc(lead.id)}')">Responder</button>
+        ${(lead.phone && lead.phone !== 'N/A') ? `<button class="btn btn-success btn-xs" onclick="event.stopPropagation();makeCall('${esc(lead.id)}')">Call</button>` : ''}
+        <button class="btn btn-primary btn-xs" onclick="event.stopPropagation();openLead('${esc(lead.id)}')">Reply</button>
       </div>
     </div>`).join('');
 }
