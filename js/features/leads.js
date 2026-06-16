@@ -3,13 +3,16 @@
 // ── Follow-up / source badge helpers ──────────────────────
 function isOverdue(lead) {
   if (!lead.followUpDate) return false;
-  return new Date(lead.followUpDate) < new Date() &&
-    lead.status !== 'Closed Won' && lead.status !== 'Do Not Call';
+  if (lead.status === 'Closed Won' || lead.status === 'Do Not Call') return false;
+  // Compare against the START of today so a follow-up dated TODAY reads as
+  // "Today", not "Overdue" (it was flagging red all day before).
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return new Date(lead.followUpDate + 'T00:00:00') < today;
 }
 
 function isTodayFU(lead) {
   if (!lead.followUpDate) return false;
-  return new Date(lead.followUpDate).toDateString() === new Date().toDateString();
+  return new Date(lead.followUpDate + 'T00:00:00').toDateString() === new Date().toDateString();
 }
 
 function fuBadgeHTML(lead) {

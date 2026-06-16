@@ -270,7 +270,7 @@ async function bulkMarkPaid() {
 function promptAdjustCollected(leadId) {
   const lead = S.leads.find(l => l.id === leadId);
   if (!lead) return;
-  const raw = prompt(`How much was actually collected? (COP)\nContracted value: ${fmtUSD(lead.dealValue)}`, lead.collectedAmount || lead.dealValue || '');
+  const raw = prompt(`How much was actually collected? (USD)\nContracted value: ${fmtUSD(lead.dealValue)}`, lead.collectedAmount || lead.dealValue || '');
   if (raw === null) return;
   const reason = prompt('Reason for the adjustment (optional):') || '';
   adjustCollectedAmount(leadId, raw, reason);

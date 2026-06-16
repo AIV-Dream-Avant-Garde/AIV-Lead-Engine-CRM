@@ -49,10 +49,20 @@ function phoneKey(p) {
 function toast(msg, type, duration) {
   type     = type     || 'info';
   duration = duration || 3500;
+  // Stack toasts in a single container so simultaneous messages don't overlap.
+  let stack = document.getElementById('toast-stack');
+  if (!stack) {
+    stack = document.createElement('div');
+    stack.id = 'toast-stack';
+    stack.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column-reverse;gap:8px;pointer-events:none';
+    document.body.appendChild(stack);
+  }
   const el = document.createElement('div');
   el.className   = 'toast toast-' + type;
+  // Override the .toast fixed positioning so the container lays them out.
+  el.style.position = 'relative'; el.style.bottom = 'auto'; el.style.right = 'auto'; el.style.pointerEvents = 'auto';
   el.textContent = msg;
-  document.body.appendChild(el);
+  stack.appendChild(el);
   requestAnimationFrame(() => el.classList.add('visible'));
   setTimeout(() => {
     el.classList.remove('visible');
