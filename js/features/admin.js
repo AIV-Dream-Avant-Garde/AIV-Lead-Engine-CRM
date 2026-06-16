@@ -405,9 +405,11 @@ function renderScheduledJobs() {
   if (triggerWrap) {
     const active = S.triggerStatus?.scrape;
     const lr = S.triggerStatus?.lastScrapeRun;
+    const runMeta = lr && lr.ofJobs ? ` · ${lr.jobsRun||0}/${lr.ofJobs} jobs this cycle` : '';
     const lastRunLine = lr && lr.ranAt
-      ? `<div style="font-size:11px;color:var(--sub);margin-bottom:10px">Last run: ${fmtD(lr.ranAt)} ${fmtT(lr.ranAt)} · +${lr.added||0} leads</div>`
+      ? `<div style="font-size:11px;color:var(--sub);margin-bottom:10px">Last run: ${fmtD(lr.ranAt)} ${fmtT(lr.ranAt)} · +${lr.added||0} leads${runMeta}</div>`
       : `<div style="font-size:11px;color:var(--sub);margin-bottom:10px">No runs recorded yet.</div>`;
+    const budgetHint = `<div style="font-size:11px;color:var(--sub);margin-bottom:10px">Runs once daily within a free-tier budget (~4.5&nbsp;min, ~100 searches). If you add more jobs than fit, they rotate across days so every one still runs — and you never exceed the free limits.</div>`;
     triggerWrap.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
         <span style="font-size:13px;color:var(--body)">Automatic trigger (daily 6am):</span>
@@ -422,7 +424,8 @@ function renderScheduledJobs() {
           Run now
         </button>
       </div>
-      ${lastRunLine}`;
+      ${lastRunLine}
+      ${budgetHint}`;
   }
 
   const wrap = document.getElementById('admin-jobs-list');
@@ -464,6 +467,36 @@ function addScheduledJob() {
   saveLocal();
   if (S.config.scriptUrl) sheetsCall({action:'saveScheduledJobs', jobs:S.scheduledJobs});
   renderScheduledJobs();
+}
+
+// Bulk-add: create a city-level scheduled job for EVERY keyword in the selected
+// category, so you pick an industry once instead of adding keywords one by one.
+// City-level (not neighborhood) because Google now labels each lead's real
+// neighborhood anyway, and it keeps the daily job count manageable.
+function addCategoryJobs() {
+  const country = document.getElementById('sj-country')?.value || DEFAULT_COUNTRY;
+  const city    = document.getElementById('sj-city')?.value || '';
+  const cat     = document.getElementById('sj-cat')?.value || '';
+  const radius  = document.getElementById('sj-radius')?.value || '5000';
+  const max     = parseInt(document.getElementById('sj-max')?.value || '60');
+  const cityLoc = LOCATIONS[country]?.[city];
+  if (!city || !cityLoc) { toast('Select a city first.', 'error'); return; }
+  const kws = (KEYWORDS[country]?.[cat]) || [];
+  if (!kws.length) { toast('Select a category first.', 'error'); return; }
+  if (!Array.isArray(S.scheduledJobs)) S.scheduledJobs = [];
+  const has = new Set(S.scheduledJobs.map(j => (j.keyword + '|' + j.city).toLowerCase()));
+  let added = 0;
+  kws.forEach(keyword => {
+    const k = (keyword + '|' + city).toLowerCase();
+    if (has.has(k)) return;
+    has.add(k);
+    S.scheduledJobs.push({keyword, country, city, barrio:'', lat:cityLoc.lat, lng:cityLoc.lng, radius, maxResults:max, region:COUNTRY_REGION[country]||'', source:'Scraper (auto)', active:true});
+    added++;
+  });
+  saveLocal();
+  if (S.config.scriptUrl) sheetsCall({action:'saveScheduledJobs', jobs:S.scheduledJobs});
+  renderScheduledJobs();
+  toast(added ? `Added ${added} job${added!==1?'s':''} — ${cat} in ${city}.` : 'Those jobs already exist.', added ? 'success' : 'info');
 }
 
 function toggleScheduledJob(idx) {
