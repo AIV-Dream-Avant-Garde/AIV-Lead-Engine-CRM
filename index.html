@@ -386,6 +386,7 @@ Content-Type: application/json
   <div class="eyebrow">CRM</div>
   <h1 class="section-title">Lead database</h1>
   <p class="section-sub">All your contacts. Click any row for details, notes, and to call.</p>
+  <div style="margin-bottom:12px"><button class="btn btn-primary btn-sm" onclick="openAddLead()">+ Add lead</button></div>
   <div class="bulk-bar" id="bulk-bar">
     <span class="bulk-count" id="bulk-count">0 selected</span>
     <select id="bulk-status" class="filter-sel">
@@ -828,6 +829,25 @@ Content-Type: application/json
         <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
         <button class="btn btn-primary" onclick="saveLead()">Save changes</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD LEAD MODAL (manual single-lead entry) -->
+<div class="deal-overlay" id="addlead-overlay" role="dialog" aria-modal="true" aria-label="Add a lead">
+  <div class="deal-card">
+    <div class="deal-title">Add a lead</div>
+    <div class="deal-sub">Manually add a single contact — a referral, a walk-in, or someone you met. Enter at least a name or a phone.</div>
+    <div class="field"><label>Name</label><input type="text" id="al-name" placeholder="Business or contact name"></div>
+    <div class="field"><label>Phone</label><input type="text" id="al-phone" placeholder="(305) 555-0100"></div>
+    <div class="field"><label>Email</label><input type="email" id="al-email" placeholder="name@example.com"></div>
+    <div class="field"><label>Website</label><input type="text" id="al-website" placeholder="example.com"></div>
+    <div class="field"><label>City</label><input type="text" id="al-city" placeholder="Orlando"></div>
+    <div class="field"><label>Source</label><input type="text" id="al-source" placeholder="Referral" value="Manual"></div>
+    <div class="field"><label>Notes</label><textarea class="script-editor" id="al-notes" rows="2" placeholder="Anything worth remembering..."></textarea></div>
+    <div class="btn-row" style="margin-top:16px">
+      <button class="btn btn-primary" onclick="saveNewLead()">Add lead</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('addlead-overlay').classList.remove('open')">Cancel</button>
     </div>
   </div>
 </div>
