@@ -108,6 +108,10 @@ function navigate(id) {
   if (id === 'scraper') {
     fillCountries('sc-country'); onCountryChange(); fillSources('sc-source');
     renderScrapeHistory();
+    // Scheduled-scrape panel now lives here (moved from Admin): init its form + jobs.
+    if (typeof initAdminJobsForm === 'function') initAdminJobsForm();
+    if (typeof renderScheduledJobs === 'function') renderScheduledJobs();
+    if (typeof checkTriggerStatus === 'function') checkTriggerStatus();
   }
   if (id === 'import') {
     fillCountries('imp-country'); onImpCountryChange(); fillSources('imp-source');
