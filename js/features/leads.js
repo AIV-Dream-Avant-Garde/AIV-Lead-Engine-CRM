@@ -1,5 +1,50 @@
 /* ── FEATURE: Leads table, modal, CRUD ───────────────────── */
 
+// ── Manual add lead (single-lead entry) ───────────────────
+function openAddLead() {
+  ['al-name','al-phone','al-email','al-website','al-city','al-notes'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+  const src = document.getElementById('al-source'); if (src) src.value = 'Manual';
+  document.getElementById('addlead-overlay')?.classList.add('open');
+  setTimeout(() => document.getElementById('al-name')?.focus(), 50);
+}
+
+function saveNewLead() {
+  const get = id => document.getElementById(id)?.value?.trim() || '';
+  const name = get('al-name'), phoneRaw = get('al-phone'), email = get('al-email').toLowerCase();
+  if (!name && !phoneRaw && !email) { toast('Enter at least a name, phone, or email.', 'error'); return; }
+  const phone = phoneRaw ? normalizePhone(phoneRaw) : '';
+  // Dedup by phone or email — warn before adding a likely duplicate.
+  const pk = phoneKey(phone);
+  const dup = S.leads.find(l => (pk && phoneKey(l.phone) === pk) || (email && (l.email || '').toLowerCase() === email));
+  if (dup && !confirm(`A lead with this contact already exists ("${dup.name}"). Add anyway?`)) return;
+
+  const now  = new Date().toISOString();
+  const sess = S.session;
+  const isProvider = sess && (sess.role === 'provider' || sess.role === 'solo');
+  const lead = {
+    id: uid(), name: name || 'No name', phone: phone || 'N/A', email,
+    address: 'N/A', website: get('al-website') || 'N/A', rating: 'N/A', reviews: 'N/A',
+    country: DEFAULT_COUNTRY, city: get('al-city'), barrio: '', keyword: '',
+    source: get('al-source') || 'Manual', sourceDetail: '', status: 'New',
+    providerId: isProvider ? sess.userId : '', providerRate: isProvider ? (sess.providerRate || 0) : 0,
+    closerId: '', closerRate: 0, dealValue: '',
+    providerCommission: '', closerCommission: '', commissionStatus: '',
+    lockedBy: '', lockedUntil: '', assignedAt: isProvider ? now : '',
+    workHistory: [], dncReason: '', followUpDate: '', notes: [],
+    importedAt: now, updatedAt: now, _synced: false,
+  };
+  const noteText = get('al-notes');
+  if (noteText) lead.notes.push({ date: now, text: noteText });
+  S.leads.push(lead);
+  S.dirty.add(lead.id);
+  saveLocal();
+  if (typeof auditLog === 'function') auditLog('addLead', lead.id, lead.name);
+  document.getElementById('addlead-overlay')?.classList.remove('open');
+  toast('Lead added.', 'success');
+  S.page = 1; renderAll();
+  if (S.config.scriptUrl) syncNow();   // push the new lead to Sheets now
+}
+
 // ── Follow-up / source badge helpers ──────────────────────
 function isOverdue(lead) {
   if (!lead.followUpDate) return false;
