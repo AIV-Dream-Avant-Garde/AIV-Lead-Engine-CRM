@@ -23,6 +23,14 @@ async function sheetsCall(params) {
 function setSyncUI(state, text) {
   document.getElementById('sync-dot').className = 'sync-dot' + (state ? ' ' + state : '');
   document.getElementById('sync-text').textContent = text;
+  // Surface sync failures the user would otherwise miss — the status dot is tiny
+  // and the 75s background poll is silent. Toast ONCE per failure streak (and
+  // once on recovery), so a solo founder knows when work isn't reaching Sheets.
+  if (state === 'error') {
+    if (!S._syncFailing) { S._syncFailing = true; toast(text || 'Sync failed — working offline, will retry.', 'error', 6000); }
+  } else if (state === 'ok') {
+    if (S._syncFailing) { S._syncFailing = false; toast('Back online — changes synced.', 'success'); }
+  }
 }
 
 function setProgress(pct) {

@@ -434,7 +434,7 @@ Content-Type: application/json
     <table>
       <thead><tr>
         <th style="width:32px"><input type="checkbox" id="chk-all" onchange="toggleAll(this)"></th>
-        <th class="sortable" onclick="sortBy('score')" style="width:28px" title="Sort by priority">P</th>
+        <th class="sortable" onclick="sortBy('score')" style="width:44px" title="Lead priority score">Score</th>
         <th class="sortable" onclick="sortBy('name')">Name</th>
         <th>Phone</th>
         <th class="sortable" onclick="sortBy('city')">City</th>
@@ -978,6 +978,7 @@ Content-Type: application/json
     <textarea class="cw-notes-inp" id="cw-notes" rows="2" placeholder="Call notes..."></textarea>
     <button class="btn btn-primary btn-full" onclick="saveCallLog(false)" style="font-size:12px;padding:8px">Save and close</button>
     <button class="cw-next-btn" onclick="saveCallLog(true)">Save and go to next lead →</button>
+    <button class="btn btn-ghost btn-sm" style="margin-top:4px;width:100%" onclick="discardCall()">Close without logging</button>
     <button class="btn btn-ghost btn-sm" id="cw-skip-btn" style="display:none;margin-top:4px;width:100%" onclick="skipDialerLead()">Skip this lead (dialer)</button>
     <div id="cw-sms-wrap" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
       <div style="font-size:11px;color:var(--body);margin-bottom:6px">Send SMS/WhatsApp</div>

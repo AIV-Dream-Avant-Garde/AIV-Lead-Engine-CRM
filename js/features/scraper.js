@@ -137,8 +137,8 @@ function onSjCountryChange() {
 let scraperRunning = false;
 
 async function runScraper() {
-  if (scraperRunning) { alert('A scrape is already in progress.'); return; }
-  if (!S.config.scriptUrl) { alert('Set up the Apps Script URL first.'); return; }
+  if (scraperRunning) { toast('A scrape is already in progress.', 'error'); return; }
+  if (!S.config.scriptUrl) { toast('Set up the Apps Script URL first (Settings).', 'error'); return; }
   const country   = document.getElementById('sc-country')?.value || DEFAULT_COUNTRY;
   const region    = COUNTRY_REGION[country] || '';
   const city      = document.getElementById('sc-city')?.value   || '';
@@ -149,7 +149,7 @@ async function runScraper() {
   const max       = parseInt(document.getElementById('sc-max')?.value || '100');
   const src       = document.getElementById('sc-source')?.value || 'Google Maps';
   const srcDetail = document.getElementById('sc-source-detail')?.value?.trim() || '';
-  if (!lat || !lng) { alert('Select a neighborhood first.'); return; }
+  if (!lat || !lng) { toast('Select a neighborhood first.', 'error'); return; }
 
   scraperRunning = true;
   const btn      = document.getElementById('scraper-run-btn');
@@ -162,7 +162,9 @@ async function runScraper() {
   try {
     const res = await sheetsCall({action:'scrape', keyword:kw, lat, lng, radius, maxResults:max, region});
     if (!res || !res.success || !res.leads) {
-      if (statusEl) statusEl.textContent = 'Error: ' + (res?.error || 'No response');
+      const msg = res?.error || 'No response from the server';
+      if (statusEl) statusEl.textContent = 'Error: ' + msg;
+      toast('Scrape failed: ' + msg, 'error', 6000);
       scraperRunning = false;
       if (btn) { btn.disabled = false; btn.textContent = 'Start scrape via Apps Script'; }
       return;

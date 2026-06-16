@@ -156,6 +156,15 @@ function setOutcome(val) {
   document.querySelector(`.outcome-btn[onclick="setOutcome('${val}')"]`)?.classList.add('active');
 }
 
+// Close the call widget WITHOUT logging an outcome (e.g. a mis-dial) — no call
+// record is written. Hangs up if still connected, then resets state.
+function discardCall() {
+  if (CALL.timer) { clearInterval(CALL.timer); CALL.timer = null; }
+  if (CALL.activeCall) { try { CALL.activeCall.disconnect(); } catch(e){} CALL.activeCall = null; }
+  document.getElementById('call-widget')?.classList.remove('visible');
+  CALL.curLeadId = null; CALL.outcome = null; CALL.seconds = 0; CALL.consentConfirmed = false;
+}
+
 // saveCallLog — consolidated (goNext support, call note auto-added)
 async function saveCallLog(goNext) {
   if (!CALL.outcome) { toast('Select the call outcome.', 'error'); return; }
@@ -232,7 +241,7 @@ function renderCallsSection() {
       ${c.notes ? `<div class="call-notes-text">${esc(c.notes)}</div>` : ''}
       ${audio}
     </div>`;
-  }).join('') : '<div style="text-align:center;padding:40px;color:var(--body);font-size:13px">No calls recorded.</div>';
+  }).join('') : '<div style="text-align:center;padding:40px;color:var(--body);font-size:13px">No calls yet — open a lead and hit <strong>Call</strong> to start dialing.</div>';
 }
 
 function renderLeadCallHistory(leadId) {
@@ -379,13 +388,13 @@ function saveCallScript() {
 }
 
 function previewScript() {
-  const company = document.getElementById('cfg-company')?.value?.trim() || '[empresa]';
+  const company = document.getElementById('cfg-company')?.value?.trim() || '[your company]';
   const script  = document.getElementById('cfg-script')?.value?.trim()  || '';
   const box     = document.getElementById('script-preview-box');
   if (!box) return;
   if (script) {
     box.style.display = 'block';
-    box.textContent   = script.replace(/\[empresa\]/gi, company).replace(/\[tu empresa\]/gi, company);
+    box.textContent   = script.replace(/\[your company\]/gi, company).replace(/\[empresa\]/gi, company).replace(/\[tu empresa\]/gi, company);
   } else {
     box.style.display = 'none';
   }
@@ -456,7 +465,7 @@ function runSimulatedCall() {
   CALL.callSid = 'CA-demo-' + Math.random().toString(36).slice(2, 10);
 
   const cb = document.getElementById('cw-consent-btn');
-  if (cb) { cb.className = 'cw-consent-btn confirmed'; cb.textContent = '✓ Consentimiento confirmado'; }
+  if (cb) { cb.className = 'cw-consent-btn confirmed'; cb.textContent = '✓ Consent confirmed'; }
   document.getElementById('cw-consent').style.display  = 'none';
   document.getElementById('cw-controls').style.display = 'flex';
 
@@ -473,8 +482,9 @@ function runSimulatedCall() {
 }
 
 function getCallScript() {
-  const company = S.config.companyName || '[empresa]';
-  return (S.config.callScript || '"Hi, I\'m calling from [empresa]. This call may be recorded for quality purposes. Is now a good time to talk?"')
-    .replace(/\[empresa\]/gi, company)
+  const company = S.config.companyName || '[your company]';
+  return (S.config.callScript || '"Hi, I\'m calling from [your company]. This call may be recorded for quality and training purposes. Is now a good time to talk?"')
+    .replace(/\[your company\]/gi, company)
+    .replace(/\[empresa\]/gi, company)        // legacy token, kept for back-compat
     .replace(/\[tu empresa\]/gi, company);
 }
