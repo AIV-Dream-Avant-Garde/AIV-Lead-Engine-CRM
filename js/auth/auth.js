@@ -47,7 +47,7 @@ async function tryLogin() {
 
   // Admin PIN check — a rotated PIN (S.config.adminHash) overrides the built-in default
   if (hash === (S.config.adminHash || ADMIN_HASH)) {
-    startSession({userId:'admin', userName:'Admin', role:'admin', closerRate:0});
+    startSession({userId:'admin', userName:(S.config.adminName || 'Andres Toro'), role:'admin', closerRate:0});
     return;
   }
 
@@ -268,6 +268,19 @@ function applySidebarForRole(role) {
     const hasTools = allowed.some(s => ['setup','scraper','import'].includes(s));
     toolsLabel.classList.toggle('role-hidden', !hasTools);
   }
+}
+
+// The admin's display name (shown in the sidebar and used as the {agent} name in
+// outbound email/SMS, so messages sign with a real person, not "Admin").
+function setAdminName(name) {
+  name = String(name || '').trim();
+  S.config.adminName = name;
+  if (S.session && S.session.userId === 'admin') {
+    S.session.userName = name || 'Andres Toro';
+    updateSidebarUser(S.session);
+  }
+  saveLocal();
+  if (name) toast('Name updated to "' + name + '".', 'success');
 }
 
 function updateSidebarUser(user) {
