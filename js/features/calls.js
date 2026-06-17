@@ -170,10 +170,8 @@ function onCallEnd() {
   document.getElementById('cw-controls').style.display = 'none';
   const rr = document.getElementById('cw-record-reminder'); if (rr) rr.style.display = 'none';
   document.getElementById('cw-post').classList.add('visible');
-  // Post-call SMS box stays hidden until SMS is actually live (S.config.smsReady),
-  // so it isn't dead noise before A2P is set up.
   const smsWrap = document.getElementById('cw-sms-wrap');
-  if (smsWrap) smsWrap.style.display = (S.config.smsReady && S.config.scriptUrl && !S.demoMode) ? '' : 'none';
+  if (smsWrap) smsWrap.style.display = S.config.scriptUrl && !S.demoMode ? '' : 'none';
   const l = S.leads.find(x => x.id === CALL.curLeadId);
   // Only advance to "Contacted" if the call actually connected. Failed/rejected/
   // cancelled calls all route here with 0 seconds and must not inflate contact metrics.

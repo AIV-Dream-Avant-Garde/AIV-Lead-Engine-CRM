@@ -112,6 +112,8 @@ function navigate(id) {
     if (typeof initAdminJobsForm === 'function') initAdminJobsForm();
     if (typeof renderScheduledJobs === 'function') renderScheduledJobs();
     if (typeof checkTriggerStatus === 'function') checkTriggerStatus();
+    // Render the dark map once the section is visible/sized.
+    setTimeout(() => { if (typeof renderScraperMap === 'function') renderScraperMap(); }, 80);
   }
   if (id === 'import') {
     fillCountries('imp-country'); onImpCountryChange(); fillSources('imp-source');
@@ -120,6 +122,7 @@ function navigate(id) {
     setTimeout(() => {
       const cfg = S.config;
       const setCfgEl = (eid, v) => { const el2 = document.getElementById(eid); if (el2) el2.value = v || ''; };
+      setCfgEl('cfg-admin-name', cfg.adminName      || '');
       setCfgEl('cfg-company',    cfg.companyName    || '');
       setCfgEl('cfg-booking',    cfg.bookingUrl     || '');
       setCfgEl('cfg-script',     cfg.callScript     || '');

@@ -90,6 +90,96 @@ function updateGPS() {
     const el = document.getElementById('sc-gps');
     if (el) el.value = `${p[1]}, ${p[2]}  --  ${p[0]}`;
   }
+  renderScraperMap();
+}
+
+// ── Bloomberg-style dark scraper map (Leaflet + CartoDB dark) ──
+var _scMap = null, _scCircle = null, _scCenter = null, _scLeadLayer = null;
+
+// Resolve the current target: selected neighborhood coords if any, else the
+// city center. Returns {lat, lng, city, country, barrio} or null.
+function scMapTarget() {
+  const country = document.getElementById('sc-country')?.value || DEFAULT_COUNTRY;
+  const city    = document.getElementById('sc-city')?.value    || '';
+  const bv      = document.getElementById('sc-barrio')?.value  || '';
+  const [barrio, blat, blng] = bv.split('|');
+  const base    = LOCATIONS[country] && LOCATIONS[country][city];
+  let lat = parseFloat(blat), lng = parseFloat(blng);
+  if (!isFinite(lat) || !isFinite(lng)) {
+    if (!base) return null;
+    lat = base.lat; lng = base.lng;
+  }
+  return { lat, lng, city, country, barrio: barrio || '', base };
+}
+
+function renderScraperMap() {
+  if (typeof L === 'undefined') return;                 // Leaflet not loaded (offline)
+  const host = document.getElementById('scraper-map');
+  if (!host) return;
+  const t = scMapTarget();
+  if (!t) return;
+  const radius = parseInt(document.getElementById('sc-radius')?.value || '1000', 10);
+
+  // Init once
+  if (!_scMap) {
+    _scMap = L.map(host, { zoomControl:true, attributionControl:true, scrollWheelZoom:true })
+              .setView([t.lat, t.lng], 13);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap &copy; CARTO',
+    }).addTo(_scMap);
+    _scLeadLayer = L.layerGroup().addTo(_scMap);
+  }
+
+  // Center pin
+  const centerIcon = L.divIcon({ className:'map-center-pin', html:'<span></span>', iconSize:[14,14], iconAnchor:[7,7] });
+  if (_scCenter) _scCenter.setLatLng([t.lat, t.lng]).setIcon(centerIcon);
+  else _scCenter = L.marker([t.lat, t.lng], { icon:centerIcon, interactive:false }).addTo(_scMap);
+
+  // Radius circle
+  if (_scCircle) _scCircle.setLatLng([t.lat, t.lng]).setRadius(radius);
+  else _scCircle = L.circle([t.lat, t.lng], {
+    radius, color:'#2DD4BF', weight:1.5, opacity:.85,
+    fillColor:'#2DD4BF', fillOpacity:.07,
+  }).addTo(_scMap);
+
+  // Plot existing leads in the selected city (deterministic coords from name)
+  _scLeadLayer.clearLayers();
+  let inView = 0;
+  if (t.base) {
+    (S.leads || []).forEach(l => {
+      if (String(l.city || '').toLowerCase() !== String(t.city).toLowerCase()) return;
+      const c = l.barrio ? barrioCoords(t.base, l.barrio) : { lat:t.base.lat, lng:t.base.lng };
+      const la = parseFloat(c.lat), ln = parseFloat(c.lng);
+      const d = scHaversine(t.lat, t.lng, la, ln);
+      if (d <= radius) inView++;
+      L.circleMarker([la, ln], {
+        radius:4, color:'#cdd8ff', weight:1, fillColor:'#4B72FF', fillOpacity:.9,
+      }).bindPopup(`<b>${esc(l.name||'No name')}</b><br>${esc(l.barrio||'')}${l.barrio?' · ':''}${esc(l.status||'')}`)
+        .addTo(_scLeadLayer);
+    });
+  }
+
+  // Fit to the circle so the whole radius is "everything it can show"
+  try { _scMap.fitBounds(_scCircle.getBounds(), { padding:[28,28], maxZoom:16 }); } catch(e) {}
+  setTimeout(() => { try { _scMap.invalidateSize(); } catch(e) {} }, 60);
+
+  // Overlay meta
+  const km = radius >= 1000 ? (radius/1000) + 'km' : radius + 'm';
+  const locEl = document.getElementById('map-meta-loc');
+  if (locEl) locEl.textContent = [t.barrio, t.city, t.country].filter(Boolean).join(', ');
+  const radEl = document.getElementById('map-meta-radius');
+  if (radEl) radEl.textContent = km + ' radius';
+  const leadEl = document.getElementById('map-meta-leads');
+  if (leadEl) leadEl.textContent = inView;
+}
+
+// Great-circle distance in meters
+function scHaversine(lat1, lng1, lat2, lng2) {
+  const R = 6371000, toR = d => d * Math.PI / 180;
+  const dLat = toR(lat2-lat1), dLng = toR(lng2-lng1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toR(lat1))*Math.cos(toR(lat2))*Math.sin(dLng/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(a));
 }
 
 // Scraper cascade: country → city → barrio, and country → category → keyword
