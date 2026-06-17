@@ -42,7 +42,7 @@ const SHEETS = { leads:'Leads', calls:'Llamadas', team:'Team', commissions:'Comm
 // CSRF protection — paste the value from your browser's Setup page
 const CRM_SECRET = 'PASTE_YOUR_CRM_SECRET_HERE'; // Setup → shows after first load
 
-const LEAD_HDR = ['id','name','phone','address','website','rating','reviews','city','barrio','keyword','source','sourceDetail','status','providerId','providerRate','closerId','closerRate','dealValue','collectedAmount','providerCommission','closerCommission','commissionStatus','lockedBy','lockedUntil','assignedAt','workHistory','dncReason','followUpDate','notes','importedAt','updatedAt','calendarEventId','refundAmount','refundReason','refundedAt','country','email','externalId','lastTouchAt','lastReplyAt','consentSms','consentWhatsapp','consentEmail'];
+const LEAD_HDR = ['id','name','phone','address','website','rating','reviews','city','barrio','keyword','source','sourceDetail','status','providerId','providerRate','closerId','closerRate','dealValue','collectedAmount','providerCommission','closerCommission','commissionStatus','lockedBy','lockedUntil','assignedAt','workHistory','dncReason','followUpDate','notes','importedAt','updatedAt','calendarEventId','refundAmount','refundReason','refundedAt','country','email','externalId','lastTouchAt','lastReplyAt','consentSms','consentWhatsapp','consentEmail','lat','lng'];
 const CALL_HDR = ['id','leadId','leadName','phone','callSid','outcome','duration','notes','recordingUrl','driveUrl','consentConfirmed','calledAt'];
 const TEAM_HDR = ['id','name','role','pinHash','providerRate','closerRate','contact','active','createdAt'];
 const COMM_HDR   = ['id','leadId','leadName','dealValue','collectedAmount','providerId','providerRate','providerAmount','closerId','closerRate','closerAmount','status','createdAt','paidAt','paidBy','paymentRef','refundReason','adjustedBy','adjustedAt','providerName','closerName'];
@@ -478,7 +478,7 @@ function doPost(e) {
     if (a === 'scrape') {
       const {keyword,lat,lng,radius,maxResults,region} = b;
       const url='https://places.googleapis.com/v1/places:searchText';
-      const hdr={'Content-Type':'application/json','X-Goog-Api-Key':PLACES_API_KEY,'X-Goog-FieldMask':'places.displayName,places.formattedAddress,places.addressComponents,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount,nextPageToken'};
+      const hdr={'Content-Type':'application/json','X-Goog-Api-Key':PLACES_API_KEY,'X-Goog-FieldMask':'places.displayName,places.formattedAddress,places.addressComponents,places.location,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount,nextPageToken'};
       const baseBody={textQuery:keyword,locationBias:{circle:{center:{latitude:parseFloat(lat),longitude:parseFloat(lng)},radius:parseFloat(radius)}},maxResultCount:20};
       if(region)baseBody.regionCode=region;
       const MAX_API_CALLS = 15; // Guard against quota exhaustion
@@ -493,7 +493,7 @@ function doPost(e) {
         apiCalls++;
         const d=JSON.parse(r.getContentText());
         if(d.error)return err_(d.error.message);
-        (d.places||[]).forEach(p=>{ if(leads.length<maxResults)leads.push({name:p.displayName?.text||'N/A',phone:p.nationalPhoneNumber||'N/A',address:p.formattedAddress||'N/A',website:p.websiteUri||'N/A',rating:p.rating||'N/A',reviews:p.userRatingCount||'N/A',neighborhood:comp_(p,['neighborhood','sublocality','sublocality_level_1']),cityReal:comp_(p,['locality','postal_town'])}); });
+        (d.places||[]).forEach(p=>{ if(leads.length<maxResults)leads.push({name:p.displayName?.text||'N/A',phone:p.nationalPhoneNumber||'N/A',address:p.formattedAddress||'N/A',website:p.websiteUri||'N/A',rating:p.rating||'N/A',reviews:p.userRatingCount||'N/A',neighborhood:comp_(p,['neighborhood','sublocality','sublocality_level_1']),cityReal:comp_(p,['locality','postal_town']),lat:p.location?.latitude??'',lng:p.location?.longitude??''}); });
         token=d.nextPageToken; tries++;
         if(!token)break;
         Utilities.sleep(2000);
@@ -680,7 +680,7 @@ function runScheduledScrapes() {
 
   const url = 'https://places.googleapis.com/v1/places:searchText';
   const hdr = {'Content-Type':'application/json','X-Goog-Api-Key':PLACES_API_KEY,
-    'X-Goog-FieldMask':'places.displayName,places.formattedAddress,places.addressComponents,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount,nextPageToken'};
+    'X-Goog-FieldMask':'places.displayName,places.formattedAddress,places.addressComponents,places.location,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount,nextPageToken'};
   const comp_=(p,types)=>{ const c=(p.addressComponents||[]).find(x=>(x.types||[]).some(t=>types.indexOf(t)>=0)); return c?(c.longText||c.shortText||''):''; };
 
   const now = new Date().toISOString();
@@ -693,17 +693,37 @@ function runScheduledScrapes() {
   // are configured from the dashboard.
   const active = jobs.filter(j => j.active);
   if (!active.length) { cfgSet('lastScrapeRun', JSON.stringify({ranAt: now, added: 0, jobsRun: 0, ofJobs: 0})); return {added: 0, ranAt: now}; }
+
+  // Exhaustion-skip: a job that returns ZERO new leads for several runs in a row
+  // has been fully harvested — stop burning daily API budget re-scraping it.
+  // emptyMap tracks consecutive empty runs per job; once a week we wipe the map so
+  // exhausted areas get one fresh recheck (new businesses do open).
+  const EXHAUST_AT = 3, RECHECK_MS = 7 * 24 * 60 * 60 * 1000;
+  const jobKey = j => [j.keyword, j.lat, j.lng, j.radius || 1000].join('|');
+  let emptyMap = {}; try { emptyMap = JSON.parse(cfgGet('scrapeEmpty') || '{}') || {}; } catch(e) {}
+  let lastRecheck = 0; try { lastRecheck = parseInt(cfgGet('scrapeRecheckAt')) || 0; } catch(e) {}
+  if (Date.now() - lastRecheck > RECHECK_MS) { emptyMap = {}; cfgSet('scrapeRecheckAt', String(Date.now())); }
+
+  // Skip jobs proven exhausted; rotate only over the ones still worth running.
+  const eligible = active.filter(j => (emptyMap[jobKey(j)] || 0) < EXHAUST_AT);
+  const skipped  = active.length - eligible.length;
+  if (!eligible.length) {
+    cfgSet('lastScrapeRun', JSON.stringify({ranAt: now, added: 0, jobsRun: 0, ofJobs: active.length, skipped}));
+    return {added: 0, ranAt: now, jobsRun: 0, ofJobs: active.length, skipped};
+  }
+
   const RUN_BUDGET_MS = 270000;  // ~4.5 min of headroom under the 6-min hard limit
   const MAX_CALLS     = 100;     // cap Places requests per daily run (free-tier friendly)
   const t0 = Date.now();
   let apiCalls = 0, jobsRun = 0;
   let cursor = 0; try { cursor = parseInt(cfgGet('scrapeCursor')) || 0; } catch(e) {}
-  if (cursor < 0 || cursor >= active.length) cursor = 0;
+  if (cursor < 0 || cursor >= eligible.length) cursor = 0;
 
-  for (let n = 0; n < active.length; n++) {
+  for (let n = 0; n < eligible.length; n++) {
     if (Date.now() - t0 > RUN_BUDGET_MS || apiCalls >= MAX_CALLS) break;   // budget reached — resume next run
-    const job = active[(cursor + n) % active.length];
+    const job = eligible[(cursor + n) % eligible.length];
     jobsRun++;
+    const addedBefore = totalAdded;
     let leads = [], token = null, tries = 0;
     const max = parseInt(job.maxResults) || 50;
     const baseBody = {textQuery:job.keyword, locationBias:{circle:{center:{latitude:parseFloat(job.lat),longitude:parseFloat(job.lng)},radius:parseFloat(job.radius||1000)}},maxResultCount:20, ...(job.region?{regionCode:job.region}:{})};
@@ -718,7 +738,8 @@ function runScheduledScrapes() {
           name:p.displayName?.text||'N/A', phone:p.nationalPhoneNumber||'N/A',
           address:p.formattedAddress||'N/A', website:p.websiteUri||'N/A',
           rating:p.rating||'N/A', reviews:p.userRatingCount||'N/A',
-          neighborhood:comp_(p,['neighborhood','sublocality','sublocality_level_1']), cityReal:comp_(p,['locality','postal_town'])
+          neighborhood:comp_(p,['neighborhood','sublocality','sublocality_level_1']), cityReal:comp_(p,['locality','postal_town']),
+          lat:p.location?.latitude??'', lng:p.location?.longitude??''
         });
       });
       token = d.nextPageToken; tries++;
@@ -737,19 +758,23 @@ function runScheduledScrapes() {
           providerId:'', providerRate:0, closerId:'', closerRate:0,
           dealValue:'', providerCommission:'', closerCommission:'', commissionStatus:'',
           lockedBy:'', lockedUntil:'', assignedAt:'', workHistory:JSON.stringify([]),
-          importedAt:now, updatedAt:now
+          importedAt:now, updatedAt:now, lat:l.lat??'', lng:l.lng??''
         };
         leadsSheet.appendRow(LEAD_HDR.map(h => lead[h] ?? ''));
         existing.add(key);
         totalAdded++;
       }
     });
+    // Update this job's empty-run streak: reset on any new lead, else increment.
+    const k = jobKey(job);
+    emptyMap[k] = (totalAdded > addedBefore) ? 0 : (emptyMap[k] || 0) + 1;
   }
-  cfgSet('scrapeCursor', String((cursor + jobsRun) % active.length));
+  cfgSet('scrapeCursor', String((cursor + jobsRun) % eligible.length));
+  cfgSet('scrapeEmpty', JSON.stringify(emptyMap));
   const ranAt = new Date().toISOString();
-  cfgSet('lastScrapeRun', JSON.stringify({ranAt, added: totalAdded, jobsRun, ofJobs: active.length}));
-  Logger.log('Scheduled scrape: +' + totalAdded + ' leads, ' + jobsRun + '/' + active.length + ' jobs, ' + apiCalls + ' calls.');
-  return {added: totalAdded, ranAt, jobsRun, ofJobs: active.length};
+  cfgSet('lastScrapeRun', JSON.stringify({ranAt, added: totalAdded, jobsRun, ofJobs: active.length, skipped}));
+  Logger.log('Scheduled scrape: +' + totalAdded + ' leads, ' + jobsRun + '/' + eligible.length + ' eligible (' + skipped + ' exhausted-skipped of ' + active.length + '), ' + apiCalls + ' calls.');
+  return {added: totalAdded, ranAt, jobsRun, ofJobs: active.length, skipped};
 }
 
 // ── Low-level send helpers (shared by the message handlers + the cadence engine) ──
@@ -766,12 +791,12 @@ function twilioSend_(phoneE164, channel, body) {
   return d.sid ? {sid:d.sid, status:d.status || 'sent'} : {error: d.message || 'send failed'};
 }
 // Append the CAN-SPAM footer (physical address + unsubscribe) required on every
-// commercial email. Bilingual so it's correct regardless of the body's language.
+// commercial email.
 function emailFooter_() {
   const cfg = getCadenceCfg_();
   const addr = (cfg.postalAddress && cfg.postalAddress.indexOf('TU_') !== 0) ? cfg.postalAddress : cfg.company;
   return '\n\n—\n' + addr +
-    '\nPara dejar de recibir estos correos, responde BAJA a este mensaje. · To unsubscribe, reply STOP.';
+    '\nTo unsubscribe, reply STOP to this message.';
 }
 // Resend email. Returns {sid,status} on success, {error} on failure.
 function resendSend_(email, subject, body) {

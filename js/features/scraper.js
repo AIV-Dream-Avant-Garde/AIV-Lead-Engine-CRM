@@ -149,7 +149,11 @@ function renderScraperMap() {
   if (t.base) {
     (S.leads || []).forEach(l => {
       if (String(l.city || '').toLowerCase() !== String(t.city).toLowerCase()) return;
-      const c = l.barrio ? barrioCoords(t.base, l.barrio) : { lat:t.base.lat, lng:t.base.lng };
+      // Prefer real captured coords; fall back to deterministic name-based coords.
+      const rla = parseFloat(l.lat), rln = parseFloat(l.lng);
+      const c = (isFinite(rla) && isFinite(rln) && (rla !== 0 || rln !== 0))
+        ? { lat:rla, lng:rln }
+        : (l.barrio ? barrioCoords(t.base, l.barrio) : { lat:t.base.lat, lng:t.base.lng });
       const la = parseFloat(c.lat), ln = parseFloat(c.lng);
       const d = scHaversine(t.lat, t.lng, la, ln);
       if (d <= radius) inView++;
@@ -276,6 +280,7 @@ async function runScraper() {
           id:uid(), name:r.name||'No name', phone:r.phone, address:r.address||'N/A',
           website:r.website||'N/A', rating:r.rating||'N/A', reviews:r.reviews||'N/A',
           country, city: (r.cityReal ?? city), barrio: (r.neighborhood ?? barrio), keyword:kw, source, sourceDetail:srcDetail,
+          lat: (r.lat ?? lat ?? ''), lng: (r.lng ?? lng ?? ''),
           status:'New', dncReason:'', followUpDate:'', notes:[],
           providerId:   isProvider ? sess.userId    : '',
           providerRate: isProvider ? (sess.providerRate || 0) : 0,

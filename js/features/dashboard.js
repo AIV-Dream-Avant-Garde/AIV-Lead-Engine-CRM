@@ -11,10 +11,13 @@ const DSH_STATUS_COLOR = {
 
 var _dshMap = null, _dshLayer = null;
 
-// Resolve a lead's plot coordinate from its city + neighborhood names.
-// Leads have no stored lat/lng yet, so we derive deterministic coords the same
-// way the scraper picker does — good enough for a territory overview.
+// Resolve a lead's plot coordinate. Prefer the REAL lat/lng captured at scrape
+// time; fall back to deterministic coords derived from the city + neighborhood
+// names (same as the scraper picker) for older leads that predate coordinate
+// capture — good enough for a territory overview.
 function dshLeadCoord(l) {
+  const rla = parseFloat(l.lat), rln = parseFloat(l.lng);
+  if (isFinite(rla) && isFinite(rln) && (rla !== 0 || rln !== 0)) return { lat: rla, lng: rln };
   const country = l.country || DEFAULT_COUNTRY;
   const base = LOCATIONS[country] && LOCATIONS[country][l.city];
   if (!base) return null;
