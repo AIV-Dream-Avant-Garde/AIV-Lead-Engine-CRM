@@ -67,6 +67,7 @@ function renderAll() {
   updatePerfilBadge();
   updateAdminBadge();
   applyAdminNavVisibility();
+  if (document.getElementById('sec-dashboard')?.classList.contains('active') && typeof renderDashboard === 'function') renderDashboard();
   if (document.getElementById('sec-pipeline')?.classList.contains('active')) renderPipeline();
   if (document.getElementById('sec-analytics')?.classList.contains('active')) renderAnalytics();
   if (document.getElementById('sec-perfil')?.classList.contains('active')) renderPerfil();
@@ -88,6 +89,7 @@ function navigate(id) {
   document.querySelector(`.nav-item[data-sec="${id}"]`)?.classList.add('active');
 
   const labels = {
+    dashboard:'Dashboard',
     setup:'Setup', scraper:'Scraper', import:'Import', responder:'Respond Now', leads:'Leads',
     pipeline:'Pipeline', llamadas:'Calls', export:'Export',
     perfil:'My Profile', admin:'Admin', analytics:'Analytics',
@@ -95,6 +97,7 @@ function navigate(id) {
   const el = document.getElementById('tb-section');
   if (el) el.textContent = labels[id] || id;
 
+  if (id === 'dashboard') renderDashboard();
   if (id === 'pipeline')  renderPipeline();
   if (id === 'analytics') renderAnalytics();
   if (id === 'responder') renderResponder();
