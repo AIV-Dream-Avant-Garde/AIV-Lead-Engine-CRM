@@ -61,16 +61,11 @@ function makeCall(leadId) {
   document.getElementById('cw-phone').textContent     = l.phone;
   document.getElementById('cw-timer').textContent     = '0:00';
   document.getElementById('cw-post').classList.remove('visible');
-  document.getElementById('cw-controls').style.display = 'none';
-  document.getElementById('cw-consent').style.display  = 'block';
+  const rr0 = document.getElementById('cw-record-reminder'); if (rr0) rr0.style.display = 'none';
 
-  // Load consent/call script
+  // Consent/call script text (reminder + the gated-flow script)
   const scriptEl = document.getElementById('cw-consent-script');
   if (scriptEl) scriptEl.textContent = getCallScript();
-
-  const cb = document.getElementById('cw-consent-btn');
-  cb.className  = 'cw-consent-btn';
-  cb.textContent = 'Informed the prospect — connect call';
 
   // Load talking-points panel
   const panel = document.getElementById('cw-script-panel');
@@ -85,19 +80,39 @@ function makeCall(leadId) {
   const skipBtn = document.getElementById('cw-skip-btn');
   if (skipBtn) skipBtn.style.display = S.dialerMode ? '' : 'none';
   populateSmsTemplates();
-  setCWStatus('ringing','Inform the prospect first');
   document.getElementById('call-widget').classList.add('visible');
+
+  if (S.config.requireConsentClick) {
+    // Gated flow (opt-in via Settings): show the consent step, wait for the click.
+    document.getElementById('cw-controls').style.display = 'none';
+    document.getElementById('cw-consent').style.display  = 'block';
+    const cb = document.getElementById('cw-consent-btn');
+    if (cb) { cb.className = 'cw-consent-btn'; cb.textContent = 'Informed the prospect — connect call'; }
+    setCWStatus('ringing', 'Inform the prospect first');
+  } else {
+    // Streamlined default: dial immediately; the recording reminder banner stays
+    // up so the rep announces it verbally (FL two-party consent = the spoken line,
+    // not a UI click).
+    document.getElementById('cw-consent').style.display = 'none';
+    CALL.consentConfirmed = true;
+    dialNow();
+  }
 }
 
-async function confirmConsentAndCall() {
-  if (S.demoMode) { runSimulatedCall(); return; }
-  if (!CALL.device) { toast('Twilio is not connected.', 'error'); return; }
+// Used only when Settings → "Require consent confirmation" is on.
+function confirmConsentAndCall() {
   CALL.consentConfirmed = true;
   const cb = document.getElementById('cw-consent-btn');
-  cb.className   = 'cw-consent-btn confirmed';
-  cb.textContent = '✓ Consent confirmed';
-  document.getElementById('cw-consent').style.display   = 'none';
-  document.getElementById('cw-controls').style.display  = 'flex';
+  if (cb) { cb.className = 'cw-consent-btn confirmed'; cb.textContent = '✓ Consent confirmed'; }
+  dialNow();
+}
+
+async function dialNow() {
+  if (S.demoMode) { runSimulatedCall(); return; }
+  if (!CALL.device) { toast('Twilio is not connected.', 'error'); return; }
+  document.getElementById('cw-consent').style.display  = 'none';
+  document.getElementById('cw-controls').style.display = 'flex';
+  const rr = document.getElementById('cw-record-reminder'); if (rr) rr.style.display = 'block';
   setCWStatus('ringing','Calling...');
   const l = S.leads.find(x => x.id === CALL.curLeadId);
   if (!l) return;
@@ -125,6 +140,17 @@ function setCWStatus(state, text) {
   document.getElementById('cw-status-text').textContent = text;
 }
 
+// Settings toggle: restore the explicit "I informed them" click before dialing.
+function setRequireConsent(on) {
+  S.config.requireConsentClick = !!on;
+  saveLocal();
+  toast(on ? 'Consent confirmation step enabled (extra click before dialing).'
+           : 'Calls now dial immediately — announce recording via the on-screen reminder.', 'success', 5000);
+}
+
+// Map number keys 1–7 to call outcomes (used by the keyboard shortcuts).
+const CALL_OUTCOME_KEYS = { '1':'answered', '2':'noanswer', '3':'voicemail', '4':'busy', '5':'callback', '6':'wrong', '7':'other' };
+
 function hangUp() {
   if (S.demoMode) { if (CALL.timer) { clearInterval(CALL.timer); CALL.timer = null; } onCallEnd(); return; }
   if (CALL.activeCall) CALL.activeCall.disconnect(); else onCallEnd();
@@ -141,9 +167,13 @@ function toggleMute() {
 function onCallEnd() {
   if (CALL.timer) { clearInterval(CALL.timer); CALL.timer = null; }
   setCWStatus('ended','Call ended · ' + fmtSec(CALL.seconds));
+  document.getElementById('cw-controls').style.display = 'none';
+  const rr = document.getElementById('cw-record-reminder'); if (rr) rr.style.display = 'none';
   document.getElementById('cw-post').classList.add('visible');
+  // Post-call SMS box stays hidden until SMS is actually live (S.config.smsReady),
+  // so it isn't dead noise before A2P is set up.
   const smsWrap = document.getElementById('cw-sms-wrap');
-  if (smsWrap) smsWrap.style.display = S.config.scriptUrl && !S.demoMode ? '' : 'none';
+  if (smsWrap) smsWrap.style.display = (S.config.smsReady && S.config.scriptUrl && !S.demoMode) ? '' : 'none';
   const l = S.leads.find(x => x.id === CALL.curLeadId);
   // Only advance to "Contacted" if the call actually connected. Failed/rejected/
   // cancelled calls all route here with 0 seconds and must not inflate contact metrics.
@@ -439,15 +469,10 @@ function startDemoCall(leadId) {
   document.getElementById('cw-phone').textContent     = l.phone;
   document.getElementById('cw-timer').textContent     = '0:00';
   document.getElementById('cw-post').classList.remove('visible');
-  document.getElementById('cw-controls').style.display = 'none';
-  document.getElementById('cw-consent').style.display  = 'block';
+  const rr0 = document.getElementById('cw-record-reminder'); if (rr0) rr0.style.display = 'none';
 
   const scriptEl = document.getElementById('cw-consent-script');
   if (scriptEl) scriptEl.textContent = getCallScript();
-
-  const cb = document.getElementById('cw-consent-btn');
-  cb.className   = 'cw-consent-btn';
-  cb.textContent = 'Informed the prospect — connect call';
 
   document.querySelectorAll('.outcome-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('cw-notes').value = '';
@@ -456,8 +481,19 @@ function startDemoCall(leadId) {
   if (skipBtn) skipBtn.style.display = S.dialerMode ? '' : 'none';
 
   populateSmsTemplates();
-  setCWStatus('ringing', 'Inform the prospect first');
   document.getElementById('call-widget').classList.add('visible');
+
+  if (S.config.requireConsentClick) {
+    document.getElementById('cw-controls').style.display = 'none';
+    document.getElementById('cw-consent').style.display  = 'block';
+    const cb = document.getElementById('cw-consent-btn');
+    if (cb) { cb.className = 'cw-consent-btn'; cb.textContent = 'Informed the prospect — connect call'; }
+    setCWStatus('ringing', 'Inform the prospect first');
+  } else {
+    document.getElementById('cw-consent').style.display = 'none';
+    CALL.consentConfirmed = true;
+    runSimulatedCall();
+  }
 }
 
 function runSimulatedCall() {
@@ -468,6 +504,7 @@ function runSimulatedCall() {
   if (cb) { cb.className = 'cw-consent-btn confirmed'; cb.textContent = '✓ Consent confirmed'; }
   document.getElementById('cw-consent').style.display  = 'none';
   document.getElementById('cw-controls').style.display = 'flex';
+  const rr = document.getElementById('cw-record-reminder'); if (rr) rr.style.display = 'block';
 
   setCWStatus('ringing', 'Dialing…');
 
