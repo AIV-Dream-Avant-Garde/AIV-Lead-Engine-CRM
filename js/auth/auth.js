@@ -116,7 +116,7 @@ function startSession(user) {
   applyAdminNavVisibility();
   resetSessionTimer();
   syncNow().then(() => {
-    navigate('leads');
+    navigate('dashboard');
     renderAll();
   });
   // Deferred: show admin nav after sync data loads
@@ -253,7 +253,7 @@ function startDemo() {
   updateSidebarUser(user);
   applyAdminNavVisibility();
   populateFilters();
-  navigate('leads');
+  navigate('dashboard');
   renderAll();
 }
 
@@ -263,11 +263,11 @@ function applySidebarForRole(role) {
   document.querySelectorAll('.nav-item[data-sec]').forEach(el => {
     el.classList.toggle('role-hidden', !allowed.includes(el.dataset.sec));
   });
-  const toolsLabel = document.getElementById('sb-tools-label');
-  if (toolsLabel) {
-    const hasTools = allowed.some(s => ['setup','scraper','import'].includes(s));
-    toolsLabel.classList.toggle('role-hidden', !hasTools);
-  }
+  // A group label hides when none of its sections are visible for this role.
+  document.querySelectorAll('.sb-sec-label[data-secs]').forEach(lbl => {
+    const secs = lbl.dataset.secs.split(',');
+    lbl.classList.toggle('role-hidden', !secs.some(s => allowed.includes(s)));
+  });
 }
 
 // The admin's display name (shown in the sidebar and used as the {agent} name in
