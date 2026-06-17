@@ -127,6 +127,7 @@ function navigate(id) {
       setCfgEl('cfg-objections', cfg.objectionsScript || '');
       setCfgEl('cfg-close',      cfg.closeScript    || '');
       const hp = document.getElementById('cfg-hide-pinplain'); if (hp) hp.checked = !!cfg.hidePinPlain;
+      const rc = document.getElementById('cfg-require-consent'); if (rc) rc.checked = !!cfg.requireConsentClick;
     }, 150);
   }
   if (id === 'leads') auditLog('viewLeads', '', '');
@@ -135,6 +136,22 @@ function navigate(id) {
 // ── Keyboard shortcuts ─────────────────────────────────────
 document.addEventListener('keydown', e => {
   if (!S.session) return;
+
+  // ── Call-widget shortcuts: while a call is up, it owns the keyboard ──
+  if (document.getElementById('call-widget')?.classList.contains('visible')) {
+    const cwPost = document.getElementById('cw-post')?.classList.contains('visible');
+    const typing = /INPUT|TEXTAREA|SELECT/.test(e.target.tagName || '');
+    if (e.key === 'Escape') { e.preventDefault(); if (cwPost && typeof discardCall === 'function') discardCall(); else hangUp(); return; }
+    if (cwPost) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); saveCallLog(!!S.dialerMode); return; }
+      if (!typing) {
+        if (typeof CALL_OUTCOME_KEYS !== 'undefined' && CALL_OUTCOME_KEYS[e.key]) { e.preventDefault(); setOutcome(CALL_OUTCOME_KEYS[e.key]); return; }
+        if (e.key === 'Enter') { e.preventDefault(); saveCallLog(!!S.dialerMode); return; }
+      }
+    }
+    return; // don't let other shortcuts (sync/next/?) fire mid-call
+  }
+
   if (e.key === 'Escape') {
     if (S.curLeadId) closeModal();
     if (document.getElementById('deal-overlay')?.classList.contains('open'))

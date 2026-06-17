@@ -211,6 +211,13 @@
         <span>Don't store PINs in plain text. Disables the "reveal PIN" button and deletes locally stored PINs. <strong>Recommended</strong> — if a PIN is lost, the admin resets it.</span>
       </label>
     </div>
+    <div class="card" style="margin-top:12px">
+      <div class="card-title" style="font-size:12px">Calling</div>
+      <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--body);margin-top:8px;cursor:pointer;line-height:1.5">
+        <input type="checkbox" id="cfg-require-consent" onchange="setRequireConsent(this.checked)" style="margin-top:2px">
+        <span>Require a consent-confirmation click before each call. <strong>Off by default</strong> — calls dial immediately and a "recording" reminder stays on screen so you announce it verbally (which is what two-party-consent law actually requires). Turn on for an explicit extra click.</span>
+      </label>
+    </div>
   </div>
   <div class="card">
     <div class="card-title">Set up Apps Script (5 steps)</div>
@@ -979,21 +986,22 @@ Content-Type: application/json
     </div>
     <div class="cw-lead-name" id="cw-lead-name">—</div>
     <div class="cw-phone" id="cw-phone">—</div>
+    <div id="cw-record-reminder" style="display:none;background:rgba(255,69,69,.12);border:1px solid rgba(255,69,69,.35);color:#ff8a8a;font-size:11px;font-weight:600;padding:7px 10px;border-radius:7px;margin:8px 0;text-align:center">🔴 This call is recorded — let the prospect know.</div>
     <div class="cw-controls" id="cw-controls" style="display:none">
       <button class="cw-btn cw-btn-mute" id="cw-mute-btn" onclick="toggleMute()"><span class="cw-btn-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:16px;height:16px"><rect x="5" y="1" width="6" height="9" rx="3"/><path d="M3 8.5a5 5 0 0 0 10 0M8 13.5V15M6 15h4"/></svg></span><span id="cw-mute-label">Mute</span></button>
       <button class="cw-btn cw-btn-hangup" onclick="hangUp()"><span class="cw-btn-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:16px;height:16px"><path d="M5 1.5H3.5A1.5 1.5 0 0 0 2 3C2 9.6 6.4 14 13 14a1.5 1.5 0 0 0 1.5-1.5V11l-3-1-1 1.5C9 10.7 5.3 7 4.5 5.5L6 4.5l-1-3z"/><path d="M1.5 1.5l13 13"/></svg></span>Hang up</button>
     </div>
   </div>
   <div class="cw-post" id="cw-post">
-    <div class="cw-post-title">Call outcome</div>
+    <div class="cw-post-title">Call outcome <span style="font-weight:400;color:var(--sub);font-size:11px">— press 1–7, Enter to save</span></div>
     <div class="outcome-btns">
-      <button class="outcome-btn" onclick="setOutcome('answered')">Answered</button>
-      <button class="outcome-btn" onclick="setOutcome('noanswer')">No answer</button>
-      <button class="outcome-btn" onclick="setOutcome('voicemail')">Voicemail</button>
-      <button class="outcome-btn" onclick="setOutcome('busy')">Busy</button>
-      <button class="outcome-btn" onclick="setOutcome('callback')">Call me back</button>
-      <button class="outcome-btn" onclick="setOutcome('wrong')">Wrong number</button>
-      <button class="outcome-btn" onclick="setOutcome('other')">Other</button>
+      <button class="outcome-btn" onclick="setOutcome('answered')"><span style="opacity:.45;font-size:10px;margin-right:4px">1</span>Answered</button>
+      <button class="outcome-btn" onclick="setOutcome('noanswer')"><span style="opacity:.45;font-size:10px;margin-right:4px">2</span>No answer</button>
+      <button class="outcome-btn" onclick="setOutcome('voicemail')"><span style="opacity:.45;font-size:10px;margin-right:4px">3</span>Voicemail</button>
+      <button class="outcome-btn" onclick="setOutcome('busy')"><span style="opacity:.45;font-size:10px;margin-right:4px">4</span>Busy</button>
+      <button class="outcome-btn" onclick="setOutcome('callback')"><span style="opacity:.45;font-size:10px;margin-right:4px">5</span>Call me back</button>
+      <button class="outcome-btn" onclick="setOutcome('wrong')"><span style="opacity:.45;font-size:10px;margin-right:4px">6</span>Wrong number</button>
+      <button class="outcome-btn" onclick="setOutcome('other')"><span style="opacity:.45;font-size:10px;margin-right:4px">7</span>Other</button>
     </div>
     <textarea class="cw-notes-inp" id="cw-notes" rows="2" placeholder="Call notes..."></textarea>
     <button class="btn btn-primary btn-full" onclick="saveCallLog(false)" style="font-size:12px;padding:8px">Save and close</button>
