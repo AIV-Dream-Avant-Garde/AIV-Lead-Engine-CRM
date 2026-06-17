@@ -368,7 +368,11 @@ function deleteSelected() {
   if (S.selected.size === 0) return;
   const n = S.selected.size;
   if (!confirm(`Delete ${n} lead${n !== 1 ? 's' : ''}? This cannot be undone.`)) return;
-  S.selected.forEach(id => { if (S.config.scriptUrl) sheetsCall({action:'delete', id}); });
+  S.selected.forEach(id => {
+    if (S.config.scriptUrl) sheetsCall({action:'delete', id});
+    S.deletedIds.add(id);   // tombstone — keeps a failed/slow server delete from resurrecting it on pull
+    S.dirty.delete(id);
+  });
   S.leads = S.leads.filter(l => !S.selected.has(l.id));
   saveLocal(); clearSelection(); renderAll();
 }
@@ -624,7 +628,7 @@ function saveLead() {
         releasedAt: new Date().toISOString(),
       });
     }
-    if (l.commissionStatus === 'pending') l.commissionStatus = 'cancelled';
+    if (!cancelLeadCommission(l.id, 'Deal marked Closed Lost') && l.commissionStatus === 'pending') l.commissionStatus = 'cancelled';
     l.closerId = ''; l.lockedBy = ''; l.lockedUntil = ''; l.assignedAt = '';
   }
 
@@ -661,6 +665,8 @@ function deleteLeadModal() {
     return;
   }
   if (S.config.scriptUrl) sheetsCall({action:'delete', id:S.curLeadId});
+  S.deletedIds.add(S.curLeadId);   // tombstone — see deleteSelected
+  S.dirty.delete(S.curLeadId);
   auditLog('deleteLead', S.curLeadId, l.name);
   S.leads = S.leads.filter(x => x.id !== S.curLeadId);
   saveLocal(); closeModal(); renderAll();

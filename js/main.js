@@ -78,6 +78,11 @@ function renderAll() {
 function toggleSidebar(force) {
   const open = force === undefined ? !document.body.classList.contains('sb-open') : !!force;
   document.body.classList.toggle('sb-open', open);
+  // The drawer slide changes the content width — re-measure maps once it settles.
+  setTimeout(() => {
+    try { if (window._dshMap) _dshMap.invalidateSize(); } catch(e) {}
+    try { if (window._scMap)  _scMap.invalidateSize();  } catch(e) {}
+  }, 320);
 }
 
 // ── navigate — consolidated (all section logic merged) ─────
@@ -220,10 +225,29 @@ function showShortcutsModal() {
   const webhookEl = document.getElementById('webhook-url-display');
   if (webhookEl && S.config.scriptUrl) webhookEl.value = S.config.scriptUrl;
 
-  // 4. Wire sidebar navigation
+  // 4. Wire sidebar navigation — clickable AND keyboard-accessible (the items
+  // are <div>s, so make them real buttons for Tab + Enter/Space + screen readers).
   document.querySelectorAll('.nav-item[data-sec]').forEach(item => {
+    item.setAttribute('role', 'button');
+    item.setAttribute('tabindex', '0');
     item.addEventListener('click', () => navigate(item.dataset.sec));
+    item.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(item.dataset.sec); }
+    });
   });
+
+  // 4b. Re-measure the Leaflet maps when the layout width changes (drawer toggle,
+  // window resize, orientation) — otherwise mobile shows grey/mis-centered tiles.
+  let _mapResizeT;
+  const reflowMaps = () => {
+    clearTimeout(_mapResizeT);
+    _mapResizeT = setTimeout(() => {
+      try { if (window._dshMap) _dshMap.invalidateSize(); } catch(e) {}
+      try { if (window._scMap)  _scMap.invalidateSize();  } catch(e) {}
+    }, 160);
+  };
+  window.addEventListener('resize', reflowMaps);
+  window.addEventListener('orientationchange', reflowMaps);
 
   // 5. Initialize dropzone
   initDropzone();

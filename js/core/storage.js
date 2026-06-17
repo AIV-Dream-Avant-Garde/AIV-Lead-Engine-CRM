@@ -16,6 +16,7 @@ function saveLocal() {
     // only on confirmed sync success (syncNow) — NOT on every local save, or
     // failed edits would be silently dropped.
     localStorage.setItem('aiv-dirty', JSON.stringify([...S.dirty]));
+    localStorage.setItem('aiv-deleted', JSON.stringify([...S.deletedIds]));
     checkStorage();
   } catch(e) {
     checkStorage();
@@ -35,6 +36,7 @@ function loadLocal() {
   try { S.smsTemplates = JSON.parse(localStorage.getItem('aiv-sms-tpl') || '[]'); } catch(e) {}
   try { S.scheduledJobs = JSON.parse(localStorage.getItem('aiv-sched-jobs') || '[]'); } catch(e) {}
   try { S.dirty = new Set(JSON.parse(localStorage.getItem('aiv-dirty') || '[]')); } catch(e) { S.dirty = new Set(); }
+  try { S.deletedIds = new Set(JSON.parse(localStorage.getItem('aiv-deleted') || '[]')); } catch(e) { S.deletedIds = new Set(); }
   purgeDemoData();
 }
 

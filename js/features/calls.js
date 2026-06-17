@@ -13,8 +13,14 @@ async function initTwilio() {
     }
     if (CALL.device) CALL.device.destroy();
     CALL.device = new Twilio.Device(res.token, {logLevel:1, codecPreferences:['opus','pcmu']});
-    CALL.device.on('registered', () => { setSyncUI('ok','Twilio ready'); toast('Twilio connected. You can now make calls from the CRM.', 'success'); });
-    CALL.device.on('error',      err => { setSyncUI('error','Twilio error'); console.error(err); });
+    // If registration never resolves (SDK/token/network stall), don't leave the
+    // sync dot spinning forever — surface it after 15s.
+    let registered = false;
+    const regTimeout = setTimeout(() => {
+      if (!registered) { setSyncUI('error','Twilio timeout'); toast('Twilio is taking too long to connect. Check the token/credentials in Apps Script, then retry.', 'error', 6000); }
+    }, 15000);
+    CALL.device.on('registered', () => { registered = true; clearTimeout(regTimeout); setSyncUI('ok','Twilio ready'); toast('Twilio connected. You can now make calls from the CRM.', 'success'); });
+    CALL.device.on('error',      err => { clearTimeout(regTimeout); setSyncUI('error','Twilio error'); console.error(err); toast('Twilio error: ' + (err?.message || 'connection problem'), 'error', 6000); });
     // Single incoming handler — both banner + CALL.incomingCall state
     CALL.device.on('incoming', call => {
       CALL.incomingCall = call;
@@ -205,17 +211,25 @@ async function saveCallLog(goNext) {
     calledAt: new Date().toISOString(),
     calledBy: S.session?.userId || '',
     calledByName: S.session?.userName || '',
+    _synced: false,
   };
   S.calls.push(rec);
   saveLocal();
-  if (S.config.scriptUrl) sheetsCall({action:'saveCall', ...rec});
+  // Confirm the server write; on failure the call stays _synced:false and
+  // syncNow() retries it — so a transient error can't silently drop the record.
+  if (S.config.scriptUrl) {
+    sheetsCall({action:'saveCall', ...rec}).then(r => { if (r && r.success) { rec._synced = true; saveLocal(); } });
+  }
   if (l) {
     if (!Array.isArray(l.notes)) l.notes = [];
     l.notes.push({
       date: rec.calledAt,
       text: 'Call: ' + (OUTCOME_LABELS[CALL.outcome] || CALL.outcome) + ' · ' + fmtSec(CALL.seconds) + (rec.notes ? ' · ' + rec.notes : ''),
     });
+    // A call IS a touch — stamp lastTouchAt so the "needs reply" logic and the
+    // cadence engine don't treat a just-called lead as still awaiting first contact.
     l.updatedAt = rec.calledAt;
+    l.lastTouchAt = rec.calledAt;
     pushLead(l);
   }
   document.getElementById('call-widget').classList.remove('visible');

@@ -15,6 +15,9 @@
   .perf-grid{grid-template-columns:repeat(2,1fr)}
 }
 
+/* Smooth momentum scrolling for the single inner scroll container (iOS). */
+.content-area{-webkit-overflow-scrolling:touch}
+
 /* ── Phones / small tablets: off-canvas sidebar ── */
 @media (max-width: 860px){
   .sidebar{transform:translateX(-100%);transition:transform .25s cubic-bezier(.22,1,.36,1);box-shadow:var(--shadow-lg);width:min(86vw,300px)}
@@ -29,16 +32,36 @@
   .stats-grid,.stats-grid.col4{grid-template-columns:repeat(2,1fr);gap:10px}
   .form-grid,.form-grid.col3{grid-template-columns:1fr}
   .table-wrap{overflow-x:auto}
-  .table-wrap table{min-width:600px}
+  /* The leads table has 13 columns — keep it readable and let it scroll; the
+     smaller analytics/team tables can pack tighter. */
+  .table-wrap table{min-width:640px}
+  #sec-leads .table-wrap table{min-width:900px}
   .modal{width:calc(100vw - 24px) !important}
-  .call-widget{left:12px;right:12px;width:auto;bottom:12px}
+
+  /* Maps: shrink so they don't push the page below the fold on a phone. */
+  .map-card{height:260px}
+  .map-card-lg{height:300px}
+
+  /* Call widget: never taller than the screen — let the post-call panel scroll
+     so "Save and close" / "Skip" stay reachable on short phones. */
+  .call-widget{left:12px;right:12px;width:auto;bottom:12px;max-height:calc(100dvh - 24px);overflow-y:auto;-webkit-overflow-scrolling:touch}
+
+  /* Comfortable tap targets (>=40px) for the dense toolbars on touch. */
+  .btn-sm,.btn-xs,.filter-sel,.page-btn{min-height:40px}
+  .page-btn{min-width:40px}
+  .modal-close,.sb-logout,.signal-banner-dismiss{min-width:40px;min-height:40px}
 }
 
 /* ── Narrow phones ── */
 @media (max-width: 520px){
   .stats-grid,.stats-grid.col4{grid-template-columns:1fr 1fr}
   .perf-grid{grid-template-columns:1fr 1fr}
+  .dsh-focus{grid-template-columns:1fr 1fr;gap:10px}
   .tb-bc{max-width:44vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #sync-btn{font-size:0;padding:6px 9px}            /* icon-only sync on tiny screens */
   #sync-btn::before{content:'\21BB';font-size:14px}
+
+  /* Lead-detail modal becomes a near-full-screen sheet — more room to scroll,
+     and dvh avoids the iOS address-bar clipping the sticky footer. */
+  .modal{max-height:100dvh;border-radius:0}
 }

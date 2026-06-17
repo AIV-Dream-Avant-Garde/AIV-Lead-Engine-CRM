@@ -78,6 +78,12 @@ async function syncNow() {
     const r = await sheetsCall({action:'saveInteraction', ...it});
     if (r && r.success) it._synced = true;
   }
+  // Push unsynced calls (append-only) — retries any saveCall that failed at
+  // call-end time, so call records aren't lost on a transient error.
+  for (const c of (S.calls || []).filter(c => c && c._synced === false)) {
+    const r = await sheetsCall({action:'saveCall', ...c});
+    if (r && r.success) c._synced = true;
+  }
   setProgress(40);
 
   // Pull from server
@@ -91,11 +97,14 @@ async function syncNow() {
     // server copy.
     const sm = {};
     (res.leads || []).forEach(l => { if (l.id) sm[l.id] = l; });
+    // Prune tombstones the server has already honored (id no longer returned),
+    // so the suppress-set can't grow forever and a legitimate future re-add works.
+    if (S.deletedIds.size) S.deletedIds.forEach(id => { if (!sm[id]) S.deletedIds.delete(id); });
     S.leads.forEach(l => {
       if (sm[l.id] && !S.dirty.has(l.id)) { Object.assign(l, sm[l.id]); l.country = l.country || DEFAULT_COUNTRY; l._synced = true; }
     });
     (res.leads || []).forEach(l => {
-      if (l.id && !S.leads.find(x => x.id === l.id)) {
+      if (l.id && !S.deletedIds.has(l.id) && !S.leads.find(x => x.id === l.id)) {
         S.leads.push({...l, _synced:true,
           country:     l.country || DEFAULT_COUNTRY,
           notes:       Array.isArray(l.notes)       ? l.notes       : [],
@@ -103,7 +112,12 @@ async function syncNow() {
         });
       }
     });
-    if (!res.isIncremental && res.calls) S.calls = res.calls;
+    // Merge pulled calls by id (append unseen) instead of replacing the array —
+    // a wholesale replace would clobber locally-saved calls not yet pushed.
+    if (Array.isArray(res.calls)) {
+      const haveCalls = new Set(S.calls.map(c => c.id));
+      res.calls.forEach(c => { if (c && c.id && !haveCalls.has(c.id)) { S.calls.push({...c, _synced:true}); haveCalls.add(c.id); } });
+    }
     if (res.team) {
       // Preserve pinPlain (local-only) when merging server team data
       S.team = res.team.map(m => {

@@ -13,6 +13,7 @@ const S = {
   team:        [],
   commissions: [],
   dirty:       new Set(),
+  deletedIds:  new Set(),   // tombstones — suppress re-add on pull until the server confirms deletion
   selected:    new Set(),
   page:        1,
   pageSize:    50,

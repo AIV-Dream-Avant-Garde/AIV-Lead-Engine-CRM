@@ -123,7 +123,7 @@ function pipelineDrop(e, newStatus) {
       closerName: S.team.find(m => m.id === lead.closerId)?.name || lead.closerId,
       outcome: 'Closed Lost', releasedAt: new Date().toISOString(),
     });
-    if (lead.commissionStatus === 'pending') lead.commissionStatus = 'cancelled';
+    if (!cancelLeadCommission(lead.id, 'Deal marked Closed Lost') && lead.commissionStatus === 'pending') lead.commissionStatus = 'cancelled';
     lead.closerId = ''; lead.lockedBy = ''; lead.lockedUntil = ''; lead.assignedAt = '';
   }
 
