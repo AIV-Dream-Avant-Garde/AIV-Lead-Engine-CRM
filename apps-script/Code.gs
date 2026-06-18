@@ -20,6 +20,15 @@ const REPLY_TO_EMAIL     = 'andres@axius.tech';
 const TELEGRAM_ALERT_BOT_TOKEN = 'TU_TELEGRAM_BOT_TOKEN';  // founder alerts — @BotFather token
 const TELEGRAM_ALERT_CHAT_ID   = 'TU_TELEGRAM_CHAT_ID';    // your personal chat id (from getUpdates)
 
+// ── AI reply drafting (free) ──────────────────────────────────────────
+// Google Gemini free tier (https://aistudio.google.com/apikey). Reusing the
+// Discord workspace key is fine — AI replies are reply-gated (low volume); split
+// to a dedicated key only if you hit free-tier rate limits.
+const GEMINI_API_KEY     = 'TU_GEMINI_API_KEY';
+const GEMINI_MODEL       = 'gemini-2.0-flash';            // fast + free tier
+const BOOKING_URL        = 'https://cal.com/andrestoro/discovery-call?overlayCalendar=true';
+const AI_MAX_REPLIES     = 3;     // cap AI back-and-forths per lead (anti-loop)
+
 // ── CADENCE ENGINE config (Cadence Engine) ────────────────────────────
 // Autonomous templated outreach (deterministic; no LLM). SAFETY: inert until
 // CADENCE_ENABLED = true. While false the engine DRY-RUNS — it logs what it
@@ -431,6 +440,8 @@ function doPost(e) {
         quietStart: intIn(c.quietStart, 8, 0, 23),
         quietEnd:   intIn(c.quietEnd, 20, 1, 24),
         postalAddress: String(c.postalAddress || '').slice(0, 200),
+        smsEnabled: c.smsEnabled === true,
+        aiReplies:  c.aiReplies === true,
       };
       cfgSet('cadenceConfig', JSON.stringify(clean));
       return ok({ saved:true, config: getCadenceCfg_() });
@@ -1149,6 +1160,7 @@ function getCadenceCfg_() {
     quietEnd:   hr(s.quietEnd, 20),
     postalAddress: s.postalAddress || COMPANY_POSTAL_ADDRESS,
     smsEnabled: typeof s.smsEnabled === 'boolean' ? s.smsEnabled : false,
+    aiReplies:  typeof s.aiReplies  === 'boolean' ? s.aiReplies  : false,
   };
 }
 
@@ -1214,6 +1226,104 @@ function runInboundEmailScan() {
   return { logged };
 }
 
+// ── AI reply drafting (Gemini, free) ────────────────────────────────────────
+// Call Gemini and return the plain-text completion, or '' on any failure.
+function geminiGenerate_(system, prompt) {
+  if (!GEMINI_API_KEY || GEMINI_API_KEY.indexOf('TU_') === 0) return '';
+  try {
+    const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent?key=' + encodeURIComponent(GEMINI_API_KEY);
+    const payload = {
+      systemInstruction: { parts: [{ text: system }] },
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.7, maxOutputTokens: 400 },
+    };
+    const res = UrlFetchApp.fetch(url, { method:'post', contentType:'application/json', payload:JSON.stringify(payload), muteHttpExceptions:true });
+    const d = JSON.parse(res.getContentText() || '{}');
+    const text = d && d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts
+      ? d.candidates[0].content.parts.map(function(p){ return p.text || ''; }).join('').trim() : '';
+    return text;
+  } catch (e) { Logger.log('geminiGenerate_ error: ' + e.message); return ''; }
+}
+
+// When a business replies, draft a tailored response (addressing what they said)
+// with the Cal booking link and send it — automatically, looping until they book,
+// opt out, a human takes over, or the per-lead cap is hit. Reply-gated + capped.
+// Inert unless cfg.aiReplies is on; previews (logs only) while the cadence is in
+// dry-run, sends for real when the cadence is live.
+function runAiReplies() {
+  const cfg = getCadenceCfg_();
+  if (!cfg.aiReplies) return { sent: 0, skipped: 'disabled' };
+  const live = cfg.enabled === true;
+
+  const ls = getSheet(SHEETS.leads, LEAD_HDR);
+  const rows = ls.getDataRange().getValues(), h = rows[0] || LEAD_HDR;
+  const idc=h.indexOf('id'), nc=h.indexOf('name'), ec=h.indexOf('email'), cc=h.indexOf('city'),
+        kc=h.indexOf('keyword'), stc=h.indexOf('status'), lbc=h.indexOf('lockedBy');
+  const leadById = {};
+  for (let i = 1; i < rows.length; i++) leadById[String(rows[i][idc])] = rows[i];
+
+  // All interactions, grouped per lead, oldest→newest.
+  const is = getSheet(SHEETS.interactions, INTERACTION_HDR);
+  const iRows = is.getDataRange().getValues(), ih = iRows[0] || INTERACTION_HDR;
+  const di=ih.indexOf('direction'), bo=ih.indexOf('body'), li=ih.indexOf('leadId'),
+        ca=ih.indexOf('createdAt'), tg=ih.indexOf('stepTag'), sd=ih.indexOf('sid'), cb=ih.indexOf('createdBy');
+  const threadOf = {};
+  for (let i = 1; i < iRows.length; i++) {
+    const lid = String(iRows[i][li] || ''); if (!lid) continue;
+    (threadOf[lid] = threadOf[lid] || []).push(iRows[i]);
+  }
+  Object.keys(threadOf).forEach(function(k){ threadOf[k].sort(function(a,b){ return new Date(a[ca]) - new Date(b[ca]); }); });
+
+  const company = cfg.company, agent = cfg.agentName;
+  const system = 'You are ' + agent + ', a friendly, concise sales rep at ' + company +
+    '. You reply to business owners who answered a cold outreach email. Goal: book a short discovery call. ' +
+    'Write a warm, natural, specific reply (60-110 words) that directly addresses what they wrote, then invite them ' +
+    'to pick a time using THIS exact link: ' + BOOKING_URL + '. Always include the link. Never invent pricing, ' +
+    'features, or commitments. Plain text only, no subject line, sign off as ' + agent + '.';
+
+  let sent = 0, considered = 0;
+  for (const lid of Object.keys(threadOf)) {
+    const lead = leadById[lid]; if (!lead) continue;
+    const status = String(lead[stc] || 'New');
+    if (status === 'Do Not Call' || status === 'Closed Won' || status === 'Closed Lost') continue;
+    if (lbc >= 0 && String(lead[lbc] || '')) continue;            // a human claimed it
+    const email = String(lead[ec] || '').trim(); if (!email) continue;
+
+    const thread = threadOf[lid];
+    const last = thread[thread.length - 1];
+    if (String(last[di]) !== 'in') continue;                       // latest msg isn't their reply
+    const inboundSid = String(last[sd] || '');
+    const dedupeTag = 'ai:' + (inboundSid || last[ca]);
+    if (thread.some(function(r){ return String(r[tg]) === dedupeTag; })) continue;   // already answered this reply
+    const aiCount = thread.filter(function(r){ return String(r[cb]) === 'ai'; }).length;
+    if (aiCount >= AI_MAX_REPLIES) continue;                       // cap reached → leave for a human
+    considered++;
+
+    const convo = thread.slice(-6).map(function(r){
+      return (String(r[di]) === 'in' ? 'THEM' : 'US') + ': ' + String(r[bo] || '').slice(0, 600);
+    }).join('\n');
+    const prompt = 'Business: ' + String(lead[nc] || '') + (lead[cc] ? ' (' + lead[cc] + ')' : '') +
+      (lead[kc] ? ' — ' + lead[kc] : '') + '\n\nConversation so far:\n' + convo +
+      '\n\nWrite our next reply now.';
+    const draft = geminiGenerate_(system, prompt);
+    if (!draft) continue;
+
+    const nowIso = new Date().toISOString();
+    if (live) {
+      const r = resendSend_(email, 'Re: quick question for ' + String(lead[nc] || 'your team'), draft);
+      appendInteraction_({ id:Utilities.getUuid(), leadId:lid, leadName:lead[nc], phone:'',
+        channel:'email', direction:'out', body:draft, stepTag:dedupeTag,
+        status: r.sid ? 'sent' : 'error', sid:r.sid || '', error:r.error || '',
+        createdAt:nowIso, createdBy:'ai' });
+      if (r.sid) sent++;
+    } else {
+      Logger.log('[AI dry-run] → ' + email + ': ' + draft.slice(0, 160));
+    }
+  }
+  cfgSet('lastAiReplies', JSON.stringify({ ranAt: new Date().toISOString(), sent, considered, live }));
+  return { sent, considered, live };
+}
+
 // The engine. Hourly trigger. Pass 1 enroll, Pass 2 advance. Dry-runs (writes
 // nothing, sends nothing) until the cadence config is enabled (UI or constant).
 function runCadence() {
@@ -1231,6 +1341,9 @@ function runCadence() {
     // Pull in any new email replies FIRST so freshly-logged replies pause their
     // sequence in this same run (the snapshot reads below pick them up).
     try { runInboundEmailScan(); } catch (e) { Logger.log('runInboundEmailScan error: ' + e.message); }
+    // Then let the AI answer those replies (with the booking link). Reply-gated,
+    // capped, and opt-in (cfg.aiReplies); dry-runs unless the cadence is live.
+    try { runAiReplies(); } catch (e) { Logger.log('runAiReplies error: ' + e.message); }
 
     // Read leads once (with row indices for in-place stamps).
     const leadsSheet = getSheet(SHEETS.leads, LEAD_HDR);
