@@ -1,33 +1,62 @@
 // AXIUS CRM — Apps Script v4
 // Fill in ALL the constants before deploying
 
-const SHEET_ID           = 'TU_SPREADSHEET_ID';
-const PLACES_API_KEY     = 'TU_GOOGLE_PLACES_API_KEY';
-const TWILIO_ACCOUNT_SID = 'ACxxxx';
-const TWILIO_API_KEY_SID = 'SKxxxx';
-const TWILIO_API_SECRET  = 'your_api_secret';
-const TWILIO_AUTH_TOKEN  = 'your_auth_token';
-const TWILIO_TWIML_APP   = 'APxxxx';
-const TWILIO_FROM_NUMBER = '+15551234567';     // voice (existing)
-const TWILIO_FROM_SMS_US = '+15551234567';     // US SMS sender (10DLC) — set in Project 0
-const TWILIO_FROM_WA     = '+14155238886';     // WhatsApp sender (whatsapp: prefix added at send) — set in Project 0
-const DRIVE_FOLDER_ID    = 'TU_DRIVE_FOLDER_ID';
-const RESEND_API_KEY     = 'TU_RESEND_API_KEY';            // Project C — Resend (https://resend.com)
-const RESEND_FROM        = 'AXIUS <hola@axius.tech>';      // verified sending domain (SPF/DKIM/DMARC)
-// Replies are sent here so they land in a Google Workspace inbox that this
-// Apps Script can read (runInboundEmailScan polls it). Change to your inbox.
-const REPLY_TO_EMAIL     = 'andres@axius.tech';
-const TELEGRAM_ALERT_BOT_TOKEN = 'TU_TELEGRAM_BOT_TOKEN';  // founder alerts — @BotFather token
-const TELEGRAM_ALERT_CHAT_ID   = 'TU_TELEGRAM_CHAT_ID';    // your personal chat id (from getUpdates)
+// ── SECRETS LIVE IN SCRIPT PROPERTIES, not in this file ──────────────────────
+// Set them ONCE in Project Settings → Script properties (or fill seedProperties()
+// below and Run it once). They persist across every future code paste/redeploy,
+// so you never re-enter secrets again — this repo copy is safe to paste as-is.
+const PROPS = PropertiesService.getScriptProperties();
+function PROP_(key, fallback) {
+  const v = PROPS.getProperty(key);
+  return (v == null || v === '') ? (fallback || '') : v;
+}
 
-// ── AI reply drafting (free) ──────────────────────────────────────────
-// Google Gemini free tier (https://aistudio.google.com/apikey). Reusing the
-// Discord workspace key is fine — AI replies are reply-gated (low volume); split
-// to a dedicated key only if you hit free-tier rate limits.
-const GEMINI_API_KEY     = 'TU_GEMINI_API_KEY';
-const GEMINI_MODEL       = 'gemini-2.0-flash';            // fast + free tier
-const BOOKING_URL        = 'https://cal.com/andrestoro/discovery-call?overlayCalendar=true';
+const SHEET_ID           = PROP_('SHEET_ID');
+const PLACES_API_KEY     = PROP_('PLACES_API_KEY');
+const TWILIO_ACCOUNT_SID = PROP_('TWILIO_ACCOUNT_SID');
+const TWILIO_API_KEY_SID = PROP_('TWILIO_API_KEY_SID');
+const TWILIO_API_SECRET  = PROP_('TWILIO_API_SECRET');
+const TWILIO_AUTH_TOKEN  = PROP_('TWILIO_AUTH_TOKEN');
+const TWILIO_TWIML_APP   = PROP_('TWILIO_TWIML_APP');
+const TWILIO_FROM_NUMBER = PROP_('TWILIO_FROM_NUMBER');
+const TWILIO_FROM_SMS_US = PROP_('TWILIO_FROM_SMS_US');
+const TWILIO_FROM_WA     = PROP_('TWILIO_FROM_WA', '+14155238886');
+const DRIVE_FOLDER_ID    = PROP_('DRIVE_FOLDER_ID');
+const RESEND_API_KEY     = PROP_('RESEND_API_KEY');
+const TELEGRAM_ALERT_BOT_TOKEN = PROP_('TELEGRAM_ALERT_BOT_TOKEN');
+const TELEGRAM_ALERT_CHAT_ID   = PROP_('TELEGRAM_ALERT_CHAT_ID');
+const GEMINI_API_KEY     = PROP_('GEMINI_API_KEY');
+const CRM_SECRET         = PROP_('CRM_SECRET');
+
+// Deployment config — overridable via Script properties, with safe defaults.
+const RESEND_FROM        = PROP_('RESEND_FROM', 'AXIUS <hola@axius.tech>');   // verified sending domain
+const REPLY_TO_EMAIL     = PROP_('REPLY_TO_EMAIL', 'andres@axius.tech');      // inbox runInboundEmailScan polls
+const GEMINI_MODEL       = PROP_('GEMINI_MODEL', 'gemini-2.0-flash');
+const BOOKING_URL        = PROP_('BOOKING_URL', 'https://cal.com/andrestoro/discovery-call?overlayCalendar=true');
+const COMPANY_POSTAL_ADDRESS = PROP_('COMPANY_POSTAL_ADDRESS', '');           // CAN-SPAM footer
 const AI_MAX_REPLIES     = 3;     // cap AI back-and-forths per lead (anti-loop)
+
+// ── ONE-TIME SETUP ───────────────────────────────────────────────────────────
+// Fill your real values below and Run this once (Run ▸ seedProperties). It writes
+// them to Script properties, which survive every future redeploy. Leave a value
+// '' to skip it. Afterwards you can blank these back out — the repo ships empty.
+function seedProperties() {
+  const vals = {
+    SHEET_ID: '', PLACES_API_KEY: '',
+    TWILIO_ACCOUNT_SID: '', TWILIO_API_KEY_SID: '', TWILIO_API_SECRET: '',
+    TWILIO_AUTH_TOKEN: '', TWILIO_TWIML_APP: '',
+    TWILIO_FROM_NUMBER: '', TWILIO_FROM_SMS_US: '', TWILIO_FROM_WA: '',
+    DRIVE_FOLDER_ID: '', RESEND_API_KEY: '',
+    TELEGRAM_ALERT_BOT_TOKEN: '', TELEGRAM_ALERT_CHAT_ID: '',
+    GEMINI_API_KEY: '', CRM_SECRET: '',
+    // Optional overrides (defaults already fine):
+    // RESEND_FROM: '', REPLY_TO_EMAIL: '', BOOKING_URL: '', COMPANY_POSTAL_ADDRESS: '',
+  };
+  const props = PropertiesService.getScriptProperties();
+  let n = 0;
+  Object.keys(vals).forEach(function(k){ if (vals[k] !== '') { props.setProperty(k, vals[k]); n++; } });
+  Logger.log('Seeded ' + n + ' Script properties. You can now blank the values above.');
+}
 
 // ── CADENCE ENGINE config (Cadence Engine) ────────────────────────────
 // Autonomous templated outreach (deterministic; no LLM). SAFETY: inert until
@@ -43,16 +72,12 @@ const CADENCE_DAILY_CAP        = 200;     // max sends per day
 const CADENCE_STEP_GAP_DAYS    = 2;       // min days between proactive touches
 const CADENCE_FIRST_SPREAD_MIN = 360;     // spread first touches over N minutes (anti-burst)
 const CADENCE_GAP_MS           = CADENCE_STEP_GAP_DAYS * 24 * 3600 * 1000;
-// CAN-SPAM: every commercial email MUST carry a working unsubscribe + a physical
-// postal address. Fill this before sending real email. Appended to ALL outbound
-// email in resendSend_. (Automated suppression via a Resend bounce/complaint
+// CAN-SPAM note: COMPANY_POSTAL_ADDRESS (Script property, top of file) is the
+// physical address appended to every outbound email's footer in resendSend_.
+// Set it before sending real email. (Bounce/complaint suppression via a Resend
 // webhook is still a separate follow-up — see GO-LIVE §1.)
-const COMPANY_POSTAL_ADDRESS   = 'TU_DIRECCION_POSTAL';   // e.g. 'AXIUS, Calle 00 #00-00, Medellín, Colombia'
 
 const SHEETS = { leads:'Leads', calls:'Llamadas', team:'Team', commissions:'Commissions', scripts:'Scripts', interactions:'Interactions', sequences:'Sequences' };
-
-// CSRF protection — paste the value from your browser's Setup page
-const CRM_SECRET = 'PASTE_YOUR_CRM_SECRET_HERE'; // Setup → shows after first load
 
 const LEAD_HDR = ['id','name','phone','address','website','rating','reviews','city','barrio','keyword','source','sourceDetail','status','providerId','providerRate','closerId','closerRate','dealValue','collectedAmount','providerCommission','closerCommission','commissionStatus','lockedBy','lockedUntil','assignedAt','workHistory','dncReason','followUpDate','notes','importedAt','updatedAt','calendarEventId','refundAmount','refundReason','refundedAt','country','email','externalId','lastTouchAt','lastReplyAt','consentSms','consentWhatsapp','consentEmail','lat','lng'];
 const CALL_HDR = ['id','leadId','leadName','phone','callSid','outcome','duration','notes','recordingUrl','driveUrl','consentConfirmed','calledAt'];
