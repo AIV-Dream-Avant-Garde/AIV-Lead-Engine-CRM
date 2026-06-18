@@ -33,17 +33,17 @@ const CADENCE_STEPS = {
     // step takes over with the booking link. Steps 2–3 nudge, then bow out.
     email: [
       { variants: [
-        "Hi — I'm {agent} with {company}. As {business} has grown, you've likely also become the person who runs its technology — the software, the automations, the vendors who don't talk to each other. We take that over: one operator, accountable for all of it. Worth a short conversation?\n\n{agent}\n{company}",
-        "Hi — {agent} here, the operator behind {company}. One line, plainly: we become the single accountable owner of the technology that runs {business}, so you can get back to running the business. No agencies to manage, no vendors to chase. Worth exploring?\n\n{agent}\n{company}",
-        "Hi — I'm {agent} with {company}. Running {business} in {city} probably means you're also the default owner of its technology — every system, every vendor, every thing that breaks. We exist so that's never you again. Open to a short conversation about what that would look like?\n\n{agent}\n{company}",
+        "Hi there. As {business} has grown, I'd bet the technology behind it quietly became your job too. The software, the automations, the vendors that never quite line up. We take all of that over and own it, so it stops landing on you. Any interest in a quick call?\n\n{agent}\n{company}",
+        "Hi, I'm {agent}, I run {company}. We do one thing: become the single person accountable for the technology behind a business, so the owner isn't the one holding it together. Is that a headache worth solving at {business}?\n\n{agent}\n{company}",
+        "Hi there. Most owners I talk to run their business and end up running its tech by accident too. Every system, every vendor, every thing that breaks. We're here so that part stops being yours. Worth fifteen minutes to talk it through?\n\n{agent}\n{company}",
       ] },
       { variants: [
-        "Hi — following up. How it works is simple: one operator owns your systems, software, automations, and vendors. One contact. One monthly figure. Everything stays in your accounts, so you're never locked in. If you're open to it, I'll show you what we'd take ownership of first for {business}.\n\n{agent}\n{company}",
-        "Hi — circling back on {business}. Most leaders don't see how much time their technology quietly takes until someone else owns it. Quiet systems, results on record, and you stop being the fallback when something breaks. Worth fifteen minutes to see how it applies to you?\n\n{agent}\n{company}",
+        "Hi again, following up on this. The short version: one person owns your software, automations, data and vendors. You get one contact and one monthly bill, and it all stays in your own accounts so you're never stuck with us. Happy to show you what I'd take over first at {business}. Got fifteen minutes this week?\n\n{agent}\n{company}",
+        "Circling back. Most leaders don't notice how much time the tech eats until someone else is handling it. Fewer fires, nothing breaking on you, and a clear record of what got done. Want to see how that would look for {business}?\n\n{agent}\n{company}",
       ] },
       { variants: [
-        "Hi — one more note, then I'll leave it with you. I can put together a short, no-obligation read on where {business}'s technology is quietly costing you time or money, and what one accountable owner would change first. Want me to send it over?\n\n{agent}\n{company}",
-        "Hi again — let me make this concrete. Give me fifteen minutes and I'll map what running {business}'s technology should look like with one operator accountable for it. Even if we never work together, you'll leave with a clearer picture than most owners have. Worth it?\n\n{agent}\n{company}",
+        "Last one from me for now. If it's useful, I'll write up a quick read on where {business}'s tech is quietly costing you time or money, and what I'd fix first. No strings. Want it?\n\n{agent}\n{company}",
+        "Hi again. Give me fifteen minutes and I'll lay out what owning {business}'s technology should actually look like with one person accountable for it. Worst case, you come away with a clearer picture than most owners have. Up for it?\n\n{agent}\n{company}",
       ] },
     ],
   },
