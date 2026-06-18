@@ -1016,8 +1016,8 @@ const CADENCE_STEPS = {
         "Hi, circling back. The reason I reached out: most businesses in {city} leave easy customers on the table, and it's very fixable. I'd be glad to show you what that looks like for {business}. Open to it?\n\n{agent}\n{company}",
       ] },
       { variants: [
-        "Hi — I'll close the loop so I'm not crowding your inbox. If bringing in more customers for {business} ever moves up the list, just reply and I'll pick it right back up. Either way, wishing you a strong season.\n\n{agent}\n{company}",
-        "Hi — last note from me for now; I don't want to be a pest. If you'd ever like to see how we'd bring {business} more customers in {city}, a one-word reply gets us started. All the best.\n\n{agent}\n{company}",
+        "Hi — one more idea for {business}: I can put together a short, no-obligation breakdown of exactly where you're leaving customers on the table in {city}, and how we'd fix it. Want me to send it over?\n\n{agent}\n{company}",
+        "Hi again — let me make this easy. Give me 15 minutes and I'll walk you through precisely how we'd bring {business} more customers in {city}. Even if it's not a fit, you'll leave with a couple of ideas you can use right away. Worth a look?\n\n{agent}\n{company}",
       ] },
     ],
   },
