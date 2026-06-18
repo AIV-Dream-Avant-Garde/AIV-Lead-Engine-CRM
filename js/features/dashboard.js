@@ -1,13 +1,8 @@
 /* ── FEATURE: Dashboard — command-center map + focus strip ──── */
 
-// Status → dot color (matches the legend in index.html)
-const DSH_STATUS_COLOR = {
-  'New':         '#4B72FF',
-  'Contacted':   '#F59E0B',
-  'Interested':  '#2DD4BF',
-  'Closed Won':  '#84CC16',
-  'Closed Lost': '#6B7280',
-};
+// Status → dot color comes from the shared STATUS_COLOR (constants.js) so the
+// dashboard map and scraper map stay in sync.
+const DSH_STATUS_COLOR = STATUS_COLOR;
 
 var _dshMap = null, _dshLayer = null;
 

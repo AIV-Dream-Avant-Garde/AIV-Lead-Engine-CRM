@@ -15,7 +15,27 @@ function fillCampaignSelectors() {
     const cats = Object.keys(KEYWORDS[DEFAULT_COUNTRY] || {});
     cat.innerHTML = cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
   }
+  fillCampaignBizTypes();
+}
+
+// Business type = a single keyword within the industry (e.g. "Dentist"), or all
+// of them. Lets you grind just dentists across a whole state.
+function fillCampaignBizTypes() {
+  const sel = document.getElementById('cmp-biztype');
+  if (!sel) return;
+  const industry = document.getElementById('cmp-industry')?.value || '';
+  const kws = KEYWORDS[DEFAULT_COUNTRY]?.[industry] || [];
+  sel.innerHTML = `<option value="__all__">All in this industry (${kws.length})</option>`
+    + kws.map(k => `<option value="${esc(k)}">${esc(k)}</option>`).join('');
   updateCampaignPreview();
+}
+
+// The keywords a campaign will scrape: one business type, or the whole industry.
+function campaignKeywords() {
+  const industry = document.getElementById('cmp-industry')?.value || '';
+  const biz      = document.getElementById('cmp-biztype')?.value || '__all__';
+  const all      = KEYWORDS[DEFAULT_COUNTRY]?.[industry] || [];
+  return biz === '__all__' ? all : [biz];
 }
 
 // Live preview of how big the grid is before launching.
@@ -26,8 +46,7 @@ function updateCampaignPreview() {
   const el = document.getElementById('cmp-preview');
   if (!el || !bounds) return;
   const g = campaignGrid(bounds, radius);
-  const cat = document.getElementById('cmp-industry')?.value || '';
-  const kws = (KEYWORDS[DEFAULT_COUNTRY]?.[cat] || []).length;
+  const kws = campaignKeywords().length;
   el.textContent = `${g.count} tiles × ${kws} keyword${kws !== 1 ? 's' : ''} ≈ ${(g.count * kws).toLocaleString()} search points to grind through.`;
 }
 
@@ -35,21 +54,24 @@ function launchStateCampaign() {
   if (!S.config.scriptUrl) { toast('Connect Apps Script first (Settings).', 'error'); return; }
   const state    = document.getElementById('cmp-state')?.value;
   const industry = document.getElementById('cmp-industry')?.value;
+  const biz      = document.getElementById('cmp-biztype')?.value || '__all__';
   const radius   = parseInt(document.getElementById('cmp-radius')?.value || '25000', 10);
   const dailyCap = parseInt(document.getElementById('cmp-cap')?.value || '100', 10);
   const bounds   = STATE_BOUNDS[DEFAULT_COUNTRY]?.[state];
-  const keywords = KEYWORDS[DEFAULT_COUNTRY]?.[industry] || [];
+  const keywords = campaignKeywords();
   if (!bounds || !keywords.length) { toast('Pick a state and industry.', 'error'); return; }
 
-  // One campaign per (state, industry) — relaunching resumes rather than dupes.
-  if (S.stateCampaigns.some(c => c.state === state && c.industry === industry && c.active && !c.exhausted)) {
-    toast(`A ${state} · ${industry} campaign is already running.`, 'warning'); return;
+  const target = biz === '__all__' ? industry : biz;     // what we're targeting
+  const name   = `${state} · ${target}`;
+  // One campaign per (state, target) — relaunching resumes rather than dupes.
+  if (S.stateCampaigns.some(c => c.name === name && !c.exhausted)) {
+    toast(`A “${name}” campaign already exists — resume it below instead.`, 'warning'); return;
   }
   const g = campaignGrid(bounds, radius);
   const campaign = {
     id: uid(),
-    name: `${state} · ${industry}`,
-    state, industry,
+    name,
+    state, industry, businessType: biz === '__all__' ? '' : biz,
     region: COUNTRY_REGION[DEFAULT_COUNTRY] || 'us',
     bounds, radius, rows: g.rows, cols: g.cols, tileCount: g.count,
     keywords,

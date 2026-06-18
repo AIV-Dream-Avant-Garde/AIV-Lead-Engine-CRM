@@ -320,6 +320,13 @@ Content-Type: application/json
       <div class="map-meta-row"><span class="map-meta-dot"></span><span id="map-meta-loc">—</span></div>
       <div class="map-meta-sub"><span id="map-meta-radius">—</span> · <span id="map-meta-leads">0</span> leads in view</div>
     </div>
+    <div class="map-legend">
+      <span class="map-legend-item"><i style="background:#4B72FF"></i>New</span>
+      <span class="map-legend-item"><i style="background:#F59E0B"></i>Contacted</span>
+      <span class="map-legend-item"><i style="background:#2DD4BF"></i>Interested</span>
+      <span class="map-legend-item"><i style="background:#84CC16"></i>Won</span>
+      <span class="map-legend-item"><i style="background:#6B7280"></i>Lost</span>
+    </div>
   </div>
   <div class="card hl">
     <div class="form-grid">
@@ -363,7 +370,8 @@ Content-Type: application/json
     <p class="section-sub">Pick a state + industry and the scraper grid-sweeps the whole state automatically — up to your daily cap — crawling each business's website for an email, until every match is found or you pause it.</p>
     <div class="form-grid" style="margin-bottom:12px">
       <div class="field"><label>State</label><select id="cmp-state" onchange="updateCampaignPreview()"></select></div>
-      <div class="field"><label>Industry</label><select id="cmp-industry" onchange="updateCampaignPreview()"></select></div>
+      <div class="field"><label>Industry</label><select id="cmp-industry" onchange="fillCampaignBizTypes()"></select></div>
+      <div class="field"><label>Business type</label><select id="cmp-biztype" onchange="updateCampaignPreview()"></select></div>
       <div class="field"><label>Tile radius</label>
         <select id="cmp-radius" onchange="updateCampaignPreview()">
           <option value="15000">15km — dense (more tiles, slower)</option>
