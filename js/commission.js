@@ -205,6 +205,15 @@ function adjustCollectedAmount(leadId, collectedRaw, reason) {
   renderAll();
 }
 
+// Cancel the lead's pending commission ROW (not just the denormalized flag) when
+// a deal is lost — so it leaves the admin ledger, profile, and rep totals too.
+// Returns true if a pending commission row was found and cancelled.
+function cancelLeadCommission(leadId, reason) {
+  const pc = S.commissions.find(c => c.leadId === leadId && c.status === 'pending');
+  if (pc) { cancelCommission(pc.id, reason); return true; }
+  return false;
+}
+
 function cancelCommission(commId, reason) {
   const c = S.commissions.find(x => x.id === commId);
   if (!c || c.status !== 'pending') return;

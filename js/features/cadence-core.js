@@ -74,7 +74,7 @@ function cadenceGuard(lead, seq) {
   const status = String(lead.status || 'New');
   if (status === 'Do Not Call')        return 'stopped:optout';
   if (status === 'Closed Won')          return 'stopped:closed';
-  if (status === 'Not Interested' || status === 'Closed Lost' || status === 'Closed Lost') return 'stopped:rejected';
+  if (status === 'Not Interested' || status === 'Closed Lost') return 'stopped:rejected';
   if (String(lead.lockedBy || ''))   return 'paused:claimed';
   if (replyShouldPause(lead, seq))   return 'paused:replied';
   if (status !== 'New')            return 'paused:claimed';      // Contacted/Interested

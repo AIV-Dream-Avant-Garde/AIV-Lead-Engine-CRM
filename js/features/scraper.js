@@ -122,8 +122,9 @@ function renderScraperMap() {
 
   // Init once
   if (!_scMap) {
-    _scMap = L.map(host, { zoomControl:true, attributionControl:true, scrollWheelZoom:true })
+    _scMap = L.map(host, { zoomControl:false, attributionControl:true, scrollWheelZoom:true })
               .setView([t.lat, t.lng], 13);
+    L.control.zoom({ position:'topright' }).addTo(_scMap);   // keep clear of the top-left overlay
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap &copy; CARTO',

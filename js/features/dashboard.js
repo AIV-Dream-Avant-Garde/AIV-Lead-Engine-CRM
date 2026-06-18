@@ -30,8 +30,9 @@ function renderDashboardMap() {
   if (!host) return;
 
   if (!_dshMap) {
-    _dshMap = L.map(host, { zoomControl:true, attributionControl:true, scrollWheelZoom:true })
+    _dshMap = L.map(host, { zoomControl:false, attributionControl:true, scrollWheelZoom:true })
                .setView([28.0, -81.7], 7);          // Florida overview
+    L.control.zoom({ position:'topright' }).addTo(_dshMap);   // keep clear of the top-left overlay
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       maxZoom: 19, attribution: '&copy; OpenStreetMap &copy; CARTO',
     }).addTo(_dshMap);
@@ -76,10 +77,13 @@ function renderDashboardFocus() {
   const overdue = (S.leads || []).filter(l => isOverdue(l)).length;
   const now     = new Date();
   const callsToday = (S.calls || []).filter(c => c.calledAt && new Date(c.calledAt).toDateString() === now.toDateString()).length;
-  const wonThisMonth = (S.leads || []).filter(l =>
-    l.status === 'Closed Won' && l.updatedAt &&
-    new Date(l.updatedAt).getMonth() === now.getMonth() &&
-    new Date(l.updatedAt).getFullYear() === now.getFullYear()).length;
+  // Use leadClosedAt (the Closed-Won stamp), matching Pipeline + Analytics — so
+  // editing an old won deal can't inflate this month's count.
+  const wonThisMonth = (S.leads || []).filter(l => {
+    if (l.status !== 'Closed Won') return false;
+    const d = new Date(leadClosedAt(l));
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  }).length;
 
   const cards = [
     { val: waiting,    label: 'Waiting on a reply', sub: waiting ? 'Tap to respond now' : 'All caught up', nav: 'responder', color: waiting ? 'var(--red)' : 'var(--hl)' },
