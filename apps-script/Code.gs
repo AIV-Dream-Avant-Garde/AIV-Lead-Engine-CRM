@@ -1007,17 +1007,17 @@ const CADENCE_STEPS = {
   'United States': {
     email: [
       { variants: [
-        "Hi there. As {business} has grown, I'd bet the technology behind it quietly became your job too. The software, the automations, the vendors that never quite line up. We take all of that over and own it, so it stops landing on you. Any interest in a quick call?\n\n{agent}\n{company}",
-        "Hi, I'm {agent}, I run {company}. We do one thing: become the single person accountable for the technology behind a business, so the owner isn't the one holding it together. Is that a headache worth solving at {business}?\n\n{agent}\n{company}",
-        "Hi there. Most owners I talk to run their business and end up running its tech by accident too. Every system, every vendor, every thing that breaks. We're here so that part stops being yours. Worth fifteen minutes to talk it through?\n\n{agent}\n{company}",
+        "Hi there. Most businesses cover their tech in pieces: a developer here, an agency there, a stack of subscriptions, someone internal filling the gaps. We replace all of that. One team that owns your whole tech setup, for one monthly cost that usually runs less than a single hire. Want me to show you what that'd look like for {business}?\n\n{agent}\n{company}",
+        "Hi, I'm {agent}, I run {company}. Instead of hiring someone for your tech, or juggling a few vendors, we become your entire technology team. One operator, AI systems, and specialists when you need them, all for one monthly figure. Worth a quick conversation about {business}?\n\n{agent}\n{company}",
+        "Hi there. Quick one for {business}. We take over everything technical, your software, automations, data and vendors, and run it as one team for a flat monthly cost. For most businesses it lands under what a single employee would. Open to hearing more?\n\n{agent}\n{company}",
       ] },
       { variants: [
-        "Hi again, following up on this. The short version: one person owns your software, automations, data and vendors. You get one contact and one monthly bill, and it all stays in your own accounts so you're never stuck with us. Happy to show you what I'd take over first at {business}. Got fifteen minutes this week?\n\n{agent}\n{company}",
-        "Circling back. Most leaders don't notice how much time the tech eats until someone else is handling it. Fewer fires, nothing breaking on you, and a clear record of what got done. Want to see how that would look for {business}?\n\n{agent}\n{company}",
+        "Hi again, following up. How it works: one contact, one monthly bill, and we run your software, automations, data and vendors end to end. It all stays in your accounts, so you're never locked in. For most businesses it costs less than one full-time person. Happy to walk through what we'd cover at {business}. Got fifteen minutes?\n\n{agent}\n{company}",
+        "Circling back. Most businesses don't realize how much they're already spending across tools, freelancers and vendors until it's all in one place. We pull it into one team and one bill, usually for less. Want to see how that'd shake out for {business}?\n\n{agent}\n{company}",
       ] },
       { variants: [
-        "Last one from me for now. If it's useful, I'll write up a quick read on where {business}'s tech is quietly costing you time or money, and what I'd fix first. No strings. Want it?\n\n{agent}\n{company}",
-        "Hi again. Give me fifteen minutes and I'll lay out what owning {business}'s technology should actually look like with one person accountable for it. Worst case, you come away with a clearer picture than most owners have. Up for it?\n\n{agent}\n{company}",
+        "Last one from me for now. If it helps, I'll put together a quick read on what {business} is spending across its tech and vendors today, and what it'd look like handled as one team for less. No strings. Want it?\n\n{agent}\n{company}",
+        "Hi again. Give me fifteen minutes and I'll lay out what running {business}'s tech as one team would cover, and roughly what that'd cost next to what you're paying now. Worst case you get a clearer picture of your setup. Up for it?\n\n{agent}\n{company}",
       ] },
     ],
   },
@@ -1327,10 +1327,12 @@ function runAiReplies() {
   const company = cfg.company, agent = cfg.agentName;
   const system = 'You are ' + agent + ', the named operator behind ' + company +
     ', a Technology Ownership Practice. ' + company + ' becomes the single accountable owner of the technology that ' +
-    'runs a business (its systems, software, automations, data, and vendors) so leadership never has to be that owner ' +
-    'again. The idea: run your business, not your technology. One operator, one contact, one monthly figure, and ' +
-    'everything stays in the client\'s own accounts so they are never locked in. ' +
+    'runs a business (its systems, software, automations, data, and vendors). The pitch: instead of hiring a tech person ' +
+    'or juggling agencies, freelancers and subscriptions, you get your entire technology team in one place. One operator, ' +
+    'AI systems, and specialists on demand, for one monthly figure that typically costs less than a single full-time hire. ' +
+    'One contact, one bill, and everything stays in the client\'s own accounts so they are never locked in. ' +
     'You are replying to a business owner who answered a cold email. Goal: get them to book a short call. ' +
+    'If they ask about price, do NOT quote a number; say it depends on what they need and that you\'ll scope it on the call. ' +
     'WRITE LIKE A REAL PERSON typing a quick email, NOT like AI. Hard rules: do NOT use em dashes (—) at all; use periods, ' +
     'commas or just two sentences instead. Avoid the obvious AI tells: no "I hope this finds you well", no rule-of-three ' +
     'lists, no "Even if X, you\'ll Y", no "Worth a quick chat?" formula, no buzzwords, no over-polished symmetry. ' +
