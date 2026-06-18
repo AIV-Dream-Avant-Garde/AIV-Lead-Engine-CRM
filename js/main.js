@@ -120,6 +120,8 @@ function navigate(id) {
     if (typeof initAdminJobsForm === 'function') initAdminJobsForm();
     if (typeof renderScheduledJobs === 'function') renderScheduledJobs();
     if (typeof checkTriggerStatus === 'function') checkTriggerStatus();
+    if (typeof fillCampaignSelectors === 'function') fillCampaignSelectors();
+    if (typeof renderCampaigns === 'function') renderCampaigns();
     // Render the dark map once the section is visible/sized.
     setTimeout(() => { if (typeof renderScraperMap === 'function') renderScraperMap(); }, 80);
   }

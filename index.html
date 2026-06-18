@@ -356,6 +356,34 @@ Content-Type: application/json
     <div id="scrape-history-list"><div class="notes-empty">No scrapes yet.</div></div>
   </div>
 
+  <!-- State campaigns — auto-scrape an entire state until exhausted -->
+  <div class="card hl" style="margin-top:14px">
+    <div class="eyebrow">Autopilot</div>
+    <h1 class="section-title" style="font-size:18px;margin-bottom:4px">Scrape an entire state</h1>
+    <p class="section-sub">Pick a state + industry and the scraper grid-sweeps the whole state automatically — up to your daily cap — crawling each business's website for an email, until every match is found or you pause it.</p>
+    <div class="form-grid" style="margin-bottom:12px">
+      <div class="field"><label>State</label><select id="cmp-state" onchange="updateCampaignPreview()"></select></div>
+      <div class="field"><label>Industry</label><select id="cmp-industry" onchange="updateCampaignPreview()"></select></div>
+      <div class="field"><label>Tile radius</label>
+        <select id="cmp-radius" onchange="updateCampaignPreview()">
+          <option value="15000">15km — dense (more tiles, slower)</option>
+          <option value="25000" selected>25km — balanced</option>
+          <option value="40000">40km — sparse (fewer tiles, faster)</option>
+        </select>
+      </div>
+      <div class="field"><label>Leads per day (cap)</label>
+        <select id="cmp-cap">
+          <option value="50">50 / day</option>
+          <option value="100" selected>100 / day</option>
+          <option value="200">200 / day</option>
+        </select>
+      </div>
+    </div>
+    <div id="cmp-preview" style="font-size:11px;color:var(--sub);font-family:'DM Mono',monospace;margin-bottom:10px;min-height:15px"></div>
+    <button class="btn btn-primary btn-full" onclick="launchStateCampaign()">Launch state campaign</button>
+    <div id="campaign-list" style="margin-top:14px"></div>
+  </div>
+
   <!-- Scheduled (automatic) scrapes — moved here from Admin so it lives with the scraper -->
   <div class="card hl" style="margin-top:14px">
     <div class="eyebrow">Automatic</div>
@@ -1069,6 +1097,7 @@ Content-Type: application/json
 <!-- JS: load order matters — data → core → auth → locks → commission → features → main -->
 <script src="js/data/keywords.js?v=20260603a"></script>
 <script src="js/data/locations.js?v=20260603a"></script>
+<script src="js/data/states.js?v=20260603a"></script>
 <script src="js/data/constants.js?v=20260603a"></script>
 <script src="js/data/demo-data.js?v=20260603a"></script>
 <script src="js/data/outreach-templates.js?v=20260603a"></script>
@@ -1081,6 +1110,7 @@ Content-Type: application/json
 <script src="js/commission.js?v=20260603a"></script>
 <script src="js/features/scraper.js?v=20260603a"></script>
 <script src="js/features/dashboard.js?v=20260603a"></script>
+<script src="js/features/campaigns.js?v=20260603a"></script>
 <script src="js/features/outreach.js?v=20260603a"></script>
 <script src="js/features/inbox.js?v=20260603a"></script>
 <script src="js/features/import.js?v=20260603a"></script>

@@ -125,10 +125,11 @@ function doGet(e) {
       const comms   = toObjs(getSheet(SHEETS.commissions,COMM_HDR));
       const scripts = toObjs(getSheet(SHEETS.scripts,SCRIPT_HDR));
       let scheduledJobs=[]; try { const raw=cfgGet('scheduledJobs'); if(raw) scheduledJobs=JSON.parse(raw); } catch(e){}
+      let stateCampaigns=[]; try { const raw=cfgGet('stateCampaigns'); if(raw) stateCampaigns=JSON.parse(raw); } catch(e){}
       let interactions = toObjs(getSheet(SHEETS.interactions,INTERACTION_HDR));
       if(since){const sd=new Date(since);interactions=interactions.filter(i=>!i.createdAt||new Date(i.createdAt)>=sd);}
       const sequences = toObjs(getSheet(SHEETS.sequences,SEQUENCE_HDR));
-      return ok({leads,calls,team,commissions:comms,scripts,scheduledJobs,interactions,sequences,serverTime:new Date().toISOString()});
+      return ok({leads,calls,team,commissions:comms,scripts,scheduledJobs,stateCampaigns,interactions,sequences,serverTime:new Date().toISOString()});
     }
     if (a === 'getToken') return ok({token:createToken(e.parameter.identity||'agent')});
     if (a === 'checkTriggers') {
@@ -449,6 +450,10 @@ function doPost(e) {
       let found=false;
       for(let i=1;i<rows.length;i++){if(rows[i][ki]==='scheduledJobs'){cfg.getRange(i+1,vi+1).setValue(JSON.stringify(b.jobs||[]));found=true;break;}}
       if(!found)cfg.appendRow(['scheduledJobs',JSON.stringify(b.jobs||[])]);
+      return ok({saved:true});
+    }
+    if (a === 'saveStateCampaigns') {
+      cfgSet('stateCampaigns', JSON.stringify(b.data || []));
       return ok({saved:true});
     }
     if (a === 'runScrapesNow') {
@@ -777,7 +782,139 @@ function runScheduledScrapes() {
   const ranAt = new Date().toISOString();
   cfgSet('lastScrapeRun', JSON.stringify({ranAt, added: totalAdded, jobsRun, ofJobs: active.length, skipped}));
   Logger.log('Scheduled scrape: +' + totalAdded + ' leads, ' + jobsRun + '/' + eligible.length + ' eligible (' + skipped + ' exhausted-skipped of ' + active.length + '), ' + apiCalls + ' calls.');
+  // The same daily trigger also advances any state campaigns.
+  try { runStateCampaigns(); } catch (e) { Logger.log('runStateCampaigns error: ' + e.message); }
   return {added: totalAdded, ranAt, jobsRun, ofJobs: active.length, skipped};
+}
+
+// ── State campaigns: grid-sweep a whole state, up to dailyCap new leads/day per
+// campaign, crawling each business's website for an email, until exhausted. ──
+function campaignTileCenter_(b, rows, cols, idx) {
+  const row = Math.floor(idx / cols), col = idx % cols;
+  const dLat = (b.maxLat - b.minLat) / rows, dLng = (b.maxLng - b.minLng) / cols;
+  return { lat: b.minLat + (row + 0.5) * dLat, lng: b.minLng + (col + 0.5) * dLng };
+}
+
+function runStateCampaigns() {
+  let campaigns = [];
+  try { campaigns = JSON.parse(cfgGet('stateCampaigns') || '[]'); } catch (e) { return; }
+  if (!Array.isArray(campaigns) || !campaigns.length) return;
+
+  // Per-campaign daily lead counter (resets each calendar day, ET).
+  const todayKey = Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM-dd');
+  let daily = {}; try { daily = JSON.parse(cfgGet('campaignDaily') || '{}'); } catch (e) {}
+  if (daily.date !== todayKey) daily = { date: todayKey, counts: {} };
+  daily.counts = daily.counts || {};
+
+  const leadsSheet = getSheet(SHEETS.leads, LEAD_HDR);
+  const lRows = leadsSheet.getDataRange().getValues();
+  const ph = lRows[0] || LEAD_HDR, pc = ph.indexOf('phone');
+  const existing = new Set(lRows.slice(1).map(r => phoneKey(r[pc])).filter(Boolean));
+
+  const url = 'https://places.googleapis.com/v1/places:searchText';
+  const hdr = {'Content-Type':'application/json','X-Goog-Api-Key':PLACES_API_KEY,
+    'X-Goog-FieldMask':'places.displayName,places.formattedAddress,places.addressComponents,places.location,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount,nextPageToken'};
+  const comp_=(p,types)=>{ const c=(p.addressComponents||[]).find(x=>(x.types||[]).some(t=>types.indexOf(t)>=0)); return c?(c.longText||c.shortText||''):''; };
+
+  const RUN_BUDGET_MS = 270000, MAX_CALLS = 60, MAX_CRAWLS = 50;
+  const t0 = Date.now();
+  let apiCalls = 0, crawls = 0, grandAdded = 0;
+  const now = new Date().toISOString();
+
+  for (const camp of campaigns) {
+    if (Date.now() - t0 > RUN_BUDGET_MS || apiCalls >= MAX_CALLS) break;
+    if (!camp.active || camp.exhausted) continue;
+    const total = (camp.tileCount || 0) * (camp.keywords || []).length;
+    if (!total) continue;
+    const capLeft = () => (camp.dailyCap || 100) - (daily.counts[camp.id] || 0);
+    if (capLeft() <= 0) continue;
+
+    let cursor = camp.cursor || 0;
+    if (typeof camp.passAdded !== 'number') camp.passAdded = 0;   // persists across daily runs
+    let steps = 0;
+    // Walk forward through (tile × keyword) points until the daily cap, the run
+    // budget, or a full no-new-leads pass (→ exhausted).
+    while (capLeft() > 0 && apiCalls < MAX_CALLS && (Date.now() - t0) < RUN_BUDGET_MS && steps < total) {
+      const tileIdx = Math.floor(cursor / camp.keywords.length) % camp.tileCount;
+      const kwIdx   = cursor % camp.keywords.length;
+      const center  = campaignTileCenter_(camp.bounds, camp.rows, camp.cols, tileIdx);
+      const keyword = camp.keywords[kwIdx];
+
+      let token = null, tries = 0, addedHere = 0;
+      const baseBody = {textQuery:keyword, locationBias:{circle:{center:{latitude:center.lat,longitude:center.lng},radius:parseFloat(camp.radius||25000)}}, maxResultCount:20, ...(camp.region?{regionCode:camp.region}:{})};
+      do {
+        if (apiCalls >= MAX_CALLS || (Date.now() - t0) > RUN_BUDGET_MS || capLeft() <= 0) break;
+        const body = token ? {...baseBody, pageToken:token} : baseBody;
+        const r = UrlFetchApp.fetch(url, {method:'post', headers:hdr, payload:JSON.stringify(body), muteHttpExceptions:true});
+        apiCalls++;
+        let d = {}; try { d = JSON.parse(r.getContentText()); } catch(e) {}
+        (d.places||[]).forEach(p => {
+          if (capLeft() <= 0) return;
+          const phone = p.nationalPhoneNumber || '';
+          const key = phoneKey(phone);
+          if (!phone || phone === 'N/A' || !key || existing.has(key)) return;
+          const website = p.websiteUri || '';
+          let email = '';
+          if (website && crawls < MAX_CRAWLS && (Date.now() - t0) < RUN_BUDGET_MS) { email = crawlEmail_(website); crawls++; }
+          const lead = {
+            id:Utilities.getUuid(), name:p.displayName?.text||'No name', phone, email,
+            address:p.formattedAddress||'N/A', website:website||'N/A',
+            rating:p.rating||'N/A', reviews:p.userRatingCount||'N/A',
+            country:'United States', city:(comp_(p,['locality','postal_town'])||''), barrio:(comp_(p,['neighborhood','sublocality','sublocality_level_1'])||''),
+            keyword, source:'State campaign · '+camp.state, sourceDetail:camp.industry||'',
+            status:'New', dncReason:'', followUpDate:'', notes:JSON.stringify([]),
+            providerId:'', providerRate:0, closerId:'', closerRate:0,
+            dealValue:'', providerCommission:'', closerCommission:'', commissionStatus:'',
+            lockedBy:'', lockedUntil:'', assignedAt:'', workHistory:JSON.stringify([]),
+            importedAt:now, updatedAt:now,
+            lat:p.location?.latitude??'', lng:p.location?.longitude??'',
+          };
+          leadsSheet.appendRow(LEAD_HDR.map(h => lead[h] ?? ''));
+          existing.add(key);
+          addedHere++; grandAdded++;
+          daily.counts[camp.id] = (daily.counts[camp.id] || 0) + 1;
+        });
+        token = d.nextPageToken; tries++;
+        if (!token) break;
+        Utilities.sleep(2000);
+      } while (tries < 3);
+
+      cursor = (cursor + 1) % total;
+      steps++;
+      camp.leadsFound = (camp.leadsFound || 0) + addedHere;
+      camp.passAdded += addedHere;
+      // A complete sweep of the grid (cursor wrapped to 0) that found nothing new
+      // across the WHOLE pass — tracked across daily runs — means exhausted.
+      if (cursor === 0) { if (camp.passAdded === 0) { camp.exhausted = true; break; } camp.passAdded = 0; }
+    }
+    camp.cursor = cursor;
+    camp.lastRunAt = now;
+  }
+
+  cfgSet('stateCampaigns', JSON.stringify(campaigns));
+  cfgSet('campaignDaily', JSON.stringify(daily));
+  Logger.log('State campaigns: +' + grandAdded + ' leads, ' + apiCalls + ' calls, ' + crawls + ' site crawls.');
+  return { added: grandAdded, apiCalls };
+}
+
+// Fetch a business website and extract the first plausible contact email.
+// Best-effort: many sites hide emails behind forms, so a miss is normal.
+function crawlEmail_(website) {
+  try {
+    let u = String(website).trim();
+    if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
+    const res = UrlFetchApp.fetch(u, {muteHttpExceptions:true, followRedirects:true, validateHttpsCertificates:false});
+    if (res.getResponseCode() >= 400) return '';
+    const html = res.getContentText().slice(0, 200000);
+    // Prefer mailto: links, then any inline address.
+    const mailto = html.match(/mailto:([^"'?>\s]+@[^"'?>\s]+)/i);
+    const raw = mailto ? mailto[1] : (html.match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/i) || [])[0];
+    if (!raw) return '';
+    const email = raw.toLowerCase().replace(/[.,;]+$/, '');
+    // Skip junk/placeholder/asset addresses.
+    if (/(example\.|sentry|wix|\.png|\.jpg|\.gif|\.webp|godaddy|domain\.com|email@|your@|name@)/i.test(email)) return '';
+    return email;
+  } catch (e) { return ''; }
 }
 
 // ── Low-level send helpers (shared by the message handlers + the cadence engine) ──
