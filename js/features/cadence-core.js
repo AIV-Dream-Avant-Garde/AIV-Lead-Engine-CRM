@@ -33,17 +33,17 @@ const CADENCE_STEPS = {
     // step takes over with the booking link. Steps 2–3 nudge, then bow out.
     email: [
       { variants: [
-        "Hi — I'm {agent} with {company}. I came across {business} in {city} and put together a couple of specific ideas for bringing you more customers. Worth me sending them over?\n\n{agent}\n{company}",
-        "Hi, this is {agent} at {company}. {business} stood out to me in {city}, and I think there's a clear way to get you in front of more local customers. Is that a priority for you right now?\n\n{agent}\n{company}",
-        "Hi — {agent} here with {company}. Quick question for {business}: if we could bring you a steadier flow of new customers without adding to your plate, would that be worth a short conversation?\n\n{agent}\n{company}",
+        "Hi — I'm {agent} with {company}. As {business} has grown, you've likely also become the person who runs its technology — the software, the automations, the vendors who don't talk to each other. We take that over: one operator, accountable for all of it. Worth a short conversation?\n\n{agent}\n{company}",
+        "Hi — {agent} here, the operator behind {company}. One line, plainly: we become the single accountable owner of the technology that runs {business}, so you can get back to running the business. No agencies to manage, no vendors to chase. Worth exploring?\n\n{agent}\n{company}",
+        "Hi — I'm {agent} with {company}. Running {business} in {city} probably means you're also the default owner of its technology — every system, every vendor, every thing that breaks. We exist so that's never you again. Open to a short conversation about what that would look like?\n\n{agent}\n{company}",
       ] },
       { variants: [
-        "Hi — following up on my note about {business}. We help businesses in {city} turn local interest into booked customers, consistently and without you lifting a finger. Happy to show you exactly how — worth a look?\n\n{agent}\n{company}",
-        "Hi, circling back. The reason I reached out: most businesses in {city} leave easy customers on the table, and it's very fixable. I'd be glad to show you what that looks like for {business}. Open to it?\n\n{agent}\n{company}",
+        "Hi — following up. How it works is simple: one operator owns your systems, software, automations, and vendors. One contact. One monthly figure. Everything stays in your accounts, so you're never locked in. If you're open to it, I'll show you what we'd take ownership of first for {business}.\n\n{agent}\n{company}",
+        "Hi — circling back on {business}. Most leaders don't see how much time their technology quietly takes until someone else owns it. Quiet systems, results on record, and you stop being the fallback when something breaks. Worth fifteen minutes to see how it applies to you?\n\n{agent}\n{company}",
       ] },
       { variants: [
-        "Hi — one more idea for {business}: I can put together a short, no-obligation breakdown of exactly where you're leaving customers on the table in {city}, and how we'd fix it. Want me to send it over?\n\n{agent}\n{company}",
-        "Hi again — let me make this easy. Give me 15 minutes and I'll walk you through precisely how we'd bring {business} more customers in {city}. Even if it's not a fit, you'll leave with a couple of ideas you can use right away. Worth a look?\n\n{agent}\n{company}",
+        "Hi — one more note, then I'll leave it with you. I can put together a short, no-obligation read on where {business}'s technology is quietly costing you time or money, and what one accountable owner would change first. Want me to send it over?\n\n{agent}\n{company}",
+        "Hi again — let me make this concrete. Give me fifteen minutes and I'll map what running {business}'s technology should look like with one operator accountable for it. Even if we never work together, you'll leave with a clearer picture than most owners have. Worth it?\n\n{agent}\n{company}",
       ] },
     ],
   },
