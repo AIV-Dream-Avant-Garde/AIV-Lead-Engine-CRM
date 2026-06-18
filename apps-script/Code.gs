@@ -14,6 +14,9 @@ const TWILIO_FROM_WA     = '+14155238886';     // WhatsApp sender (whatsapp: pre
 const DRIVE_FOLDER_ID    = 'TU_DRIVE_FOLDER_ID';
 const RESEND_API_KEY     = 'TU_RESEND_API_KEY';            // Project C — Resend (https://resend.com)
 const RESEND_FROM        = 'AXIUS <hola@axius.tech>';      // verified sending domain (SPF/DKIM/DMARC)
+// Replies are sent here so they land in a Google Workspace inbox that this
+// Apps Script can read (runInboundEmailScan polls it). Change to your inbox.
+const REPLY_TO_EMAIL     = 'andres@axius.tech';
 const TELEGRAM_ALERT_BOT_TOKEN = 'TU_TELEGRAM_BOT_TOKEN';  // founder alerts — @BotFather token
 const TELEGRAM_ALERT_CHAT_ID   = 'TU_TELEGRAM_CHAT_ID';    // your personal chat id (from getUpdates)
 
@@ -943,7 +946,7 @@ function resendSend_(email, subject, body) {
   const res = UrlFetchApp.fetch('https://api.resend.com/emails', {
     method:'post', contentType:'application/json',
     headers:{ Authorization:'Bearer ' + RESEND_API_KEY },
-    payload: JSON.stringify({ from: RESEND_FROM, to: [email], subject: subject || 'AXIUS', text: String(body || '') + emailFooter_() }),
+    payload: JSON.stringify({ from: RESEND_FROM, to: [email], reply_to: REPLY_TO_EMAIL, subject: subject || 'AXIUS', text: String(body || '') + emailFooter_() }),
     muteHttpExceptions:true,
   });
   const d = JSON.parse(res.getContentText() || '{}');
@@ -1009,8 +1012,13 @@ function cadenceChannel(country) {
   if (c === 'estados unidos' || c === 'estados unidos de america' || c === 'estados unidos de américa' || c === 'usa' || c === 'united states') return 'sms';
   return '';
 }
+// Set at the start of runCadence from cfg.smsEnabled. While SMS is parked
+// (A2P pending), the autopilot is email-first: any lead with an email is
+// emailed rather than routed to the (disabled) SMS channel.
+var CAD_SMS_ON = false;
 function cadenceResolveChannel(lead) {
   lead = lead || {};
+  if (!CAD_SMS_ON && String(lead.email || '').trim()) return 'email';
   const phoneCh = cadenceChannel(lead.country);
   if (phoneCh && cadencePhoneKey(lead.phone)) return phoneCh;
   if (String(lead.email || '').trim()) return 'email';
@@ -1140,7 +1148,70 @@ function getCadenceCfg_() {
     quietStart: hr(s.quietStart, 8),
     quietEnd:   hr(s.quietEnd, 20),
     postalAddress: s.postalAddress || COMPANY_POSTAL_ADDRESS,
+    smsEnabled: typeof s.smsEnabled === 'boolean' ? s.smsEnabled : false,
   };
+}
+
+// ── Inbound EMAIL reply tracking ────────────────────────────────────────────
+// Polls the Workspace inbox (replies land here via REPLY_TO_EMAIL), matches each
+// message's sender to a lead by email, logs an inbound interaction, and stamps
+// lastReplyAt — which auto-pauses that lead's cadence (replyShouldPause) so a
+// human (or the AI step) takes over. Dedup by Gmail message id. Driven by the
+// same hourly cadence trigger. This is the "know exactly who responded" piece.
+function runInboundEmailScan() {
+  if (typeof GmailApp === 'undefined') return { logged: 0 };
+  const ls = getSheet(SHEETS.leads, LEAD_HDR);
+  const rows = ls.getDataRange().getValues();
+  const h = rows[0] || LEAD_HDR;
+  const ec=h.indexOf('email'), idc=h.indexOf('id'), nc=h.indexOf('name'), phc=h.indexOf('phone'),
+        rc=h.indexOf('lastReplyAt'), uc=h.indexOf('updatedAt'), stc=h.indexOf('status'), dc=h.indexOf('dncReason');
+  if (ec < 0) return { logged: 0 };
+
+  // email → lead row indices (a phone-deduped lead may still share an email).
+  const byEmail = {};
+  for (let i = 1; i < rows.length; i++) {
+    const e = String(rows[i][ec] || '').trim().toLowerCase();
+    if (e) (byEmail[e] = byEmail[e] || []).push(i);
+  }
+  if (!Object.keys(byEmail).length) return { logged: 0 };
+
+  // Dedup: Gmail message ids already logged as interactions (sid column).
+  const is = getSheet(SHEETS.interactions, INTERACTION_HDR);
+  const iRows = is.getDataRange().getValues(), ih = iRows[0] || INTERACTION_HDR, sidc = ih.indexOf('sid');
+  const seen = new Set(iRows.slice(1).map(r => String(r[sidc] || '')).filter(Boolean));
+
+  let logged = 0;
+  const threads = GmailApp.search('in:inbox newer_than:14d', 0, 40);
+  for (const thread of threads) {
+    for (const msg of thread.getMessages()) {
+      const msgId = msg.getId();
+      if (seen.has(msgId)) continue;
+      const fromRaw = msg.getFrom() || '';
+      const m = fromRaw.match(/<([^>]+)>/);
+      const from = (m ? m[1] : fromRaw).trim().toLowerCase();
+      const idxs = byEmail[from];
+      if (!idxs) continue;                       // not from a lead
+      const body = String(msg.getPlainBody() || '').replace(/\s+\n/g, '\n').slice(0, 4000);
+      const nowIso = new Date().toISOString();
+      const optout = isOptOutGs(body);
+      idxs.forEach(i => {
+        appendInteraction_({ id:Utilities.getUuid(), leadId:rows[i][idc], leadName:rows[i][nc], phone:rows[i][phc] || '',
+          channel:'email', direction:'in', body:body, stepTag:'',
+          status:'received', sid:msgId, error:'', createdAt:nowIso, createdBy:'inbound-email' });
+        if (rc >= 0) ls.getRange(i + 1, rc + 1).setValue(nowIso);
+        if (uc >= 0) ls.getRange(i + 1, uc + 1).setValue(nowIso);
+        if (optout && stc >= 0) {
+          ls.getRange(i + 1, stc + 1).setValue('Do Not Call');
+          if (dc >= 0) ls.getRange(i + 1, dc + 1).setValue('opt-out (email)');
+        }
+      });
+      seen.add(msgId);
+      logged++;
+    }
+  }
+  if (logged) { try { notifyTelegram('📨 ' + logged + ' new email repl' + (logged === 1 ? 'y' : 'ies') + ' logged in the CRM.'); } catch (e) {} }
+  cfgSet('lastInboundScan', JSON.stringify({ ranAt: new Date().toISOString(), logged }));
+  return { logged };
 }
 
 // The engine. Hourly trigger. Pass 1 enroll, Pass 2 advance. Dry-runs (writes
@@ -1153,8 +1224,13 @@ function runCadence() {
   try {
     const cfg = getCadenceCfg_();
     const live = cfg.enabled === true;
+    CAD_SMS_ON = !!cfg.smsEnabled;     // email-first routing while SMS is parked
     const gapMs = cfg.gapDays * 24 * 3600 * 1000;
     const now = new Date(), nowMs = now.getTime();
+
+    // Pull in any new email replies FIRST so freshly-logged replies pause their
+    // sequence in this same run (the snapshot reads below pick them up).
+    try { runInboundEmailScan(); } catch (e) { Logger.log('runInboundEmailScan error: ' + e.message); }
 
     // Read leads once (with row indices for in-place stamps).
     const leadsSheet = getSheet(SHEETS.leads, LEAD_HDR);
