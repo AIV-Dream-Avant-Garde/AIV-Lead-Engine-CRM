@@ -1,24 +1,47 @@
 /* ── BASE: Reset, Design Tokens, Typography ──────────────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
+/* ── AXIUS brand theme — warm light (default) + [data-theme="dark"] mode.
+   Type: Fraunces (serif display) · Instrument Sans (body) · Geist Mono.
+   Palette: ivory surfaces + warm ink + forest-green accent (from axius.tech). */
 :root{
-  --bg:#0B0D12;--surface:#12151D;--surface-hi:#1A1E2A;--border:#1F2535;--border-hi:#2A3147;
-  --accent:#4B72FF;--acc-m:rgba(75,114,255,.10);--acc-g:rgba(75,114,255,.20);
-  --hl:#EDF0F7;--sub:#A2ABBF;--body:#9BA4BA;--pos:#2DD4BF;--red:#FF4545;--amber:#F59E0B;
+  color-scheme:light;
+  --bg:#ECE6DB;--surface:#F7F3EB;--surface-hi:#FCFAF4;
+  --border:rgba(22,20,15,.13);--border-hi:rgba(22,20,15,.22);
+  --accent:#1C5A40;--acc-m:rgba(28,90,64,.09);--acc-g:rgba(28,90,64,.17);
+  --hl:#16140F;--sub:rgba(22,20,15,.50);--body:rgba(22,20,15,.72);
+  --pos:#1E7A52;--red:#B23B2E;--amber:#A86A1C;
+  /* Sidebar — forest-green "scene" with its own ivory-on-green text scale */
+  --sidebar-bg:#173B2D;--sidebar-fg:#EFEAE0;--sidebar-muted:rgba(239,234,224,.58);
+  --sidebar-line:rgba(239,234,224,.14);--sidebar-active-bg:rgba(239,234,224,.13);--sidebar-active-fg:#FFFFFF;
+  --topbar-bg:rgba(247,243,235,.82);--map-bg:#E7E2D7;--map-glow:rgba(28,90,64,.06);--map-panel:rgba(247,243,235,.9);--map-panel-fg:#16140F;
   --sw:248px;
-  --s-new:#4B72FF;--s-contact:#F59E0B;--s-interest:#2DD4BF;--s-closed:#22C55E;
-  --s-failed:#FF6B35;--s-dead:#8B93A8;--s-dnc:#FF4545;
-  /* Radius scale */
+  /* Pipeline-stage colors (categorical — readable on both themes) */
+  --s-new:#3E66C4;--s-contact:#C07A12;--s-interest:#1F9B81;--s-closed:#1E7A52;
+  --s-failed:#C2410C;--s-dead:#8C8579;--s-dnc:#B23B2E;
   --r-xs:5px;--r-sm:7px;--r-md:10px;--r-lg:14px;--r-xl:16px;--r-pill:9999px;
-  /* Shadow scale */
-  --shadow-xs:0 1px 3px rgba(0,0,0,.25);--shadow-sm:0 2px 8px rgba(0,0,0,.30);--shadow-md:0 4px 20px rgba(0,0,0,.40);--shadow-lg:0 8px 40px rgba(0,0,0,.55);
-  /* Transitions */
+  --shadow-xs:0 1px 2px rgba(22,20,15,.06);--shadow-sm:0 2px 8px rgba(22,20,15,.08);--shadow-md:0 6px 22px rgba(22,20,15,.10);--shadow-lg:0 14px 44px rgba(22,20,15,.16);
   --t-fast:120ms ease;--t-base:180ms ease;
+}
+[data-theme="dark"]{
+  color-scheme:dark;
+  /* Deep forest near-black — dark + sleek, green undertone (not brown, not blue) */
+  --bg:#0A0F0C;--surface:#121A15;--surface-hi:#1A241D;
+  --border:rgba(225,233,226,.10);--border-hi:rgba(225,233,226,.18);
+  --accent:#5FB088;--acc-m:rgba(95,176,136,.13);--acc-g:rgba(95,176,136,.24);
+  --hl:#EAF0EA;--sub:rgba(225,233,226,.52);--body:rgba(225,233,226,.80);
+  --pos:#5FB088;--red:#F0796A;--amber:#E0A93F;
+  --sidebar-bg:#0C1812;--sidebar-fg:#EAF0EA;--sidebar-muted:rgba(225,233,226,.55);
+  --sidebar-line:rgba(225,233,226,.10);--sidebar-active-bg:rgba(95,176,136,.20);--sidebar-active-fg:#FFFFFF;
+  --topbar-bg:rgba(10,15,12,.88);--map-bg:#070C09;--map-glow:rgba(95,176,136,.06);--map-panel:rgba(8,13,10,.86);--map-panel-fg:#EAF0EA;
+  --s-new:#6FA8E0;--s-contact:#E0A93F;--s-interest:#46C7A6;--s-closed:#84CC16;
+  --s-failed:#F0796A;--s-dead:#8C8579;--s-dnc:#F0796A;
+  --shadow-xs:0 1px 3px rgba(0,0,0,.5);--shadow-sm:0 2px 10px rgba(0,0,0,.55);--shadow-md:0 6px 24px rgba(0,0,0,.6);--shadow-lg:0 12px 48px rgba(0,0,0,.68);
 }
 
 html{font-size:14px;scroll-behavior:smooth}
-body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--hl);-webkit-font-smoothing:antialiased;display:flex;min-height:100vh;overflow:hidden;line-height:1.5;letter-spacing:-.01em}
-body::after{content:'';position:fixed;top:-200px;right:-200px;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(75,114,255,.05) 0%,transparent 70%);pointer-events:none;z-index:0}
+body{background:var(--bg);font-family:'Instrument Sans',system-ui,sans-serif;color:var(--body);-webkit-font-smoothing:antialiased;display:flex;min-height:100vh;overflow:hidden;line-height:1.5;letter-spacing:-.005em}
+body::after{content:'';position:fixed;top:-200px;right:-200px;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,var(--map-glow) 0%,transparent 70%);pointer-events:none;z-index:0}
 
 /* Keyboard focus: a visible ring on interactive elements for keyboard users
    (mouse clicks are unaffected via :focus-visible). Inputs keep their own

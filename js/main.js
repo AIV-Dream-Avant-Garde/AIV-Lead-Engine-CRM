@@ -205,6 +205,8 @@ function showShortcutsModal() {
 
 // ── Single clean init — replaces all stage1/stage2/stage3 inits ─
 (function init() {
+  // 0. Apply the saved theme (light default / dark) + sync the toggle icon.
+  if (typeof initTheme === 'function') initTheme();
   // 1. Load all data from localStorage
   loadLocal();
   try { S.auditLog    = JSON.parse(localStorage.getItem('aiv-audit')          || '[]'); } catch(e) { S.auditLog=[]; }
