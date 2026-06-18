@@ -268,3 +268,7 @@
 /* Theme toggle (topbar) */
 .theme-toggle{width:32px;height:32px;border:1px solid var(--border);background:var(--surface);color:var(--hl);border-radius:8px;cursor:pointer;font-size:15px;line-height:1;display:inline-flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s;flex-shrink:0}
 .theme-toggle:hover{background:var(--surface-hi);border-color:var(--border-hi)}
+
+/* Dark mode: tint + lift the near-black map tiles so they harmonize with the
+   green-charcoal UI instead of reading as a black void. */
+[data-theme="dark"] .map-card .leaflet-tile{filter:sepia(.22) hue-rotate(78deg) saturate(1.35) brightness(1.18) contrast(.92)}
