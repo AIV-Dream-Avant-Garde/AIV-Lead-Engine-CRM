@@ -430,3 +430,28 @@ test('leadClosedAt: reads Closed Won workHistory stamp, falls back to updatedAt'
   eq(leadClosedAt({workHistory:[], updatedAt:'2026-06-14T00:00:00Z'}), '2026-06-14T00:00:00Z', 'no history → updatedAt');
   eq(leadClosedAt(null), '', 'null safe');
 });
+
+// ── State-campaign grid tiling (whole-state auto-scrape coverage) ─────
+test('campaignGrid: covers a state bbox with sane tile counts', () => {
+  const fl = STATE_BOUNDS['United States']['Florida'];
+  const g = campaignGrid(fl, 25000);
+  assert(g.rows >= 1 && g.cols >= 1, 'has at least one row/col');
+  eq(g.count, g.rows * g.cols, 'count is rows×cols');
+  // A ~730km × ~600km state at 25km tiles (×1.3 spacing ≈ 32.5km) → ~20×~18ish.
+  assert(g.count > 150 && g.count < 1200, 'Florida tile count in a reasonable range: ' + g.count);
+  // Smaller radius → more tiles.
+  assert(campaignGrid(fl, 15000).count > g.count, 'finer radius yields more tiles');
+});
+
+test('campaignTile: tile centers stay inside the bounding box', () => {
+  const fl = STATE_BOUNDS['United States']['Florida'];
+  const g = campaignGrid(fl, 25000);
+  for (const idx of [0, 1, Math.floor(g.count / 2), g.count - 1]) {
+    const t = campaignTile(fl, g.rows, g.cols, idx);
+    assert(t.lat >= fl.minLat && t.lat <= fl.maxLat, 'lat in bounds for tile ' + idx);
+    assert(t.lng >= fl.minLng && t.lng <= fl.maxLng, 'lng in bounds for tile ' + idx);
+  }
+  // Distinct tiles have distinct centers.
+  const a = campaignTile(fl, g.rows, g.cols, 0), b = campaignTile(fl, g.rows, g.cols, 1);
+  assert(a.lat !== b.lat || a.lng !== b.lng, 'adjacent tiles differ');
+});

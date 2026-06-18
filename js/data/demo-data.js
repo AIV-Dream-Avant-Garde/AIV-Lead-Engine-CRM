@@ -5,6 +5,7 @@ const DEMO_DATA = (() => {
   const d   = n => { const x=new Date(); x.setDate(x.getDate()+n); return x.toISOString().slice(0,10); };
   const ts  = daysAgo => { const x=new Date(); x.setDate(x.getDate()-daysAgo); return x.toISOString(); };
   const fu  = hoursAhead => { const x=new Date(); x.setHours(x.getHours()+hoursAhead); return x.toISOString(); };
+  const hrs = h => new Date(Date.now() - h*3600000).toISOString();   // h hours ago
 
   // Minimal valid WAV (silent) — browsers render the <audio> player correctly
   const DEMO_REC = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
@@ -84,5 +85,18 @@ const DEMO_DATA = (() => {
 
   // Stamp country so demo mode matches the migrated real-data shape
   leads.forEach(l => { if (!l.country) l.country = 'United States'; });
-  return {leads, team, calls, commissions};
+  // Email threads where the business has REPLIED — these surface in "Reply now"
+  // (latest message is inbound) so the demo shows the automated-email loop.
+  const interactions = [
+    {id:'di-01', leadId:'dl-02', leadName:'Bella Vista Med Spa', phone:'+13055551002', channel:'email', direction:'out', stepTag:'seq:0', body:"Hi — I'm Andres with Axius. We help med spas in Miami Beach book more consults from their existing traffic. Worth a quick look?", status:'sent', sid:'demo', createdAt:hrs(50), createdBy:'cadence', _synced:true},
+    {id:'di-02', leadId:'dl-02', leadName:'Bella Vista Med Spa', phone:'+13055551002', channel:'email', direction:'in',  stepTag:'', body:"Yes, we'd be interested — what are your rates and how does it work?", status:'received', sid:'demo', createdAt:hrs(2), createdBy:'inbound', _synced:true},
+
+    {id:'di-03', leadId:'dl-04', leadName:'Lone Star Auto Repair', phone:'+18135551004', channel:'email', direction:'out', stepTag:'seq:0', body:"Hi — Andres at Axius. We help auto shops in Tampa fill their schedule. Open to a 10-min call this week?", status:'sent', sid:'demo', createdAt:hrs(74), createdBy:'cadence', _synced:true},
+    {id:'di-04', leadId:'dl-04', leadName:'Lone Star Auto Repair', phone:'+18135551004', channel:'email', direction:'in',  stepTag:'', body:"Sounds interesting. We're slow on Tuesdays — can you send some details first?", status:'received', sid:'demo', createdAt:hrs(6), createdBy:'inbound', _synced:true},
+
+    {id:'di-05', leadId:'dl-05', leadName:'Riverside Family Pharmacy', phone:'+19045551005', channel:'email', direction:'out', stepTag:'seq:0', body:"Hi — Andres with Axius. We help independent pharmacies in Jacksonville bring in more local customers. Worth exploring?", status:'sent', sid:'demo', createdAt:hrs(96), createdBy:'cadence', _synced:true},
+    {id:'di-06', leadId:'dl-05', leadName:'Riverside Family Pharmacy', phone:'+19045551005', channel:'email', direction:'in',  stepTag:'', body:"Who is this for — the owner? Laura handles marketing, you can reach her here.", status:'received', sid:'demo', createdAt:hrs(26), createdBy:'inbound', _synced:true},
+  ];
+
+  return {leads, team, calls, commissions, interactions};
 })();

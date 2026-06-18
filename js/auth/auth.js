@@ -182,6 +182,7 @@ function logout() {
     S.demoMode    = false;
     S.leads = []; S.calls = []; S.commissions = []; S.team = [];
     S.scripts = []; S.smsTemplates = []; S.scheduledJobs = []; S.auditLog = [];
+    S.interactions = []; S.stateCampaigns = [];
     // Restore real data from localStorage so next login sees correct state
     loadLocal();
   }
@@ -238,10 +239,11 @@ document.addEventListener('keydown', e => {
 // ── Demo mode ──────────────────────────────────────────────
 function startDemo() {
   S.demoMode    = true;
-  S.leads       = DEMO_DATA.leads.map(l => ({...l}));
-  S.calls       = DEMO_DATA.calls.map(c => ({...c}));
-  S.team        = DEMO_DATA.team.map(m => ({...m}));
-  S.commissions = DEMO_DATA.commissions.map(c => ({...c}));
+  S.leads        = DEMO_DATA.leads.map(l => ({...l}));
+  S.calls        = DEMO_DATA.calls.map(c => ({...c}));
+  S.team         = DEMO_DATA.team.map(m => ({...m}));
+  S.commissions  = DEMO_DATA.commissions.map(c => ({...c}));
+  S.interactions = (DEMO_DATA.interactions || []).map(i => ({...i}));
   const user    = {userId:'demo-admin', userName:'Demo User', role:'admin', closerRate:12};
   S.session     = user;
   // Demo is in-memory only — don't persist a session token (a refresh returns

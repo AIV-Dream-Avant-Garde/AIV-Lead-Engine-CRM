@@ -122,6 +122,7 @@ function openTeamModal(memberId) {
   if (document.getElementById('tm-prate')) document.getElementById('tm-prate').value = '0';
   document.getElementById('tm-contact').value = '';
   document.getElementById('tm-role').value    = 'closer';
+  const ct0 = document.getElementById('tm-comm-type'); if (ct0) ct0.value = 'one-time';
 
   if (memberId) {
     const m = S.team.find(x => x.id === memberId);
@@ -133,11 +134,21 @@ function openTeamModal(memberId) {
       document.getElementById('tm-crate').value   = m.closerRate   || 10;
       if (document.getElementById('tm-prate')) document.getElementById('tm-prate').value = m.providerRate || 0;
       document.getElementById('tm-contact').value = m.contact || '';
+      const ct = document.getElementById('tm-comm-type'); if (ct) ct.value = m.commissionType || 'one-time';
     }
   } else {
     titleEl.textContent = 'Add team member';
   }
+  updateCommTypeHint();
   modal.classList.add('open');
+}
+
+// For residual reps, the "closer rate" is the percentage earned EACH month, so
+// relabel the field to make that explicit in the form.
+function updateCommTypeHint() {
+  const isResidual = document.getElementById('tm-comm-type')?.value === 'residual';
+  const lbl = document.getElementById('tm-crate-label');
+  if (lbl) lbl.textContent = isResidual ? 'Residual rate (% per month)' : 'Closer rate (%)';
 }
 
 function closeTeamModal() {
@@ -176,8 +187,10 @@ async function saveTeamMember() {
     if (collision)  { toast('This PIN is already in use by ' + collision.name + '.', 'error'); return; }
   }
 
+  const commissionType = document.getElementById('tm-comm-type')?.value || 'one-time';
   const id     = existingId || uid();
-  const member = {id, name, role, contact, closerRate:crate, providerRate:prate, active:true, createdAt:new Date().toISOString()};
+  const prior  = S.team.find(m => m.id === id);
+  const member = {id, name, role, contact, closerRate:crate, providerRate:prate, commissionType, active:true, createdAt: prior?.createdAt || new Date().toISOString()};
   if (pin) {
     member.pinHash  = await sha256(pin);
     if (!S.config.hidePinPlain) member.pinPlain = pin;   // plaintext storage is opt-out
@@ -610,7 +623,7 @@ function renderAdmin() {
             <div class="team-info">
               <div class="team-name">${esc(m.name)}</div>
               <div class="team-meta">${roleLabels[m.role]||m.role} · ${inactive?'Inactive':'Active'}${m.contact?' · '+esc(m.contact):''}</div>
-              <div class="team-meta" style="font-size:10px;opacity:.75">Closer ${esc(String(m.closerRate||0))}% · Provider ${esc(String(m.providerRate||0))}%</div>
+              <div class="team-meta" style="font-size:10px;opacity:.75">${m.commissionType === 'residual' ? `Residual ${esc(String(m.closerRate||0))}%/mo` : `Closer ${esc(String(m.closerRate||0))}%`} · Provider ${esc(String(m.providerRate||0))}%</div>
               <div class="team-pin" style="font-size:11px;color:var(--sub);font-family:'DM Mono',monospace">
                 PIN: <span id="pin-${m.id}">••••</span>
                 ${m.pinPlain ? `<span onclick="togglePin('${m.id}','${m.pinPlain}')" style="cursor:pointer;margin-left:4px;opacity:.55;color:var(--accent)" title="Reveal PIN"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;vertical-align:middle"><path d="M1 8c1.5-3.5 3.8-5.5 7-5.5S13.5 4.5 15 8c-1.5 3.5-3.8 5.5-7 5.5S2.5 11.5 1 8z"/><circle cx="8" cy="8" r="2.5"/></svg></span>` : '<span style="opacity:.4;font-size:10px"> (reassign)</span>'}
@@ -661,8 +674,8 @@ function renderAdmin() {
             : '';
           return `<div class="admin-comm-row">
             <div class="admin-comm-info">
-              <div class="admin-comm-lead">${esc(c.leadName||'--')}</div>
-              <div class="admin-comm-detail">Contracted: ${fmtUSD(c.dealValue)}${collInfo} · Closer: ${esc(c.closerName||'--')} ${fmtUSD(c.closerAmount)}${provAmt ? ' · Provider: ' + esc(c.providerName||'--') + ' ' + fmtUSD(c.providerAmount) : ''} · ${fmtD(c.createdAt)}${paidInfo}${refundInfo}</div>
+              <div class="admin-comm-lead">${esc(c.leadName||'--')}${c.recurring === true || c.recurring === 'true' ? ` <span class="comm-status-badge" style="background:var(--acc-m);color:var(--accent)">Recurring${c.period ? ' · ' + esc(c.period) : ''}</span>` : ''}</div>
+              <div class="admin-comm-detail">${(c.recurring === true || c.recurring === 'true') ? 'Monthly' : 'Contracted'}: ${fmtUSD(c.dealValue)}${collInfo} · Closer: ${esc(c.closerName||'--')} ${fmtUSD(c.closerAmount)}${provAmt ? ' · Provider: ' + esc(c.providerName||'--') + ' ' + fmtUSD(c.providerAmount) : ''} · ${fmtD(c.createdAt)}${paidInfo}${refundInfo}</div>
             </div>
             <span class="admin-comm-amount" style="${amtStyle}">${fmtUSD(totalAmt)}</span>
             <span class="comm-status-badge ${statusCls}">${statusLbl}</span>

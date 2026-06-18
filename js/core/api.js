@@ -129,6 +129,9 @@ async function syncNow() {
     if (res.commissions) { S.commissions = res.commissions; localStorage.setItem('aiv-comm', JSON.stringify(S.commissions)); }
     if (res.scripts)     { S.scripts     = res.scripts;     localStorage.setItem('aiv-scripts', JSON.stringify(S.scripts)); }
     if (Array.isArray(res.scheduledJobs)) { S.scheduledJobs = res.scheduledJobs; localStorage.setItem('aiv-sched-jobs', JSON.stringify(S.scheduledJobs)); }
+    // State campaigns: the server is authoritative (it advances cursor/leadsFound
+    // as it scrapes), so take its copy on pull.
+    if (Array.isArray(res.stateCampaigns)) { S.stateCampaigns = res.stateCampaigns; localStorage.setItem('aiv-campaigns', JSON.stringify(S.stateCampaigns)); }
     // Merge incoming interactions append-only, by id (never clobber; preserves local optimistic rows)
     const freshInbound = [];
     if (Array.isArray(res.interactions)) {

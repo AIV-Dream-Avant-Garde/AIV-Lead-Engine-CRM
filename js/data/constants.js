@@ -74,6 +74,18 @@ const SCORE_WEIGHTS = {
   hasWebsite:      5,  // has website
 };
 
+// Pipeline-stage → map-dot color. Shared by the dashboard map and the scraper
+// map so a lead's color always reflects the stage it's in.
+const STATUS_COLOR = {
+  'New':          '#4B72FF',
+  'Contacted':    '#F59E0B',
+  'Interested':   '#2DD4BF',
+  'Closed Won':   '#84CC16',
+  'Closed Lost':  '#6B7280',
+  'Not Interested':'#6B7280',
+  'Do Not Call':  '#FF4545',
+};
+
 const ROLE_VISIBLE = {
   admin:    ['dashboard','setup','scraper','import','responder','leads','pipeline','llamadas','perfil','export','admin','analytics'],
   closer:   ['dashboard','responder','leads','pipeline','llamadas','perfil'],

@@ -158,10 +158,19 @@ function renderScraperMap() {
       const la = parseFloat(c.lat), ln = parseFloat(c.lng);
       const d = scHaversine(t.lat, t.lng, la, ln);
       if (d <= radius) inView++;
+      const color = STATUS_COLOR[l.status] || '#6B7280';   // dot color = pipeline stage
+      const popup = `<div style="min-width:150px">
+        <div style="font-weight:600;margin-bottom:2px">${esc(l.name || 'No name')}</div>
+        <div style="display:inline-block;font-size:11px;color:#fff;background:${color};padding:1px 7px;border-radius:9px;margin-bottom:5px">${esc(l.status || 'New')}</div>
+        <div style="font-size:12px;line-height:1.5">
+          ${l.phone ? '☎ ' + esc(l.phone) + '<br>' : ''}
+          ${l.keyword ? esc(l.keyword) + ' · ' : ''}${esc([l.barrio, l.city].filter(Boolean).join(', '))}
+        </div>
+        <button onclick="openLead('${l.id}')" style="margin-top:7px;font-size:11px;cursor:pointer;background:#1A1E2A;color:#EDF0F7;border:1px solid #2A3147;border-radius:6px;padding:4px 10px">Open lead →</button>
+      </div>`;
       L.circleMarker([la, ln], {
-        radius:4, color:'#cdd8ff', weight:1, fillColor:'#4B72FF', fillOpacity:.9,
-      }).bindPopup(`<b>${esc(l.name||'No name')}</b><br>${esc(l.barrio||'')}${l.barrio?' · ':''}${esc(l.status||'')}`)
-        .addTo(_scLeadLayer);
+        radius:5, color:'#0B0D12', weight:1, fillColor:color, fillOpacity:.95,
+      }).bindPopup(popup).addTo(_scLeadLayer);
     });
   }
 

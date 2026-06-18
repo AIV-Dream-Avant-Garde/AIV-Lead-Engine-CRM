@@ -20,6 +20,7 @@ const APP_FILES = [
   'js/data/constants.js',
   'js/data/keywords.js',
   'js/data/locations.js',
+  'js/data/states.js',      // campaignGrid, campaignTile
   'js/data/demo-data.js',
   'js/core/state.js',
   'js/core/utils.js',
