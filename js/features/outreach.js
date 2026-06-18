@@ -98,6 +98,13 @@ async function sendMessage(lead, body, opts) {
   opts = opts || {};
   if (!lead) return null;
   const channel = opts.channel || pickChannel(lead);
+  // SMS/WhatsApp stay OFF until A2P 10DLC registration + the consent gate are
+  // finished. Calls + email are the active channels for now. Flip S.config.smsEnabled
+  // to true (one switch) once A2P is approved to re-enable texting.
+  if ((channel === 'sms' || channel === 'whatsapp') && !S.config.smsEnabled) {
+    toast('Texting is disabled until A2P 10DLC registration is complete. Use email or a call for now.', 'warning', 6000);
+    return null;
+  }
   if (lead.status === 'Do Not Call') { toast('This lead is on "Do Not Call" / opted out — message not sent.', 'error'); return null; }
   const agent = ((S.session && S.session.userName) || '').split(' ')[0] || '';
   const text  = renderTemplate(body, lead, agent);
@@ -137,14 +144,20 @@ async function sendMessage(lead, body, opts) {
 
 // ── Lead-modal composer (manual send) ─────────────────────────────────
 let _composerTpls = [];
-function _composerChannel() { return document.getElementById('msg-channel')?.value || 'sms'; }
+function _composerChannel() { return document.getElementById('msg-channel')?.value || (S.config.smsEnabled ? 'sms' : 'email'); }
 function _toggleSubject() { const w = document.getElementById('msg-subject-wrap'); if (w) w.style.display = (_composerChannel() === 'email') ? '' : 'none'; }
 
 function renderComposer(lead) {
   const csel = document.getElementById('msg-channel');
   if (!csel || !lead) return;
-  const def = pickChannel(lead);
-  csel.innerHTML = ['sms','whatsapp','email'].map(c => `<option value="${c}"${c===def?' selected':''}>${CHANNEL_LABELS[c]||c}</option>`).join('');
+  // Default to email while texting is disabled (A2P pending); SMS/WhatsApp remain
+  // listed but labeled so the operator knows why they can't send yet.
+  const def = S.config.smsEnabled ? pickChannel(lead) : 'email';
+  csel.innerHTML = ['sms','whatsapp','email'].map(c => {
+    const off = !S.config.smsEnabled && (c === 'sms' || c === 'whatsapp');
+    const label = (CHANNEL_LABELS[c] || c) + (off ? ' (off — A2P pending)' : '');
+    return `<option value="${c}"${c===def?' selected':''}>${label}</option>`;
+  }).join('');
   csel.onchange = () => { _toggleSubject(); _fillComposerTemplates(lead); renderMsgPreview(); };
   const body = document.getElementById('msg-body'); if (body) body.value = '';
   const subj = document.getElementById('msg-subject'); if (subj) subj.value = '';

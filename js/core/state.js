@@ -5,6 +5,7 @@ const S = {
   config: {
     scriptUrl:'',crmSecret:'',companyName:'',bookingUrl:'',
     callScript:'',pitchScript:'',objectionsScript:'',closeScript:'',
+    smsEnabled:false,   // texting stays off until A2P 10DLC + consent gate are done
   },
   leads:       [],
   calls:       [],
