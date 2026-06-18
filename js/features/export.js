@@ -108,6 +108,20 @@ function copyCrmSecret() {
   });
 }
 
+// Rotate the CRM secret: generate a fresh value, show it, copy it. Sync stays
+// broken until the matching CRM_SECRET Script property is updated + redeployed,
+// so we warn clearly and copy it to the clipboard ready to paste.
+function regenerateCrmSecret() {
+  if (!confirm('Generate a NEW CRM secret?\n\nSync will fail until you paste the new value into the CRM_SECRET Script property and redeploy the Apps Script. Continue?')) return;
+  const fresh = uid() + '-' + uid();
+  S.config.crmSecret = fresh;
+  saveLocal();
+  const el = document.getElementById('crm-secret-display');
+  if (el) el.textContent = fresh;
+  navigator.clipboard.writeText(fresh).catch(() => {});
+  toast('New secret generated + copied. Paste it into the CRM_SECRET Script property, then redeploy.', 'success', 8000);
+}
+
 function copyWebhookUrl() {
   const url = S.config.scriptUrl || '';
   if (!url) { toast('Save the Apps Script URL first.', 'error'); return; }
