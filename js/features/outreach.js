@@ -327,7 +327,11 @@ function renderCadenceEngine() {
         <input type="checkbox" id="cad-enabled" ${live?'checked':''} style="margin-top:2px">
         <span>Send live messages. Unchecked = simulation: logs what it would send without sending anything.</span>
       </label>
-      <div style="font-size:11px;color:var(--amber);margin-top:6px">Turn on "live" only with Twilio/WhatsApp provisioned and approved, and a legal basis for consent. The engine always respects opt-outs, quiet hours, and the cap.</div>
+      <label style="display:flex;align-items:flex-start;gap:8px;margin-top:8px;font-size:12px;color:var(--hl);cursor:pointer">
+        <input type="checkbox" id="cad-aireplies" ${c.aiReplies?'checked':''} style="margin-top:2px">
+        <span>AI auto-replies. When a business replies, draft a tailored response (with your booking link) and send it automatically — looping until they book.</span>
+      </label>
+      <div style="font-size:11px;color:var(--amber);margin-top:6px">Turn on "live" only with a legal basis for consent. The engine always respects opt-outs, quiet hours, and the cap. AI replies are reply-gated and capped per lead.</div>
       <button class="btn btn-primary btn-xs" style="margin-top:10px" onclick="saveCadenceConfig()">Save configuration</button>
     </div>`;
 }
@@ -348,6 +352,7 @@ async function saveCadenceConfig() {
     quietStart:    parseInt(g('cad-qstart')?.value),
     quietEnd:      parseInt(g('cad-qend')?.value),
     postalAddress: g('cad-address')?.value?.trim() || '',
+    aiReplies:     !!(g('cad-aireplies') && g('cad-aireplies').checked),
   };
   const res = await sheetsCall({ action:'saveCadenceConfig', config });
   if (res?.success) {
