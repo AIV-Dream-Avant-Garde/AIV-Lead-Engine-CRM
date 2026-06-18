@@ -617,7 +617,8 @@ Content-Type: application/json
   <div class="admin-section">
     <div class="admin-section-title">
       <span>Commissions <span id="admin-comm-pending-label" style="font-size:11px;color:var(--amber);font-weight:400"></span></span>
-      <div style="display:flex;gap:6px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" id="gen-residuals-btn" onclick="generateResiduals()" title="Create this month's residual commission rows for active recurring deals">↻ Generate residuals</button>
         <select class="filter-sel" id="admin-comm-person" onchange="renderAdmin()" style="max-width:140px"><option value="">All members</option></select>
         <select class="filter-sel" id="admin-comm-filter" onchange="renderAdmin()">
           <option value="">All</option>
@@ -936,7 +937,13 @@ Content-Type: application/json
       </div>
       <div class="field"><label>PIN (4 digits)</label><input type="password" id="tm-pin" placeholder="••••" maxlength="4" pattern="[0-9]{4}"></div>
       <div class="field"><label>Confirm PIN</label><input type="password" id="tm-pin2" placeholder="••••" maxlength="4"></div>
-      <div class="field"><label>Closer rate (%)</label>
+      <div class="field"><label>Commission type</label>
+        <select id="tm-comm-type" onchange="updateCommTypeHint()">
+          <option value="one-time" selected>One-time (paid once per deal)</option>
+          <option value="residual">Residual (recurring each month)</option>
+        </select>
+      </div>
+      <div class="field"><label><span id="tm-crate-label">Closer rate (%)</span></label>
         <select id="tm-crate">
           <option value="5">5%</option><option value="7">7%</option><option value="8">8%</option>
           <option value="10" selected>10%</option><option value="12">12%</option><option value="13">13%</option>

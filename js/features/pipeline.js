@@ -124,6 +124,7 @@ function pipelineDrop(e, newStatus) {
       outcome: 'Closed Lost', releasedAt: new Date().toISOString(),
     });
     if (!cancelLeadCommission(lead.id, 'Deal marked Closed Lost') && lead.commissionStatus === 'pending') lead.commissionStatus = 'cancelled';
+    lead.residualActive = false;   // churned — stop generating monthly residuals
     lead.closerId = ''; lead.lockedBy = ''; lead.lockedUntil = ''; lead.assignedAt = '';
   }
 

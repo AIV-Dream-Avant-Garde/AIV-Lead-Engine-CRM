@@ -45,7 +45,7 @@ const CRM_SECRET = 'PASTE_YOUR_CRM_SECRET_HERE'; // Setup → shows after first 
 const LEAD_HDR = ['id','name','phone','address','website','rating','reviews','city','barrio','keyword','source','sourceDetail','status','providerId','providerRate','closerId','closerRate','dealValue','collectedAmount','providerCommission','closerCommission','commissionStatus','lockedBy','lockedUntil','assignedAt','workHistory','dncReason','followUpDate','notes','importedAt','updatedAt','calendarEventId','refundAmount','refundReason','refundedAt','country','email','externalId','lastTouchAt','lastReplyAt','consentSms','consentWhatsapp','consentEmail','lat','lng'];
 const CALL_HDR = ['id','leadId','leadName','phone','callSid','outcome','duration','notes','recordingUrl','driveUrl','consentConfirmed','calledAt'];
 const TEAM_HDR = ['id','name','role','pinHash','providerRate','closerRate','contact','active','createdAt'];
-const COMM_HDR   = ['id','leadId','leadName','dealValue','collectedAmount','providerId','providerRate','providerAmount','closerId','closerRate','closerAmount','status','createdAt','paidAt','paidBy','paymentRef','refundReason','adjustedBy','adjustedAt','providerName','closerName'];
+const COMM_HDR   = ['id','leadId','leadName','dealValue','collectedAmount','providerId','providerRate','providerAmount','closerId','closerRate','closerAmount','status','createdAt','paidAt','paidBy','paymentRef','refundReason','adjustedBy','adjustedAt','providerName','closerName','recurring','period'];
 const SCRIPT_HDR = ['id','name','stage','body','createdAt','updatedAt'];
 const INTERACTION_HDR = ['id','leadId','leadName','phone','channel','direction','body','stepTag','status','sid','error','createdAt','createdBy'];
 const SEQUENCE_HDR = ['leadId','state','stepIndex','nextRunAt','pausedReason','enrolledAt','updatedAt']; // cadence enrollment (Project B; written by the Vercel engine + manual CRM controls)
@@ -285,10 +285,13 @@ function doPost(e) {
       try{ lock.waitLock(10000); }catch(e){ return err_('busy'); }
       try{
         const s=getSheet(SHEETS.commissions,COMM_HDR),rows=s.getDataRange().getValues();
-        const h=rows[0]||COMM_HDR,lc=h.indexOf('leadId');
-        // Allow clawback records even when a commission for the same lead already exists
+        const h=rows[0]||COMM_HDR,lc=h.indexOf('leadId'),pc=h.indexOf('period');
+        // Dedup by leadId + period: one-time commissions use an empty period (one
+        // row per lead), recurring/residual rows use 'YYYY-MM' (one row per lead
+        // per period). Clawbacks are always allowed through.
         if(!b.isClawback){
-          const exists=rows.slice(1).some(r=>String(r[lc])===String(b.leadId));
+          const key=String(b.leadId)+'|'+String(b.period||'');
+          const exists=rows.slice(1).some(r=>(String(r[lc])+'|'+String(pc>=0?(r[pc]||''):''))===key);
           if(exists)return ok({saved:false,duplicate:true});
         }
         s.appendRow(COMM_HDR.map(col=>b[col]??''));

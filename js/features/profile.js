@@ -105,10 +105,11 @@ function renderPerfil() {
           const amt = myShare(c);
           const statusCls = {pending:'comm-pending', paid:'comm-paid', cancelled:'comm-cancelled', clawback:'comm-cancelled'}[c.status] || 'comm-pending';
           const statusLbl = {pending:'Pending', paid:'Paid', cancelled:'Cancelled', clawback:'Refund'}[c.status] || c.status;
+          const isRec = (c.recurring === true || c.recurring === 'true');
           return `<div class="comm-item">
             <div class="comm-info">
-              <div class="comm-lead">${esc(c.leadName||'--')}</div>
-              <div class="comm-detail">Deal: ${fmtUSD(c.dealValue)} · ${fmtD(c.createdAt)}</div>
+              <div class="comm-lead">${esc(c.leadName||'--')}${isRec ? ` <span class="comm-status-badge" style="background:var(--acc-m);color:var(--accent)">Recurring${c.period ? ' · ' + esc(c.period) : ''}</span>` : ''}</div>
+              <div class="comm-detail">${isRec ? 'Monthly' : 'Deal'}: ${fmtUSD(c.dealValue)} · ${fmtD(c.createdAt)}</div>
             </div>
             <span class="comm-amount">${fmtUSD(amt)}</span>
             <span class="comm-status-badge ${statusCls}">${statusLbl}</span>
