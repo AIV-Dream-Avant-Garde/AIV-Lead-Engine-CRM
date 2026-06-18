@@ -94,7 +94,7 @@ function updateGPS() {
 }
 
 // ── Bloomberg-style dark scraper map (Leaflet + CartoDB dark) ──
-var _scMap = null, _scCircle = null, _scCenter = null, _scLeadLayer = null;
+var _scMap = null, _scCircle = null, _scCenter = null, _scLeadLayer = null, _scTiles = null;
 
 // Resolve the current target: selected neighborhood coords if any, else the
 // city center. Returns {lat, lng, city, country, barrio} or null.
@@ -125,7 +125,7 @@ function renderScraperMap() {
     _scMap = L.map(host, { zoomControl:false, attributionControl:true, scrollWheelZoom:true })
               .setView([t.lat, t.lng], 13);
     L.control.zoom({ position:'topright' }).addTo(_scMap);   // keep clear of the top-left overlay
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    _scTiles = L.tileLayer(mapTileUrl(), {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap &copy; CARTO',
     }).addTo(_scMap);

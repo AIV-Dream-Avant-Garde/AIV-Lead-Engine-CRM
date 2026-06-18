@@ -4,7 +4,7 @@
 // dashboard map and scraper map stay in sync.
 const DSH_STATUS_COLOR = STATUS_COLOR;
 
-var _dshMap = null, _dshLayer = null;
+var _dshMap = null, _dshLayer = null, _dshTiles = null;
 
 // Resolve a lead's plot coordinate. Prefer the REAL lat/lng captured at scrape
 // time; fall back to deterministic coords derived from the city + neighborhood
@@ -28,7 +28,7 @@ function renderDashboardMap() {
     _dshMap = L.map(host, { zoomControl:false, attributionControl:true, scrollWheelZoom:true })
                .setView([28.0, -81.7], 7);          // Florida overview
     L.control.zoom({ position:'topright' }).addTo(_dshMap);   // keep clear of the top-left overlay
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    _dshTiles = L.tileLayer(mapTileUrl(), {
       maxZoom: 19, attribution: '&copy; OpenStreetMap &copy; CARTO',
     }).addTo(_dshMap);
     _dshLayer = L.layerGroup().addTo(_dshMap);

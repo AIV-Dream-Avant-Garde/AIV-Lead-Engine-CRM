@@ -126,7 +126,7 @@ function renderCampaigns() {
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
         <div>
           <div style="font-weight:600;color:var(--hl)">${esc(c.name)} · ${status}</div>
-          <div style="font-size:11px;color:var(--body);margin-top:3px;font-family:'DM Mono',monospace">
+          <div style="font-size:11px;color:var(--body);margin-top:3px;font-family:'Geist Mono',monospace">
             ${c.leadsFound || 0} leads found · ${pct}% of grid swept · ${c.dailyCap}/day · ${c.tileCount} tiles${c.lastRunAt ? ' · last run ' + fmtD(c.lastRunAt) : ''}
           </div>
           <div class="storage-bar-wrap" style="margin-top:7px;width:240px;max-width:60vw"><div class="storage-bar-fill" style="width:${pct}%"></div></div>

@@ -230,12 +230,12 @@ function renderTable() {
         <td onclick="event.stopPropagation()"><input type="checkbox" ${S.selected.has(l.id)?'checked':''} onchange="toggleSel('${l.id}',this.checked)"></td>
         <td style="text-align:center;width:36px">${scoreDotHTML(l)}</td>
         <td class="name-cell">${highlight(l.name, q)}${l.lastReplyAt && (!l.lastTouchAt || new Date(l.lastReplyAt) > new Date(l.lastTouchAt)) ? ' <span class="sbadge" style="background:var(--pos);color:#04140d;font-size:9px;padding:1px 5px">Replied</span>' : ''}</td>
-        <td style="font-family:'DM Mono',monospace;font-size:11px">${highlight(l.phone || '', q)}</td>
+        <td style="font-family:'Geist Mono',monospace;font-size:11px">${highlight(l.phone || '', q)}</td>
         <td style="font-size:11px">${esc(l.city   || '--')}</td>
         <td style="font-size:11px">${esc(l.barrio || '--')}</td>
         <td>${srcBadgeHTML(l.source)}</td>
         <td>${fuBadgeHTML(l)}</td>
-        <td style="font-family:'DM Mono',monospace;font-size:11px">${esc(rat)}</td>
+        <td style="font-family:'Geist Mono',monospace;font-size:11px">${esc(rat)}</td>
         <td><span class="sbadge ${sc}">${esc(l.status || 'New')}</span>${l.refundedAt ? '<span style="font-size:9px;background:#c0392b;color:#fff;border-radius:3px;padding:1px 4px;margin-left:3px">Refund</span>' : ''}</td>
         <td style="font-size:11px">${fmtD(l.updatedAt || l.importedAt)}</td>
         <td style="font-size:11px">${lc_}</td>

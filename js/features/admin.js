@@ -624,7 +624,7 @@ function renderAdmin() {
               <div class="team-name">${esc(m.name)}</div>
               <div class="team-meta">${roleLabels[m.role]||m.role} · ${inactive?'Inactive':'Active'}${m.contact?' · '+esc(m.contact):''}</div>
               <div class="team-meta" style="font-size:10px;opacity:.75">${m.commissionType === 'residual' ? `Residual ${esc(String(m.closerRate||0))}%/mo` : `Closer ${esc(String(m.closerRate||0))}%`} · Provider ${esc(String(m.providerRate||0))}%</div>
-              <div class="team-pin" style="font-size:11px;color:var(--sub);font-family:'DM Mono',monospace">
+              <div class="team-pin" style="font-size:11px;color:var(--sub);font-family:'Geist Mono',monospace">
                 PIN: <span id="pin-${m.id}">••••</span>
                 ${m.pinPlain ? `<span onclick="togglePin('${m.id}','${m.pinPlain}')" style="cursor:pointer;margin-left:4px;opacity:.55;color:var(--accent)" title="Reveal PIN"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:12px;height:12px;vertical-align:middle"><path d="M1 8c1.5-3.5 3.8-5.5 7-5.5S13.5 4.5 15 8c-1.5 3.5-3.8 5.5-7 5.5S2.5 11.5 1 8z"/><circle cx="8" cy="8" r="2.5"/></svg></span>` : '<span style="opacity:.4;font-size:10px"> (reassign)</span>'}
               </div>
@@ -768,10 +768,10 @@ function renderAdmin() {
         const initials = (m.name||'?').split(' ').map(w=>w[0]||'').join('').toUpperCase().slice(0,2);
         return `<div class="card" style="margin-bottom:10px;padding:14px 16px">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
-            <span class="pill" style="font-family:'DM Mono',monospace;flex-shrink:0">#${i+1}</span>
+            <span class="pill" style="font-family:'Geist Mono',monospace;flex-shrink:0">#${i+1}</span>
             <div class="team-avatar">${esc(initials)}</div>
             <div style="flex:1;min-width:0"><div class="team-name">${esc(m.name)}</div><div class="team-meta">${m.role}${m.contact?' · '+esc(m.contact):''}</div></div>
-            ${entry.pending>0?`<span style="font-size:11px;color:var(--amber);font-family:'DM Mono',monospace">${fmtUSD(entry.pending)} pending</span>`:''}
+            ${entry.pending>0?`<span style="font-size:11px;color:var(--amber);font-family:'Geist Mono',monospace">${fmtUSD(entry.pending)} pending</span>`:''}
           </div>
           <div class="perf-grid">
             <div class="perf-stat"><div class="perf-val">${mCalls.length}</div><div class="perf-lbl">Calls</div></div>
