@@ -150,7 +150,7 @@ function doGet(e) {
     const a = e.parameter.action;
     if (a !== 'ping' && a !== 'twiml') {
       const s = e.parameter._s || '';
-      if (s !== CRM_SECRET) return err_('Unauthorized');
+      if (String(s).trim() !== String(CRM_SECRET).trim()) return err_('Unauthorized');
     }
     if (a === 'ping') return ok({ping:true,serverTime:new Date().toISOString()});
     if (a === 'pull') {
@@ -199,7 +199,7 @@ function doPost(e) {
     // Twilio inbound messaging webhook (form-encoded; NOT our JSON+_secret shape).
     // Configure the Twilio webhook URL as:  {execUrl}?action=inboundMsg&token={CRM_SECRET}
     if (a === 'inboundMsg') {
-      if (e.parameter.token !== CRM_SECRET) return err_('Unauthorized');
+      if (String(e.parameter.token).trim() !== String(CRM_SECRET).trim()) return err_('Unauthorized');
       const from = String(e.parameter.From || '').replace('whatsapp:', '');
       const to   = String(e.parameter.To   || '');
       const text = String(e.parameter.Body || '');
@@ -234,8 +234,8 @@ function doPost(e) {
     }
 
     const b = JSON.parse((e.postData && e.postData.contents) || '{}');
-    if (b._secret !== CRM_SECRET) {
-      return err_('Unauthorized — set CRM_SECRET in Code.gs to the value from Setup.');
+    if (String(b._secret).trim() !== String(CRM_SECRET).trim()) {
+      return err_('Unauthorized — set the CRM_SECRET Script property to the value shown in Settings.');
     }
     if (a === 'push') {
       // Dedup by id (the lead's stable unique key), NOT by phone. Phone-keying
