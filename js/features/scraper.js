@@ -166,7 +166,7 @@ function renderScraperMap() {
           ${l.phone ? '☎ ' + esc(l.phone) + '<br>' : ''}
           ${l.keyword ? esc(l.keyword) + ' · ' : ''}${esc([l.barrio, l.city].filter(Boolean).join(', '))}
         </div>
-        <button onclick="openLead('${l.id}')" style="margin-top:7px;font-size:11px;cursor:pointer;background:#1A1E2A;color:#EDF0F7;border:1px solid #2A3147;border-radius:6px;padding:4px 10px">Open lead →</button>
+        <button onclick="openLead('${l.id}')" style="margin-top:7px;font-size:11px;cursor:pointer;background:var(--surface-hi);color:var(--hl);border:1px solid var(--border-hi);border-radius:6px;padding:4px 10px">Open lead →</button>
       </div>`;
       L.circleMarker([la, ln], {
         radius:5, color:'#0B0D12', weight:1, fillColor:color, fillOpacity:.95,

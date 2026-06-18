@@ -279,3 +279,9 @@
 .m-outreach-chip.muted{background:var(--surface-hi);color:var(--sub);border-color:var(--border)}
 .m-outreach-chip.pos{background:rgba(30,122,82,.12);color:var(--pos);border-color:rgba(30,122,82,.25)}
 .m-outreach-chip.warn{background:rgba(168,106,28,.14);color:var(--amber);border-color:rgba(168,106,28,.3)}
+
+/* Themed Leaflet popups (so dark mode isn't bright-white) */
+.map-card .leaflet-popup-content-wrapper,.map-card .leaflet-popup-tip{background:var(--surface);color:var(--hl);box-shadow:var(--shadow-md)}
+.map-card .leaflet-popup-content{color:var(--hl)}
+.map-card .leaflet-popup-content b{color:var(--hl)}
+.map-card a.leaflet-popup-close-button{color:var(--sub)}
