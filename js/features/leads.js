@@ -396,6 +396,7 @@ function openLead(id) {
   document.getElementById('m-meta').textContent =
     [l.country, l.city, l.barrio, l.keyword].filter(Boolean).join(' · ')
     + (_seq ? ' · Sequence: ' + seqStateLabel(_seq.state) : '');
+  renderLeadOutreach(l, _seq);
   document.getElementById('m-status').value    = l.status     || 'New';
   document.getElementById('m-followup').value  = l.followUpDate || '';
 
@@ -496,6 +497,33 @@ function switchModalTab(tab) {
   });
   document.querySelectorAll('.modal-tab').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-btn-' + tab)?.classList.add('active');
+}
+
+// At-a-glance outreach status for a lead: how many messages we've sent, how many
+// they've replied with, when we last reached out, and the cadence state.
+function renderLeadOutreach(l, seq) {
+  const el = document.getElementById('m-outreach');
+  if (!el) return;
+  const ints = (S.interactions || []).filter(i => i.leadId === l.id);
+  const out  = ints.filter(i => i.direction === 'out' && i.status !== 'failed');
+  const ins  = ints.filter(i => i.direction === 'in');
+  const lastOut = out.map(i => i.createdAt).filter(Boolean).sort().pop();
+  const lastIn  = ins.map(i => i.createdAt).filter(Boolean).sort().pop();
+  const waited  = d => { if (!d) return ''; const ms = Date.now() - new Date(d).getTime(); const day = 864e5; return ms < 36e5 ? Math.max(1, Math.round(ms/6e4)) + 'm' : ms < day ? Math.round(ms/36e5) + 'h' : Math.round(ms/day) + 'd'; };
+  const chip = (txt, tone) => `<span class="m-outreach-chip${tone ? ' ' + tone : ''}">${txt}</span>`;
+
+  if (!out.length && !ins.length) {
+    el.innerHTML = `<span class="label-sm" style="margin:0">Outreach</span>` + chip('No messages sent yet');
+    return;
+  }
+  const parts = [`<span class="label-sm" style="margin:0">Outreach</span>`];
+  parts.push(chip(`${out.length} sent`));
+  if (lastOut) parts.push(chip(`last ${waited(lastOut)} ago`, 'muted'));
+  if (ins.length) parts.push(chip(`${ins.length} repl${ins.length === 1 ? 'y' : 'ies'}`, 'pos'));
+  const needsReply = lastIn && (!lastOut || new Date(lastIn) > new Date(lastOut));
+  if (needsReply) parts.push(chip('awaiting your reply', 'warn'));
+  if (seq) parts.push(chip(seqStateLabel(seq.state), 'muted'));
+  el.innerHTML = parts.join('');
 }
 
 function renderLeadTimeline(l) {
