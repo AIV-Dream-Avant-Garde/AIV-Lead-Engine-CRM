@@ -629,6 +629,7 @@ function saveLead() {
       });
     }
     if (!cancelLeadCommission(l.id, 'Deal marked Closed Lost') && l.commissionStatus === 'pending') l.commissionStatus = 'cancelled';
+    l.residualActive = false;   // churned — stop generating monthly residuals
     l.closerId = ''; l.lockedBy = ''; l.lockedUntil = ''; l.assignedAt = '';
   }
 

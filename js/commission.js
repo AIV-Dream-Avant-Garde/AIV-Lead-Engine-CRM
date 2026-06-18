@@ -139,7 +139,17 @@ function confirmCerradoWithValue(leadId, dealValue) {
     closedAt:   lead.updatedAt,
     dealValue,
   });
-  pushLead(lead);
+  // Residual reps earn their rate EVERY month off the deal's recurring value, so
+  // mark the lead as an active residual and tag the first period's row. One-time
+  // reps get the single row as before.
+  const closer     = S.team.find(m => m.id === lead.closerId);
+  const isResidual = (closer?.commissionType === 'residual');
+  if (isResidual) {
+    lead.residualActive = true;
+    lead.residualRate   = closRate;
+    lead.residualMRR    = dealValue;
+    pushLead(lead);
+  }
   const commRec = {
     id:             uid(),
     leadId:         lead.id,
@@ -157,13 +167,55 @@ function confirmCerradoWithValue(leadId, dealValue) {
     status:         'pending',
     paidAt:'', paidBy:'', paymentRef:'',
     createdAt:      lead.updatedAt,
+    recurring:      isResidual ? true : '',
+    period:         isResidual ? currentPeriod() : '',
   };
   S.commissions.push(commRec);
   saveLocal();
   if (S.config.scriptUrl) sheetsCall({action:'saveCommission', ...commRec});
-  toast('Deal closed — commission recorded', 'success');
+  toast(isResidual ? 'Deal closed — first month’s residual recorded' : 'Deal closed — commission recorded', 'success');
   closeModal();
   renderAll();
+}
+
+// Calendar period key for recurring commissions, e.g. "2026-06".
+function currentPeriod(d) {
+  d = d || new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+// Generate this month's residual commission rows for every lead with an active
+// residual whose closer is on a residual plan — one row per lead per period
+// (dedup makes this safe to run repeatedly). Returns the count created.
+function generateResiduals(period) {
+  period = period || currentPeriod();
+  let created = 0;
+  S.leads.forEach(lead => {
+    if (!lead.residualActive || lead.status !== 'Closed Won') return;
+    const closer = S.team.find(m => m.id === lead.closerId);
+    if (!closer || closer.commissionType !== 'residual') return;
+    // Skip if this lead already has a row for this period.
+    if (S.commissions.some(c => c.leadId === lead.id && String(c.period) === period)) return;
+    const mrr  = parseFloat(lead.residualMRR  || lead.dealValue || 0);
+    const rate = parseFloat(lead.residualRate || closer.closerRate || 0);
+    if (!mrr || !rate) return;
+    const now = new Date().toISOString();
+    const rec = {
+      id: uid(), leadId: lead.id, leadName: lead.name, dealValue: mrr, collectedAmount: '',
+      providerId: lead.providerId || '', providerName: S.team.find(m => m.id === lead.providerId)?.name || '',
+      providerRate: 0, providerAmount: 0,
+      closerId: lead.closerId, closerName: closer.name, closerRate: rate,
+      closerAmount: +(mrr * rate / 100).toFixed(2),
+      status: 'pending', paidAt:'', paidBy:'', paymentRef:'', createdAt: now,
+      recurring: true, period,
+    };
+    S.commissions.push(rec);
+    if (S.config.scriptUrl) sheetsCall({action:'saveCommission', ...rec});
+    created++;
+  });
+  if (created) { saveLocal(); renderAll(); }
+  toast(created ? `Generated ${created} residual commission${created !== 1 ? 's' : ''} for ${period}.` : `No new residuals to generate for ${period}.`, created ? 'success' : 'warning');
+  return created;
 }
 
 // ── Partial payments, refunds & clawbacks ──────────────────

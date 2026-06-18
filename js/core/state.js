@@ -3,7 +3,8 @@
 // Central mutable state object — all modules read/write S
 const S = {
   config: {
-    scriptUrl:'',crmSecret:'',companyName:'',bookingUrl:'',
+    scriptUrl:'',crmSecret:'',companyName:'',
+    bookingUrl:'https://cal.com/andrestoro/discovery-call?overlayCalendar=true',
     callScript:'',pitchScript:'',objectionsScript:'',closeScript:'',
     smsEnabled:false,   // texting stays off until A2P 10DLC + consent gate are done
   },
@@ -33,6 +34,7 @@ const S = {
   dialerMode:      false,  // Power Dialer — auto-advance to next lead after saveCallLog
   dialerQueue:     [],     // Ordered lead IDs for the current dialer session
   scheduledJobs:   [],     // Scheduled scrape jobs (synced to GAS Config sheet)
+  stateCampaigns:  [],     // Whole-state grid-tiling scrape campaigns (synced to GAS Config)
   smsTemplates:    [],     // SMS/WhatsApp message templates (stored in localStorage)
   triggerStatus:   { scrape: false, report: false }, // GAS time-trigger state
   isSyncing:       false,  // Sync race guard — true while syncNow() is in flight
