@@ -29,10 +29,21 @@ const CADENCE_STEPS = {
         "Hi, this is {agent} with {company}. Following up on {business} — I can show you concretely what results we'd aim for together. If the timing's off, just say the word and I'll step back.",
       ] },
     ],
+    // The first email elicits a REPLY (not a hard ask); once they reply, the AI
+    // step takes over with the booking link. Steps 2–3 nudge, then bow out.
     email: [
       { variants: [
-        "Hi, I'm {agent} with {company}. I came across {business} in {city} and think we can help you bring in customers more consistently. I'd love to show you exactly what results we could drive together — do you have 15 minutes this week for a quick call?\n\nBest,\n{agent} — {company}",
-        "Hi, this is {agent} with {company}. {business} in {city} stood out to me, and I see a clear way to help you reach more customers consistently. Could I show you what we'd aim for on a short call this week?\n\nBest,\n{agent} — {company}",
+        "Hi — I'm {agent} with {company}. I came across {business} in {city} and put together a couple of specific ideas for bringing you more customers. Worth me sending them over?\n\n{agent}\n{company}",
+        "Hi, this is {agent} at {company}. {business} stood out to me in {city}, and I think there's a clear way to get you in front of more local customers. Is that a priority for you right now?\n\n{agent}\n{company}",
+        "Hi — {agent} here with {company}. Quick question for {business}: if we could bring you a steadier flow of new customers without adding to your plate, would that be worth a short conversation?\n\n{agent}\n{company}",
+      ] },
+      { variants: [
+        "Hi — following up on my note about {business}. We help businesses in {city} turn local interest into booked customers, consistently and without you lifting a finger. Happy to show you exactly how — worth a look?\n\n{agent}\n{company}",
+        "Hi, circling back. The reason I reached out: most businesses in {city} leave easy customers on the table, and it's very fixable. I'd be glad to show you what that looks like for {business}. Open to it?\n\n{agent}\n{company}",
+      ] },
+      { variants: [
+        "Hi — I'll close the loop so I'm not crowding your inbox. If bringing in more customers for {business} ever moves up the list, just reply and I'll pick it right back up. Either way, wishing you a strong season.\n\n{agent}\n{company}",
+        "Hi — last note from me for now; I don't want to be a pest. If you'd ever like to see how we'd bring {business} more customers in {city}, a one-word reply gets us started. All the best.\n\n{agent}\n{company}",
       ] },
     ],
   },
