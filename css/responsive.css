@@ -29,7 +29,7 @@
   .content-area{padding:20px 14px 48px}
   .section-title{font-size:22px}
   .section-sub{margin-bottom:20px}
-  .stats-grid,.stats-grid.col4{grid-template-columns:repeat(2,1fr);gap:10px}
+  .stats-grid,.stats-grid.col4{grid-template-columns:repeat(3,1fr);gap:10px}
   .form-grid,.form-grid.col3{grid-template-columns:1fr}
   .table-wrap{overflow-x:auto}
   /* The leads table has 13 columns — keep it readable and let it scroll; the
