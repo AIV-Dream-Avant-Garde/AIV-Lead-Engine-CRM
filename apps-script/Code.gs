@@ -1001,6 +1001,26 @@ function resendSend_(email, subject, body) {
    ══════════════════════════════════════════════════════════════════════════ */
 
 const CADENCE_STEPS = {
+  // US is the active market — English, email-first. The first email is built to
+  // elicit a REPLY (not a hard ask); once they reply, runAiReplies takes over and
+  // sends the tailored response with the booking link. Steps 2–3 nudge then bow out.
+  'United States': {
+    email: [
+      { variants: [
+        "Hi — I'm {agent} with {company}. I came across {business} in {city} and put together a couple of specific ideas for bringing you more customers. Worth me sending them over?\n\n{agent}\n{company}",
+        "Hi, this is {agent} at {company}. {business} stood out to me in {city}, and I think there's a clear way to get you in front of more local customers. Is that a priority for you right now?\n\n{agent}\n{company}",
+        "Hi — {agent} here with {company}. Quick question for {business}: if we could bring you a steadier flow of new customers without adding to your plate, would that be worth a short conversation?\n\n{agent}\n{company}",
+      ] },
+      { variants: [
+        "Hi — following up on my note about {business}. We help businesses in {city} turn local interest into booked customers, consistently and without you lifting a finger. Happy to show you exactly how — worth a look?\n\n{agent}\n{company}",
+        "Hi, circling back. The reason I reached out: most businesses in {city} leave easy customers on the table, and it's very fixable. I'd be glad to show you what that looks like for {business}. Open to it?\n\n{agent}\n{company}",
+      ] },
+      { variants: [
+        "Hi — I'll close the loop so I'm not crowding your inbox. If bringing in more customers for {business} ever moves up the list, just reply and I'll pick it right back up. Either way, wishing you a strong season.\n\n{agent}\n{company}",
+        "Hi — last note from me for now; I don't want to be a pest. If you'd ever like to see how we'd bring {business} more customers in {city}, a one-word reply gets us started. All the best.\n\n{agent}\n{company}",
+      ] },
+    ],
+  },
   'Colombia': {
     whatsapp: [
       { variants: [
@@ -1108,9 +1128,14 @@ function cadenceSteps(lead) {
 function cadenceRender(body, lead, company, agent) {
   lead = lead || {};
   const map = {
-    negocio: lead.name || '', ciudad: lead.city || '', barrio: lead.barrio || '',
-    categoria: lead.keyword || '', nombre: lead.contactName || lead.name || '',
-    empresa: company || 'AXIUS', agente: agent || '',
+    // Spanish tokens (legacy) + English aliases (current US copy) — same values.
+    negocio: lead.name || '', business: lead.name || '',
+    ciudad: lead.city || '', city: lead.city || '',
+    barrio: lead.barrio || '', neighborhood: lead.barrio || '',
+    categoria: lead.keyword || '', category: lead.keyword || '',
+    nombre: lead.contactName || lead.name || '', name: lead.contactName || lead.name || '',
+    empresa: company || 'AXIUS', company: company || 'AXIUS',
+    agente: agent || '', agent: agent || '',
   };
   return String(body || '')
     .replace(/\{(\w+)\}/g, function(m, k) { return (k in map ? map[k] : ''); })
