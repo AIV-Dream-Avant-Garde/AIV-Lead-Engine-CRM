@@ -95,7 +95,7 @@ function navigate(id) {
 
   const labels = {
     dashboard:'Dashboard',
-    setup:'Setup', scraper:'Scraper', import:'Import', responder:'Respond Now', leads:'Leads',
+    setup:'Settings', scraper:'Scraper', import:'Import CSV', responder:'Reply now', leads:'Leads',
     pipeline:'Pipeline', llamadas:'Calls', export:'Export',
     perfil:'My Profile', admin:'Admin', analytics:'Analytics',
   };
@@ -219,7 +219,7 @@ function showShortcutsModal() {
   // 3. Populate Setup UI
   const cfgUrlEl = document.getElementById('cfg-url');
   if (cfgUrlEl && S.config.scriptUrl) cfgUrlEl.value = S.config.scriptUrl;
-  setSyncUI('', S.config.scriptUrl ? 'Ready to sync' : 'Connect Apps Script in Setup');
+  setSyncUI('', S.config.scriptUrl ? 'Ready to sync' : 'Connect Apps Script in Settings');
 
   const secretEl = document.getElementById('crm-secret-display');
   if (secretEl && S.config.crmSecret) secretEl.textContent = S.config.crmSecret;

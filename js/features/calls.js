@@ -1,26 +1,35 @@
 /* ── FEATURE: Twilio VoIP calls, call widget, call log ───── */
 
 // ── initTwilio — single consolidated handler ───────────────
+// Dedicated Twilio status chip — kept SEPARATE from the Sheets-sync pill so the
+// two don't overwrite each other (the 75s sync poll used to wipe "Twilio ready").
+function setTwilioUI(state, text) {
+  CALL.status = state;
+  document.querySelectorAll('.twilio-status').forEach(el => {
+    el.textContent = text;
+    el.className = 'twilio-status' + (state ? ' ' + state : '');
+  });
+}
+
 async function initTwilio() {
   if (!S.config.scriptUrl) { toast('Configure the Apps Script URL first.', 'error'); return; }
-  setSyncUI('syncing','Connecting Twilio...');
+  setTwilioUI('syncing','Connecting…');
   try {
     const res = await sheetsCall({action:'getToken', identity:'agent'});
     if (!res || !res.token) {
-      setSyncUI('error','Token failed');
-      toast('Failed to get Twilio token. Check the credentials in the Apps Script.', 'error', 5000);
+      setTwilioUI('error','Token failed');
+      toast('Failed to get a Twilio token — check the Twilio keys in Script Properties (ACCOUNT_SID / API_KEY_SID / API_SECRET / TWIML_APP).', 'error', 6000);
       return;
     }
     if (CALL.device) CALL.device.destroy();
     CALL.device = new Twilio.Device(res.token, {logLevel:1, codecPreferences:['opus','pcmu']});
-    // If registration never resolves (SDK/token/network stall), don't leave the
-    // sync dot spinning forever — surface it after 15s.
+    // If registration never resolves (SDK/token/network stall), surface it after 15s.
     let registered = false;
     const regTimeout = setTimeout(() => {
-      if (!registered) { setSyncUI('error','Twilio timeout'); toast('Twilio is taking too long to connect. Check the token/credentials in Apps Script, then retry.', 'error', 6000); }
+      if (!registered) { setTwilioUI('error','Timed out'); toast('Twilio is taking too long to connect. Check the Twilio keys in Script Properties, then retry.', 'error', 6000); }
     }, 15000);
-    CALL.device.on('registered', () => { registered = true; clearTimeout(regTimeout); setSyncUI('ok','Twilio ready'); toast('Twilio connected. You can now make calls from the CRM.', 'success'); });
-    CALL.device.on('error',      err => { clearTimeout(regTimeout); setSyncUI('error','Twilio error'); console.error(err); toast('Twilio error: ' + (err?.message || 'connection problem'), 'error', 6000); });
+    CALL.device.on('registered', () => { registered = true; clearTimeout(regTimeout); setTwilioUI('ok','Connected'); toast('Twilio connected. You can now make calls from the CRM.', 'success'); });
+    CALL.device.on('error',      err => { clearTimeout(regTimeout); setTwilioUI('error','Error'); console.error(err); toast('Twilio error: ' + (err?.message || 'connection problem'), 'error', 6000); });
     // Single incoming handler — both banner + CALL.incomingCall state
     CALL.device.on('incoming', call => {
       CALL.incomingCall = call;
@@ -32,7 +41,7 @@ async function initTwilio() {
     });
     await CALL.device.register();
   } catch(e) {
-    setSyncUI('error','Error');
+    setTwilioUI('error','Error');
     toast('Twilio error: ' + e.message, 'error', 5000);
   }
 }
@@ -44,7 +53,11 @@ function makeCall(leadId) {
   if (l.status === 'Do Not Call')              { toast('This lead has the "Do Not Call" status.', 'error'); return; }
   if (!l.phone || l.phone === 'N/A')         { toast('No phone number.', 'error'); return; }
   if (S.demoMode) { startDemoCall(leadId); return; }
-  if (!CALL.device)                          { toast('Twilio is not connected. Go to Setup → Connect Twilio.', 'error'); return; }
+  if (!CALL.device) {
+    if (S.session?.role === 'admin') { toast('Twilio isn’t connected — opening Settings so you can connect it.', 'error'); navigate('setup'); }
+    else { toast('Twilio isn’t connected. Ask your admin to connect it in Settings.', 'error'); }
+    return;
+  }
 
   // Auto-claim if unclaimed
   if (S.session && !isLockedByMe(l) && !isLockedByOther(l)) {
@@ -409,10 +422,10 @@ function cwTab(tab) {
   }
   const fallbacks = {
     opening:    getCallScript(),
-    pitch:      S.config.pitchScript      || 'No pitch configured. Go to Setup → Script.',
+    pitch:      S.config.pitchScript      || 'No pitch configured. Add one in Settings → call scripts.',
     objections: S.config.objectionsScript || 'No objections configured.',
     close:      S.config.closeScript      || 'No closing script configured.',
-    rebuttals:  'No quick rebuttals configured. Add one in Admin → Scripts.',
+    rebuttals:  'No quick responses configured. Add one in Admin → Call scripts.',
   };
   el.textContent = fallbacks[tab] || '';
 }

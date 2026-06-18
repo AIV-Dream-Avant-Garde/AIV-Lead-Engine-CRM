@@ -79,9 +79,9 @@ const CADENCE_GAP_MS           = CADENCE_STEP_GAP_DAYS * 24 * 3600 * 1000;
 
 const SHEETS = { leads:'Leads', calls:'Llamadas', team:'Team', commissions:'Commissions', scripts:'Scripts', interactions:'Interactions', sequences:'Sequences' };
 
-const LEAD_HDR = ['id','name','phone','address','website','rating','reviews','city','barrio','keyword','source','sourceDetail','status','providerId','providerRate','closerId','closerRate','dealValue','collectedAmount','providerCommission','closerCommission','commissionStatus','lockedBy','lockedUntil','assignedAt','workHistory','dncReason','followUpDate','notes','importedAt','updatedAt','calendarEventId','refundAmount','refundReason','refundedAt','country','email','externalId','lastTouchAt','lastReplyAt','consentSms','consentWhatsapp','consentEmail','lat','lng'];
+const LEAD_HDR = ['id','name','phone','address','website','rating','reviews','city','barrio','keyword','source','sourceDetail','status','providerId','providerRate','closerId','closerRate','dealValue','collectedAmount','providerCommission','closerCommission','commissionStatus','lockedBy','lockedUntil','assignedAt','workHistory','dncReason','followUpDate','notes','importedAt','updatedAt','calendarEventId','refundAmount','refundReason','refundedAt','country','email','externalId','lastTouchAt','lastReplyAt','consentSms','consentWhatsapp','consentEmail','lat','lng','residualActive','residualRate','residualMRR'];
 const CALL_HDR = ['id','leadId','leadName','phone','callSid','outcome','duration','notes','recordingUrl','driveUrl','consentConfirmed','calledAt'];
-const TEAM_HDR = ['id','name','role','pinHash','providerRate','closerRate','contact','active','createdAt'];
+const TEAM_HDR = ['id','name','role','pinHash','providerRate','closerRate','contact','active','createdAt','commissionType'];
 const COMM_HDR   = ['id','leadId','leadName','dealValue','collectedAmount','providerId','providerRate','providerAmount','closerId','closerRate','closerAmount','status','createdAt','paidAt','paidBy','paymentRef','refundReason','adjustedBy','adjustedAt','providerName','closerName','recurring','period'];
 const SCRIPT_HDR = ['id','name','stage','body','createdAt','updatedAt'];
 const INTERACTION_HDR = ['id','leadId','leadName','phone','channel','direction','body','stepTag','status','sid','error','createdAt','createdBy'];
@@ -1307,7 +1307,9 @@ function runAiReplies() {
     'features, or commitments. Plain text only, no subject line, sign off as ' + agent + '.';
 
   let sent = 0, considered = 0;
+  const AI_MAX_PER_RUN = 25;   // cap per hourly run so a reply-storm can't blow the Gemini/Resend quota
   for (const lid of Object.keys(threadOf)) {
+    if (sent >= AI_MAX_PER_RUN) break;
     const lead = leadById[lid]; if (!lead) continue;
     const status = String(lead[stc] || 'New');
     if (status === 'Do Not Call' || status === 'Closed Won' || status === 'Closed Lost') continue;
@@ -1428,9 +1430,15 @@ function runCadence() {
         return;
       }
 
-      const tz = cadenceTz_(lead.country);
-      const localHour = parseInt(Utilities.formatDate(now, tz, 'H'), 10);
-      if (!withinQuietHours(localHour, cfg.quietStart, cfg.quietEnd)) return;   // outside window: skip; re-checked next hourly run
+      const channel = cadenceResolveChannel(lead);
+      // SMS/WhatsApp are parked until A2P is enabled — never send on them, even
+      // if a phone-only lead resolved to that channel. (Email isn't quiet-houred.)
+      if ((channel === 'sms' || channel === 'whatsapp') && !CAD_SMS_ON) return;
+      if (channel !== 'email') {
+        const tz = cadenceTz_(lead.country);
+        const localHour = parseInt(Utilities.formatDate(now, tz, 'H'), 10);
+        if (!withinQuietHours(localHour, cfg.quietStart, cfg.quietEnd)) return;   // outside window: skip; re-checked next hourly run
+      }
 
       const steps = cadenceSteps(lead);
       const stepIndex = Number(seq.stepIndex || 0);
@@ -1439,7 +1447,6 @@ function runCadence() {
         return;
       }
       const stepTag = 'seq:' + stepIndex;
-      const channel = cadenceResolveChannel(lead);
       const body = cadenceMessage(lead, stepIndex, cfg.company, cfg.agentName);
       if (!body) return;
 

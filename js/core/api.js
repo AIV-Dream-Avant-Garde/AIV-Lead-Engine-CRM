@@ -46,7 +46,7 @@ function setLastSynced() {
 }
 
 async function syncNow() {
-  if (!S.config.scriptUrl) { setSyncUI('','Connect Apps Script in Setup'); return; }
+  if (!S.config.scriptUrl) { setSyncUI('','Connect Apps Script in Settings'); return; }
   if (S.isSyncing) return; // prevent concurrent syncs
   S.isSyncing = true;
   const syncBtn = document.getElementById('sync-btn');
