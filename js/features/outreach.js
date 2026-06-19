@@ -328,6 +328,10 @@ function renderCadenceEngine() {
         <span>Send live messages. Unchecked = simulation: logs what it would send without sending anything.</span>
       </label>
       <label style="display:flex;align-items:flex-start;gap:8px;margin-top:8px;font-size:12px;color:var(--hl);cursor:pointer">
+        <input type="checkbox" id="cad-aipersonalize" ${c.aiPersonalize?'checked':''} style="margin-top:2px">
+        <span>AI-personalized first email. Analyze each lead (type, city, ratings) and tailor the opening outreach to lift reply rates. Falls back to the template if AI is unavailable.</span>
+      </label>
+      <label style="display:flex;align-items:flex-start;gap:8px;margin-top:8px;font-size:12px;color:var(--hl);cursor:pointer">
         <input type="checkbox" id="cad-aireplies" ${c.aiReplies?'checked':''} style="margin-top:2px">
         <span>AI auto-replies. When a business replies, draft a tailored response (with your booking link) and send it automatically — looping until they book.</span>
       </label>
@@ -353,6 +357,7 @@ async function saveCadenceConfig() {
     quietEnd:      parseInt(g('cad-qend')?.value),
     postalAddress: g('cad-address')?.value?.trim() || '',
     aiReplies:     !!(g('cad-aireplies') && g('cad-aireplies').checked),
+    aiPersonalize: !!(g('cad-aipersonalize') && g('cad-aipersonalize').checked),
   };
   const res = await sheetsCall({ action:'saveCadenceConfig', config });
   if (res?.success) {

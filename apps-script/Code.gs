@@ -36,6 +36,18 @@ const BOOKING_URL        = PROP_('BOOKING_URL', 'https://cal.com/andrestoro/disc
 const COMPANY_POSTAL_ADDRESS = PROP_('COMPANY_POSTAL_ADDRESS', '');           // CAN-SPAM footer
 const AI_MAX_REPLIES     = 3;     // cap AI back-and-forths per lead (anti-loop)
 
+// Shared positioning brief — fed to the AI personalization + reply prompts so
+// the copy reflects what Axius actually does (from the brand/capability docs).
+const AXIUS_BRIEF = 'Axius is a Technology Ownership Practice: the outsourced technology department for a growing business, ' +
+  'delivered by one accountable operator, plus AI systems and on-demand specialists. Instead of hiring a tech person or ' +
+  'juggling agencies, freelancers and subscriptions, the client gets their whole technology function for one monthly figure ' +
+  '(the entry tier is about $2,500/month, less than a single hire). It covers eight areas: sales and prospecting (lead capture, ' +
+  'follow-up, reactivation); customer experience (support automation, inbox unification); internal operations (cross-tool sync, ' +
+  'document automation); AI implementation (lead scoring, agents, automations); data and analytics (dashboards, reporting); ' +
+  'web and storefront (websites, e-commerce); custom software (internal tools, integrations); and finance/back-office ' +
+  '(invoicing, reconciliation). Everything stays in the client\'s own accounts, so they are never locked in. ' +
+  'Tagline: run your business, not your technology.';
+
 // ── ONE-TIME SETUP ───────────────────────────────────────────────────────────
 // Fill your real values below and Run this once (Run ▸ seedProperties). It writes
 // them to Script properties, which survive every future redeploy. Leave a value
@@ -467,6 +479,7 @@ function doPost(e) {
         postalAddress: String(c.postalAddress || '').slice(0, 200),
         smsEnabled: c.smsEnabled === true,
         aiReplies:  c.aiReplies === true,
+        aiPersonalize: c.aiPersonalize === true,
       };
       cfgSet('cadenceConfig', JSON.stringify(clean));
       return ok({ saved:true, config: getCadenceCfg_() });
@@ -1211,6 +1224,7 @@ function getCadenceCfg_() {
     postalAddress: s.postalAddress || COMPANY_POSTAL_ADDRESS,
     smsEnabled: typeof s.smsEnabled === 'boolean' ? s.smsEnabled : false,
     aiReplies:  typeof s.aiReplies  === 'boolean' ? s.aiReplies  : false,
+    aiPersonalize: typeof s.aiPersonalize === 'boolean' ? s.aiPersonalize : false,
   };
 }
 
@@ -1295,6 +1309,36 @@ function geminiGenerate_(system, prompt) {
   } catch (e) { Logger.log('geminiGenerate_ error: ' + e.message); return ''; }
 }
 
+// AI-personalized FIRST email: analyzes the lead (type, city, rating/reviews) and
+// tailors the opener + which of our disciplines to emphasize, to lift reply rates.
+// Returns '' on any failure so the caller falls back to the deterministic template.
+function geminiPersonalizeEmail_(lead, cfg) {
+  lead = lead || {};
+  const agent = (cfg && cfg.agentName) || CADENCE_AGENT_NAME || 'Andres';
+  const company = (cfg && cfg.company) || CADENCE_COMPANY || 'Axius';
+  const facts = [];
+  if (lead.name) facts.push('Business name: ' + lead.name);
+  if (lead.keyword) facts.push('Business type: ' + lead.keyword);
+  if (lead.city) facts.push('Location: ' + lead.city + (lead.barrio ? ', ' + lead.barrio : ''));
+  if (lead.rating && String(lead.rating) !== 'N/A') {
+    facts.push('Google rating: ' + lead.rating + (lead.reviews && String(lead.reviews) !== 'N/A' ? ' (' + lead.reviews + ' reviews)' : ''));
+  }
+  if (lead.website && String(lead.website) !== 'N/A') facts.push('Has a website: ' + lead.website);
+  if (!facts.length) return '';   // nothing to personalize on — use the template
+
+  const system = 'You are ' + agent + ', the operator behind ' + company + '. ' + AXIUS_BRIEF + ' ' +
+    'Write the FIRST cold email to this business owner. Goal: a relevant, human note that earns a reply. ' +
+    'Think about what a business of this type in this place actually needs, then pick the ONE or TWO of our areas that fit ' +
+    'best and weave them in naturally. Do NOT list all eight areas or name any framework. You may reference ONLY the facts ' +
+    'below (their type, city, rating/reviews); do NOT invent specifics, owner names, numbers, pricing, or claims you cannot know. ' +
+    'WRITE LIKE A REAL PERSON, not AI: no em dashes at all, no "I hope this finds you well", no rule-of-three lists, no buzzwords, ' +
+    'no over-polished symmetry. Use contractions. Vary sentence length. Keep it 45 to 85 words. ' +
+    'End with a short, low-friction question that invites a reply (not a hard ask, and NO booking link). ' +
+    'Plain text, no subject line. Sign off on two lines: ' + agent + ', then ' + company + '.';
+  const prompt = 'Facts you may use:\n' + facts.join('\n') + '\n\nWrite the email now.';
+  return geminiGenerate_(system, prompt);
+}
+
 // When a business replies, draft a tailored response (addressing what they said)
 // with the Cal booking link and send it — automatically, looping until they book,
 // opt out, a human takes over, or the per-lead cap is hit. Reply-gated + capped.
@@ -1325,12 +1369,8 @@ function runAiReplies() {
   Object.keys(threadOf).forEach(function(k){ threadOf[k].sort(function(a,b){ return new Date(a[ca]) - new Date(b[ca]); }); });
 
   const company = cfg.company, agent = cfg.agentName;
-  const system = 'You are ' + agent + ', the named operator behind ' + company +
-    ', a Technology Ownership Practice. ' + company + ' becomes the single accountable owner of the technology that ' +
-    'runs a business (its systems, software, automations, data, and vendors). The pitch: instead of hiring a tech person ' +
-    'or juggling agencies, freelancers and subscriptions, you get your entire technology team in one place. One operator, ' +
-    'AI systems, and specialists on demand, for one monthly figure that typically costs less than a single full-time hire. ' +
-    'One contact, one bill, and everything stays in the client\'s own accounts so they are never locked in. ' +
+  const system = 'You are ' + agent + ', the named operator behind ' + company + '. ' + AXIUS_BRIEF + ' ' +
+    'When relevant, you can speak to the specific areas that fit their business, but keep it natural and never list them all. ' +
     'You are replying to a business owner who answered a cold email. Goal: get them to book a short call. ' +
     'If they ask about price, do NOT quote a number; say it depends on what they need and that you\'ll scope it on the call. ' +
     'WRITE LIKE A REAL PERSON typing a quick email, NOT like AI. Hard rules: do NOT use em dashes (—) at all; use periods, ' +
@@ -1482,8 +1522,13 @@ function runCadence() {
         return;
       }
       const stepTag = 'seq:' + stepIndex;
-      const body = cadenceMessage(lead, stepIndex, cfg.company, cfg.agentName);
+      let body = cadenceMessage(lead, stepIndex, cfg.company, cfg.agentName);
       if (!body) return;
+      // AI personalization: tailor the FIRST email to this specific lead to lift
+      // replies. Falls back to the template body if Gemini is off/unavailable.
+      if (cfg.aiPersonalize && channel === 'email' && stepIndex === 0) {
+        try { const p = geminiPersonalizeEmail_(lead, cfg); if (p) body = p; } catch (e) { Logger.log('personalize error: ' + e.message); }
+      }
 
       // Idempotency: already really sent this step → just advance.
       if (alreadySent(interactions, lead.id, stepTag)) {
