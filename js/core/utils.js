@@ -14,8 +14,14 @@ function esc(s) {
 }
 
 function fmtD(iso) {
-  try { return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'2-digit'}); }
-  catch(e) { return iso || '--'; }
+  try {
+    const d = new Date(iso);
+    // Show the year only when it isn't the current year, so a financial ledger
+    // isn't ambiguous across year boundaries ("Jun 19" vs "Jun 19, 2025").
+    const opts = {month:'short', day:'2-digit'};
+    if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+    return d.toLocaleDateString('en-US', opts);
+  } catch(e) { return iso || '--'; }
 }
 
 function fmtT(iso) {

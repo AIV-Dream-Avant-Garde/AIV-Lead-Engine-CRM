@@ -1,5 +1,20 @@
 /* ── FEATURE: Leads table, modal, CRUD ───────────────────── */
 
+// ── Modal focus management (a11y) ─────────────────────────
+// Move focus into a modal on open, and restore it to the trigger on close, so
+// keyboard / screen-reader users aren't stranded behind the dialog.
+var _modalReturnFocus = null;
+function focusIntoModal(modalEl) {
+  _modalReturnFocus = document.activeElement;
+  if (!modalEl) return;
+  const t = modalEl.querySelector('.modal-close, input, select, textarea, button, [href]');
+  if (t) setTimeout(() => { try { t.focus(); } catch(e) {} }, 30);
+}
+function restoreModalFocus() {
+  if (_modalReturnFocus && typeof _modalReturnFocus.focus === 'function') { try { _modalReturnFocus.focus(); } catch(e) {} }
+  _modalReturnFocus = null;
+}
+
 // ── Manual add lead (single-lead entry) ───────────────────
 function openAddLead() {
   ['al-name','al-phone','al-email','al-website','al-city','al-notes'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
@@ -486,6 +501,7 @@ function openLead(id) {
   auditLog('viewLead', id, l.name);
 
   document.getElementById('modal').classList.add('open');
+  focusIntoModal(document.getElementById('modal'));
 }
 
 function renderModalNotes(l) {
@@ -495,7 +511,7 @@ function renderModalNotes(l) {
         `<div class="note-item">
           <div class="note-date">${fmtD(n.date)} ${fmtT(n.date)}</div>
           <div class="note-text">${esc(n.text)}</div>
-          <button class="note-del" onclick="delNote(${i})" title="Delete">&times;</button>
+          <button class="note-del" onclick="delNote(${i})" title="Delete note" aria-label="Delete note">&times;</button>
         </div>`).join('')
     : '<div class="notes-empty">No notes yet.</div>';
 }
@@ -587,6 +603,7 @@ function renderLeadTimeline(l) {
 function closeModal() {
   document.getElementById('modal').classList.remove('open');
   S.curLeadId = null;
+  restoreModalFocus();
 }
 
 function onModalStatusChange() {
