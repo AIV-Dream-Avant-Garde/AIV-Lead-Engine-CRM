@@ -31,6 +31,19 @@
   .section-sub{margin-bottom:20px}
   .stats-grid,.stats-grid.col4{grid-template-columns:repeat(3,1fr);gap:10px}
   .form-grid,.form-grid.col3{grid-template-columns:1fr}
+
+  /* Floating cards (team member add/edit, deal value) are fixed-width on desktop
+     and overflow a phone — constrain them like .modal does. */
+  .tm-modal-card,.deal-card{width:calc(100vw - 24px) !important;max-width:440px}
+  .shortcuts-modal{left:12px;right:12px;min-width:0}
+
+  /* iOS Safari zooms the page when focusing an input under 16px. Bump every form
+     control to 16px on touch so focusing a field never yanks the viewport. */
+  input,select,textarea,.search-box input,.filter-sel{font-size:16px}
+
+  /* Keep the primary nav toggle + theme toggle at a comfortable tap size. */
+  .mobile-menu-btn{width:40px;height:40px}
+  .theme-toggle{min-width:40px;min-height:40px}
   .table-wrap{overflow-x:auto}
   /* The leads table has 13 columns — keep it readable and let it scroll; the
      smaller analytics/team tables can pack tighter. */

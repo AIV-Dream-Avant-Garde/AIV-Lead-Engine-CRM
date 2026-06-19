@@ -567,7 +567,7 @@ function doPost(e) {
         apiCalls++;
         const d=JSON.parse(r.getContentText());
         if(d.error)return err_(d.error.message);
-        (d.places||[]).forEach(p=>{ if(leads.length<maxResults)leads.push({name:p.displayName?.text||'N/A',phone:p.nationalPhoneNumber||'N/A',address:p.formattedAddress||'N/A',website:p.websiteUri||'N/A',rating:p.rating||'N/A',reviews:p.userRatingCount||'N/A',neighborhood:comp_(p,['neighborhood','sublocality','sublocality_level_1']),cityReal:comp_(p,['locality','postal_town']),lat:p.location?.latitude??'',lng:p.location?.longitude??''}); });
+        (d.places||[]).forEach(p=>{ if(leads.length<(maxResults||100))leads.push({name:p.displayName?.text||'N/A',phone:p.nationalPhoneNumber||'N/A',address:p.formattedAddress||'N/A',website:p.websiteUri||'N/A',rating:p.rating||'N/A',reviews:p.userRatingCount||'N/A',neighborhood:comp_(p,['neighborhood','sublocality','sublocality_level_1']),cityReal:comp_(p,['locality','postal_town']),lat:p.location?.latitude??'',lng:p.location?.longitude??''}); });
         token=d.nextPageToken; tries++;
         if(!token)break;
         Utilities.sleep(2000);
