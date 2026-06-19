@@ -506,7 +506,20 @@ function doPost(e) {
       return ok({saved:true});
     }
     if (a === 'saveStateCampaigns') {
-      cfgSet('stateCampaigns', JSON.stringify(b.data || []));
+      // Merge by id so a client save (pause/resume/launch/delete) can't clobber the
+      // progress fields the server advances as it scrapes. Client owns active/dailyCap
+      // + which campaigns exist; server owns cursor/leadsFound/passAdded/exhausted/dead.
+      let cur = []; try { cur = JSON.parse(cfgGet('stateCampaigns') || '[]'); } catch(e) {}
+      const curById = {}; cur.forEach(function(c){ if (c && c.id) curById[c.id] = c; });
+      const SERVER_FIELDS = ['cursor','leadsFound','passAdded','exhausted','dead','deadCheckedAt','lastRunAt'];
+      const merged = (b.data || []).map(function(c){
+        const s = curById[c.id];
+        if (!s) return c;
+        const out = Object.assign({}, c);
+        SERVER_FIELDS.forEach(function(f){ if (s[f] !== undefined) out[f] = s[f]; });
+        return out;
+      });
+      cfgSet('stateCampaigns', JSON.stringify(merged));
       return ok({saved:true});
     }
     if (a === 'runScrapesNow') {
@@ -1056,11 +1069,15 @@ function emailFooter_() {
     '\nTo unsubscribe, reply STOP to this message.';
 }
 // Resend email. Returns {sid,status} on success, {error} on failure.
-function resendSend_(email, subject, body) {
+function resendSend_(email, subject, body, opts) {
+  opts = opts || {};
+  const payload = { from: RESEND_FROM, to: [email], reply_to: REPLY_TO_EMAIL, subject: subject || 'AXIUS', text: String(body || '') + emailFooter_() };
+  // Thread a reply under the recipient's email (In-Reply-To / References headers).
+  if (opts.inReplyTo) payload.headers = { 'In-Reply-To': opts.inReplyTo, 'References': opts.references || opts.inReplyTo };
   const res = UrlFetchApp.fetch('https://api.resend.com/emails', {
     method:'post', contentType:'application/json',
     headers:{ Authorization:'Bearer ' + RESEND_API_KEY },
-    payload: JSON.stringify({ from: RESEND_FROM, to: [email], reply_to: REPLY_TO_EMAIL, subject: subject || 'AXIUS', text: String(body || '') + emailFooter_() }),
+    payload: JSON.stringify(payload),
     muteHttpExceptions:true,
   });
   const d = JSON.parse(res.getContentText() || '{}');
@@ -1425,7 +1442,7 @@ function runAiReplies() {
   const is = getSheet(SHEETS.interactions, INTERACTION_HDR);
   const iRows = is.getDataRange().getValues(), ih = iRows[0] || INTERACTION_HDR;
   const di=ih.indexOf('direction'), bo=ih.indexOf('body'), li=ih.indexOf('leadId'),
-        ca=ih.indexOf('createdAt'), tg=ih.indexOf('stepTag'), sd=ih.indexOf('sid'), cb=ih.indexOf('createdBy');
+        ca=ih.indexOf('createdAt'), tg=ih.indexOf('stepTag'), sd=ih.indexOf('sid'), cb=ih.indexOf('createdBy'), chc=ih.indexOf('channel');
   const threadOf = {};
   for (let i = 1; i < iRows.length; i++) {
     const lid = String(iRows[i][li] || ''); if (!lid) continue;
@@ -1477,7 +1494,23 @@ function runAiReplies() {
 
     const nowIso = new Date().toISOString();
     if (live) {
-      const r = resendSend_(email, 'Re: quick question for ' + String(lead[nc] || 'your team'), draft);
+      // Thread under their reply: pull the inbound email's Message-ID + subject so
+      // our response lands in the same conversation (best-effort; falls back to a
+      // fresh email if the source message can't be read).
+      let subject = 'Re: quick question for ' + String(lead[nc] || 'your team');
+      let threadOpts = {};
+      if (chc < 0 || String(last[chc]) === 'email') {
+        try {
+          const gmsg = GmailApp.getMessageById(inboundSid);
+          if (gmsg) {
+            const subj = gmsg.getSubject() || '';
+            if (subj) subject = /^re:/i.test(subj) ? subj : ('Re: ' + subj);
+            const mid = (gmsg.getRawContent().match(/^message-id:\s*(<[^>]+>)/im) || [])[1];
+            if (mid) threadOpts = { inReplyTo: mid, references: mid };
+          }
+        } catch (e) { /* not a Gmail message / no access — send fresh */ }
+      }
+      const r = resendSend_(email, subject, draft, threadOpts);
       appendInteraction_({ id:Utilities.getUuid(), leadId:lid, leadName:lead[nc], phone:'',
         channel:'email', direction:'out', body:draft, stepTag:dedupeTag,
         status: r.sid ? 'sent' : 'error', sid:r.sid || '', error:r.error || '',
