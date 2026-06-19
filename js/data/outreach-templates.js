@@ -1,23 +1,22 @@
 /* ── DATA: Seed outreach templates, by country × channel ──────────────────
-   VOICE (non-negotiable): confident, capable, genuinely in the lead's best
-   interest. Sincere but never weak; respectful but never subservient;
-   assured but never pushy. No pleading, no apologizing for reaching out,
-   NO emojis. Every message must make the reader feel both that we act in
-   their interest AND that what we offer is strong and worth its weight.
+   VOICE (non-negotiable): editorial, restrained, declarative, second person.
+   Axius is a Technology Ownership Practice, one accountable owner for the
+   technology behind a business, NOT an agency or lead-gen. Lead with value,
+   never price. No hype, no buzzwords, NO em dashes, NO emojis, no pleading.
    Tokens: {business} {city} {neighborhood} {category} {name} {company} {agent}.
    Edit/extend these in the SMS-template admin UI; keep them on-voice.        */
 
 const OUTREACH_TEMPLATES = {
-  'United States': {  // SMS — brief, respectful, one clear ask
+  'United States': {  // SMS — brief, on-brand, one clear ask
     sms: [
       { name: 'First touch', body:
-        "Hi, this is {agent} with {company}. I came across {business} in {city} — impressive work. We help businesses like yours bring in customers consistently, and I think we'd add real value. Open to a quick chat?" },
+        "Hi, this is {agent} with {company}. Quick one about {business}: who runs the tech behind it, the software, automations and vendors? Usually it's no one, or you. We take that over and run it as one operation, for less than a hire. Open to a short call?" },
       { name: 'Follow-up (value)', body:
-        "Hi, {agent} from {company} again. What we do fits a {category} like {business} well — happy to show you exactly what results we could drive. If now isn't the time, no problem at all." },
+        "Hi, {agent} from {company} again. Everything we run stays in your accounts, so you're never locked in, and it usually costs less than what you already spend across tools. Happy to show what we'd cover for {business}. If now isn't the time, no problem." },
     ],
     email: [
       { name: 'First touch (email)', body:
-        "Hi, I'm {agent} with {company}. I came across {business} in {city} and think we can help you bring in customers more consistently. I'd love to show you exactly what results we could drive together — do you have 15 minutes this week for a quick call?\n\nBest,\n{agent} — {company}" },
+        "Hi, I'm {agent} with {company}. Who owns the technology behind {business}, the software, automations and vendors? For most owners it's no one, or themselves on top of everything. That's what we do. We become the technology function behind a business for one monthly figure that lands under a single hire. Want me to show you what that would cover for {business}?\n\n{agent}\n{company}" },
     ],
   },
 };

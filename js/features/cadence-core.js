@@ -20,13 +20,13 @@ const CADENCE_STEPS = {
   'United States': {      // SMS — brief, respectful, one clear ask
     sms: [
       { variants: [
-        "Hi, this is {agent} with {company}. I came across {business} in {city} — impressive work. We help businesses like yours bring in customers consistently, and I think we'd add real value. Open to a quick chat?",
-        "Hi, {agent} from {company} here. {business} in {city} caught my eye — you're clearly doing things right. We help businesses like yours win customers more consistently, and I think there's a real fit. Worth a quick chat?",
-        "Hello, this is {agent} with {company}. I noticed {business} in {city} and wanted to reach out directly: what we do fits a {category} like yours well for bringing in more customers. Open to a short conversation?",
+        "Hi, this is {agent} with {company}. Quick one about {business}: who runs the tech behind it, the software, automations and vendors? Usually it's no one, or you. We take that over and run it as one operation, for less than a hire. Open to a short call?",
+        "Hi, {agent} from {company}. Most owners run {business} on a handful of tools and whoever set them up. We become the one accountable owner for all of it, one monthly figure, less than a hire. Worth a quick chat?",
+        "Hello, this is {agent} with {company}. We run the whole technology side for a {category} like {business}, the software, automations, data and vendors, so you stop holding it together. One owner, one figure. Open to a short conversation?",
       ] },
       { variants: [
-        "Hi, {agent} from {company} again. What we do fits a {category} like {business} well — happy to show you exactly what results we could drive. If now isn't the time, no problem at all.",
-        "Hi, this is {agent} with {company}. Following up on {business} — I can show you concretely what results we'd aim for together. If the timing's off, just say the word and I'll step back.",
+        "Hi, {agent} from {company} again. Everything we run stays in your accounts, so you're never locked in, and it usually costs less than what you already spend across tools. Happy to show what we'd cover for {business}. If now isn't the time, no problem.",
+        "Hi, this is {agent} with {company}. Following up on {business}. I can show you what running your tech as one operation would cover, and roughly what it'd cost. If the timing's off, just say the word and I'll step back.",
       ] },
     ],
     // The first email elicits a REPLY (not a hard ask); once they reply, the AI

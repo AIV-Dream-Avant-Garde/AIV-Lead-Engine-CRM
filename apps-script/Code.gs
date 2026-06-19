@@ -1177,6 +1177,17 @@ const CADENCE_STEPS = {
   // elicit a REPLY (not a hard ask); once they reply, runAiReplies takes over and
   // sends the tailored response with the booking link. Steps 2–3 nudge then bow out.
   'United States': {
+    sms: [
+      { variants: [
+        "Hi, this is {agent} with {company}. Quick one about {business}: who runs the tech behind it, the software, automations and vendors? Usually it's no one, or you. We take that over and run it as one operation, for less than a hire. Open to a short call?",
+        "Hi, {agent} from {company}. Most owners run {business} on a handful of tools and whoever set them up. We become the one accountable owner for all of it, one monthly figure, less than a hire. Worth a quick chat?",
+        "Hello, this is {agent} with {company}. We run the whole technology side for a {category} like {business}, the software, automations, data and vendors, so you stop holding it together. One owner, one figure. Open to a short conversation?",
+      ] },
+      { variants: [
+        "Hi, {agent} from {company} again. Everything we run stays in your accounts, so you're never locked in, and it usually costs less than what you already spend across tools. Happy to show what we'd cover for {business}. If now isn't the time, no problem.",
+        "Hi, this is {agent} with {company}. Following up on {business}. I can show you what running your tech as one operation would cover, and roughly what it'd cost. If the timing's off, just say the word and I'll step back.",
+      ] },
+    ],
     email: [
       { variants: [
         "Hi there. A question most owners can't answer cleanly: who owns the technology behind {business}? The software, the automations, the data, the vendors. Usually it's no one, or it's you on top of running the place. That's what we do. Axius becomes the technology function behind a business, so the owner stops being the one holding it together. One person accountable, not an agency to manage. Curious what that would look like for {business}?\n\n{agent}\n{company}",
@@ -1209,25 +1220,6 @@ const CADENCE_STEPS = {
       { variants: [
         'Hola, soy {agente} de {empresa}. Vi el trabajo de {negocio} en {ciudad} y creo que podemos ayudarles a atraer clientes de forma más constante. Me encantaría mostrarles, en concreto, qué resultados podríamos lograr juntos. ¿Tienen 15 minutos esta semana para una llamada corta?\n\nUn saludo,\n{agente} — {empresa}',
         'Hola, le escribe {agente} de {empresa}. Conocí {negocio} en {ciudad} y veo una oportunidad clara para que lleguen a más clientes de manera constante. Con gusto les muestro en una llamada corta qué podríamos lograr juntos. ¿Les viene bien esta semana?\n\nUn saludo,\n{agente} — {empresa}',
-      ] },
-    ],
-  },
-  'Estados Unidos': {
-    sms: [
-      { variants: [
-        "Hi, this is {agente} with {empresa}. I came across {negocio} in {ciudad} — impressive work. We help businesses like yours bring in customers consistently, and I think we'd add real value. Open to a quick chat?",
-        "Hi, {agente} from {empresa} here. {negocio} in {ciudad} caught my eye — you're clearly doing things right. We help businesses like yours win customers more consistently, and I think there's a real fit. Worth a quick chat?",
-        "Hello, this is {agente} with {empresa}. I noticed {negocio} in {ciudad} and wanted to reach out directly: what we do fits a {categoria} like yours well for bringing in more customers. Open to a short conversation?",
-      ] },
-      { variants: [
-        "Hi, {agente} from {empresa} again. What we do fits a {categoria} like {negocio} well — happy to show you exactly what results we could drive. If now isn't the time, no problem at all.",
-        "Hi, this is {agente} with {empresa}. Following up on {negocio} — I can show you concretely what results we'd aim for together. If the timing's off, just say the word and I'll step back.",
-      ] },
-    ],
-    email: [
-      { variants: [
-        "Hi, I'm {agente} with {empresa}. I came across {negocio} in {ciudad} and think we can help you bring in customers more consistently. I'd love to show you exactly what results we could drive together — do you have 15 minutes this week for a quick call?\n\nBest,\n{agente} — {empresa}",
-        "Hi, this is {agente} with {empresa}. {negocio} in {ciudad} stood out to me, and I see a clear way to help you reach more customers consistently. Could I show you what we'd aim for on a short call this week?\n\nBest,\n{agente} — {empresa}",
       ] },
     ],
   },
@@ -1294,7 +1286,7 @@ function cadenceJitterMinutes(leadId, maxMinutes) {
 function cadenceSteps(lead) {
   const ch = cadenceResolveChannel(lead);
   if (!ch) return [];
-  const country = (lead && CADENCE_STEPS[lead.country]) ? lead.country : (ch === 'sms' ? 'Estados Unidos' : 'Colombia');
+  const country = (lead && CADENCE_STEPS[lead.country]) ? lead.country : (ch === 'whatsapp' ? 'Colombia' : 'United States');
   return (CADENCE_STEPS[country] || {})[ch] || [];
 }
 function cadenceRender(body, lead, company, agent) {
@@ -1350,7 +1342,7 @@ function cadenceToE164_(phone, country) {
   const raw = String(phone || '').replace(/[^\d+]/g, ''); if (!raw) return '';
   if (raw[0] === '+') { const d = raw.slice(1).replace(/\D/g, ''); return d.length >= 8 ? '+' + d : ''; }
   const digits = raw.replace(/\D/g, ''); if (!digits) return '';
-  const dial = { 'Colombia':'57', 'Estados Unidos':'1' }[country] || '';
+  const dial = { 'Colombia':'57', 'Estados Unidos':'1', 'United States':'1', 'USA':'1' }[country] || '';
   if (dial && digits.indexOf(dial) === 0 && digits.length >= 11) return '+' + digits;
   return dial ? '+' + dial + digits : '+' + digits;
 }

@@ -267,7 +267,7 @@ test('cadenceJitterMinutes: deterministic, within bound', () => {
 test('cadenceMessage: renders an on-voice, token-filled, emoji-free message', () => {
   const lead = {id:'L1', country:'United States', phone:'3055550199', name:'Brickell Coffee', city:'Miami', keyword:'Cafe'};
   const msg = cadenceMessage(lead, 0, 'AXIUS', 'Andres');
-  assert(msg.includes('Brickell Coffee') && msg.includes('Miami'), 'tokens filled');
+  assert(msg.includes('Brickell Coffee'), 'business token filled');
   assert(msg.includes('AXIUS') && msg.includes('Andres'), 'company + agent filled');
   assert(!msg.includes('{'), 'no leftover tokens');
   assert(!/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(msg), 'no emoji');
