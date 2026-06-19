@@ -172,7 +172,7 @@ function confirmCerradoWithValue(leadId, dealValue) {
   };
   S.commissions.push(commRec);
   saveLocal();
-  if (S.config.scriptUrl) sheetsCall({action:'saveCommission', ...commRec});
+  bgSave({action:'saveCommission', ...commRec}, 'Commission');
   toast(isResidual ? 'Deal closed — first month’s residual recorded' : 'Deal closed — commission recorded', 'success');
   closeModal();
   renderAll();

@@ -20,6 +20,17 @@ async function sheetsCall(params) {
   }
 }
 
+// Fire a backend save the user expects to persist, and surface a failure. These
+// writes used to be silent — a rejected save would quietly vanish on the next
+// pull (which overwrites local team/commissions/etc. from the server). The local
+// copy is already saved, so this just tells the user to retry.
+function bgSave(params, label) {
+  if (!S.config.scriptUrl) return;            // local-only mode — nothing to sync to
+  Promise.resolve(sheetsCall(params)).then(res => {
+    if (!res || !res.success) toast((label || 'Change') + " didn't save to the server. Check your connection and try again.", 'error', 6000);
+  }).catch(() => toast((label || 'Change') + " didn't save to the server. Check your connection and try again.", 'error', 6000));
+}
+
 function setSyncUI(state, text) {
   document.getElementById('sync-dot').className = 'sync-dot' + (state ? ' ' + state : '');
   document.getElementById('sync-text').textContent = text;

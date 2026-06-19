@@ -204,7 +204,7 @@ async function saveTeamMember() {
   else           S.team.push(member);
 
   saveLocal();
-  if (S.config.scriptUrl) sheetsCall({action:'saveTeamMember', ...member});
+  bgSave({action:'saveTeamMember', ...member}, 'Team member');
   auditLog(isNew ? 'createTeamMember' : 'updateTeamMember', id, name + ' role=' + role);
   closeTeamModal();
   renderAdmin();
@@ -217,7 +217,7 @@ function toggleTeamActive(memberId) {
   const newActive = !(String(m.active) !== 'false');
   m.active = newActive;
   saveLocal();
-  if (S.config.scriptUrl) sheetsCall({action:'saveTeamMember', ...m});
+  bgSave({action:'saveTeamMember', ...m}, 'Team member');
   auditLog(newActive ? 'activateTeamMember' : 'deactivateTeamMember', memberId, m.name);
   renderAdmin();
 }
@@ -256,7 +256,7 @@ async function markCommissionPaid(commId) {
   comm.paidBy     = S.session?.userName || '';
   comm.paymentRef = ref;
   saveLocal();
-  if (S.config.scriptUrl) sheetsCall({action:'markCommissionPaid', id:commId, paidBy:comm.paidBy, paymentRef:ref});
+  bgSave({action:'markCommissionPaid', id:commId, paidBy:comm.paidBy, paymentRef:ref}, 'Payment');
   auditLog('markCommissionPaid', commId, ref);
   toast('Commission marked as paid', 'success');
   renderAdmin();
@@ -576,7 +576,7 @@ function saveScript() {
   if (idx >= 0) S.scripts[idx] = sc;
   else          { if (!Array.isArray(S.scripts)) S.scripts = []; S.scripts.push(sc); }
   saveLocal();
-  if (S.config.scriptUrl) sheetsCall({action:'saveScript', ...sc});
+  bgSave({action:'saveScript', ...sc}, 'Script');
   closeScriptModal();
   renderScripts();
 }
