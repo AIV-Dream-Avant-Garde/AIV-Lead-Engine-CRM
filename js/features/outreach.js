@@ -210,13 +210,20 @@ function insertBookingLink() {
 async function sendComposer() {
   const lead = S.leads.find(l => l.id === S.curLeadId);
   if (!lead) return;
+  const sendBtn = document.getElementById('msg-send-btn');
+  if (sendBtn && sendBtn.disabled) return;                 // a send is already in flight
   const body = document.getElementById('msg-body')?.value || '';
   const subject = document.getElementById('msg-subject')?.value || '';
-  await sendMessage(lead, body, { channel: _composerChannel(), subject });
-  const b = document.getElementById('msg-body'); if (b) b.value = '';
-  renderMsgPreview();
-  if (typeof renderLeadTimeline === 'function') renderLeadTimeline(lead);
-  switchModalTab('timeline');
+  if (sendBtn) { sendBtn.disabled = true; sendBtn.setAttribute('aria-busy', 'true'); }
+  try {
+    await sendMessage(lead, body, { channel: _composerChannel(), subject });
+    const b = document.getElementById('msg-body'); if (b) b.value = '';
+    renderMsgPreview();
+    if (typeof renderLeadTimeline === 'function') renderLeadTimeline(lead);
+    switchModalTab('timeline');
+  } finally {
+    if (sendBtn) { sendBtn.disabled = false; sendBtn.removeAttribute('aria-busy'); }
+  }
 }
 
 // ── Cadence (Sequences) — control surface for the CRM-native engine ──────

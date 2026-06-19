@@ -346,6 +346,7 @@ async function runScraper() {
     renderAll();
   } catch(ex) {
     if (statusEl) statusEl.textContent = 'Error: ' + ex.message;
+    toast('Scrape failed: ' + ex.message, 'error', 5000);
   }
   scraperRunning = false;
   if (btn) { btn.disabled = false; btn.textContent = 'Start scrape via Apps Script'; }

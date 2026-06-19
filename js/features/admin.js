@@ -248,6 +248,7 @@ function forceReleaseLead(leadId) {
 async function markCommissionPaid(commId) {
   const ref = prompt('Payment reference (e.g., transfer #123, cash, bank):');
   if (ref === null) return;
+  if (!String(ref).trim()) { toast('A payment reference is required to mark a commission paid.', 'error'); return; }
   const comm = S.commissions.find(c => c.id === commId);
   if (!comm) return;
   comm.status     = 'paid';
@@ -741,7 +742,7 @@ function renderAdmin() {
   // DNC registry
   const dncLeads = S.leads.filter(l => l.status === 'Do Not Call');
   const dncCount = document.getElementById('admin-dnc-count');
-  if (dncCount) dncCount.textContent = dncLeads.length + ' registro' + (dncLeads.length !== 1 ? 's' : '');
+  if (dncCount) dncCount.textContent = dncLeads.length + ' lead' + (dncLeads.length !== 1 ? 's' : '');
   const dncWrap = document.getElementById('admin-dnc-list');
   if (dncWrap) {
     dncWrap.innerHTML = dncLeads.length

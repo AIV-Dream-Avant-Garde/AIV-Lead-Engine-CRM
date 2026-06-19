@@ -7,6 +7,7 @@ var sessionTimer        = null;
 var sessionWarningTimer = null;
 var loginMode      = 'pin';   // 'pin' (reps + legacy admin) | 'admin' (two-gate server login)
 var adminGate1     = '';      // first gate's digits while collecting the second
+var adminVerifying = false;   // true while an admin gate code is being checked server-side
 
 // ── SHA-256 via WebCrypto ──────────────────────────────────
 async function sha256(s) {
@@ -16,7 +17,8 @@ async function sha256(s) {
 
 // ── PIN numpad ─────────────────────────────────────────────
 function pinKey(k) {
-  if (Date.now() < pinLockedUntil) return;
+  if (adminVerifying) return;                                  // a gate code is mid-check
+  if (loginMode !== 'admin' && Date.now() < pinLockedUntil) return;  // PIN lockout is PIN-mode only
   if (pinBuffer.length >= 4) return;
   pinBuffer += k;
   updatePinDots();
@@ -27,7 +29,11 @@ function pinKey(k) {
 function toggleAdminMode() { loginMode === 'admin' ? exitAdminMode() : enterAdminMode(); }
 
 function enterAdminMode() {
-  loginMode = 'admin'; adminGate1 = ''; pinBuffer = ''; updatePinDots();
+  loginMode = 'admin'; adminGate1 = ''; pinBuffer = ''; adminVerifying = false; updatePinDots();
+  // Clear any PIN-mode lockout chrome so the gate is usable even right after a
+  // failed-PIN lockout (the admin gate has its own server-side lockout).
+  const np = document.querySelector('.numpad'); if (np) np.style.opacity = '1';
+  const lo = document.getElementById('login-lockout'); if (lo) lo.style.display = 'none';
   setLoginLabel('Admin · gate 1 of 2', 'Enter your first 4 digits');
   const a = document.getElementById('login-admin-link'); if (a) a.textContent = '← Back to PIN';
 }
@@ -53,8 +59,10 @@ function advanceAdminGate() {
   adminLoginSubmit(code);
 }
 async function adminLoginSubmit(code) {
+  adminVerifying = true;
   let res;
   try { res = await sheetsCall({ action:'adminLogin', code }); } catch(e) { res = null; }
+  adminVerifying = false;
   if (res && res.ok && res.token) {
     sessionStorage.setItem('aiv-admin-token', res.token);
     loginMode = 'pin';
