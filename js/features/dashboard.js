@@ -71,6 +71,11 @@ function renderDashboardFocus() {
   const waiting = (typeof responderCount === 'function') ? responderCount() : 0;
   const overdue = (S.leads || []).filter(l => isOverdue(l)).length;
   const now     = new Date();
+  // Email autopilot, last 7 days — at-a-glance proof it's working.
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const ix7 = (S.interactions || []).filter(i => i.channel === 'email' && i.createdAt && new Date(i.createdAt).getTime() >= weekAgo);
+  const sent7    = ix7.filter(i => i.direction === 'out').length;
+  const replied7 = new Set(ix7.filter(i => i.direction === 'in').map(i => i.leadId).filter(Boolean)).size;
   const callsToday = (S.calls || []).filter(c => c.calledAt && new Date(c.calledAt).toDateString() === now.toDateString()).length;
   // Use leadClosedAt (the Closed-Won stamp), matching Pipeline + Analytics — so
   // editing an old won deal can't inflate this month's count.
@@ -82,6 +87,7 @@ function renderDashboardFocus() {
 
   const cards = [
     { val: waiting,    label: 'Waiting on a reply', sub: waiting ? 'Tap to respond now' : 'All caught up', nav: 'responder', color: waiting ? 'var(--red)' : 'var(--hl)' },
+    { val: sent7,      label: 'Emails sent (7d)',   sub: replied7 ? replied7 + ' replied' : 'Autopilot outreach', nav: 'analytics', color: 'var(--hl)' },
     { val: overdue,    label: 'Overdue follow-ups',  sub: overdue ? 'Past their date' : 'Nothing overdue', nav: 'leads',     color: overdue ? 'var(--amber)' : 'var(--hl)' },
     { val: callsToday, label: 'Calls today',         sub: 'Dialed since midnight',                          nav: 'llamadas',  color: 'var(--hl)' },
     { val: wonThisMonth, label: 'Won this month',    sub: 'Closed Won this calendar month',                 nav: 'pipeline',  color: 'var(--pos)' },

@@ -3,10 +3,68 @@
 function renderAnalytics() {
   if (!S.session) return;
   renderAnalyticsKPIs();
+  renderOutreach();
   renderFunnel();
   renderSourceROI();
   renderLeaderboard();
   renderCallPerformance();
+}
+
+// ── Outreach performance (email autopilot) ─────────────────
+// Surfaces what the cadence + AI replies are actually doing: how much went out,
+// how much came back, and how emailed leads progress to interested/won. All from
+// the interaction log (channel 'email'), so it reflects real sends + replies.
+function renderOutreach() {
+  const stats = document.getElementById('analytics-outreach-stats');
+  if (!stats) return;
+  const funnelEl = document.getElementById('analytics-outreach-funnel');
+  const emails = (S.interactions || []).filter(i => i.channel === 'email');
+  const out = emails.filter(i => i.direction === 'out');
+  const inb = emails.filter(i => i.direction === 'in');
+
+  if (!out.length) {
+    stats.innerHTML = '<div class="notes-empty">No outreach sent yet. Turn on the email cadence in Admin to start reaching leads.</div>';
+    if (funnelEl) funnelEl.innerHTML = '';
+    return;
+  }
+
+  const emailedIds = new Set(out.map(i => i.leadId).filter(Boolean));
+  const repliedIds = new Set(inb.map(i => i.leadId).filter(Boolean));
+  const reached    = emailedIds.size;
+  const replied    = repliedIds.size;
+  const replyRate  = reached ? Math.round(replied / reached * 100) : 0;
+  const aiSent     = out.filter(i => i.createdBy === 'ai').length;
+  const optOut     = S.leads.filter(l => l.status === 'Do Not Call' && /opt-?out/i.test(l.dncReason || '')).length;
+
+  stats.innerHTML = `<div class="analytics-call-stats-grid">
+    <div class="call-stat"><div class="call-stat-val">${out.length}</div><div class="call-stat-lbl">Emails sent</div></div>
+    <div class="call-stat"><div class="call-stat-val">${reached}</div><div class="call-stat-lbl">Leads reached</div></div>
+    <div class="call-stat"><div class="call-stat-val">${replied}</div><div class="call-stat-lbl">Replied</div></div>
+    <div class="call-stat"><div class="call-stat-val">${replyRate}%</div><div class="call-stat-lbl">Reply rate</div></div>
+    <div class="call-stat"><div class="call-stat-val">${aiSent}</div><div class="call-stat-lbl">AI replies sent</div></div>
+    <div class="call-stat"><div class="call-stat-val">${optOut}</div><div class="call-stat-lbl">Opt-outs</div></div>
+  </div>`;
+
+  if (funnelEl) {
+    const emailed    = S.leads.filter(l => emailedIds.has(l.id));
+    const interested = emailed.filter(l => l.status === 'Interested' || l.status === 'Closed Won').length;
+    const won        = emailed.filter(l => l.status === 'Closed Won').length;
+    const base = reached || 1;
+    const rows = [
+      {label:'Reached',    count:reached,    cls:'contacted'},
+      {label:'Replied',    count:replied,    cls:'interested'},
+      {label:'Interested', count:interested, cls:'interested'},
+      {label:'Closed Won', count:won,        cls:'closed'},
+    ];
+    funnelEl.innerHTML = rows.map(r => {
+      const pct = Math.round(r.count / base * 100);
+      return `<div class="funnel-row">
+        <div class="funnel-label">${r.label}</div>
+        <div class="funnel-bar-wrap"><div class="funnel-bar status-${r.cls}" style="width:${Math.max(pct,1)}%"></div></div>
+        <div class="funnel-count">${r.count} <span class="funnel-pct">(${pct}%)</span></div>
+      </div>`;
+    }).join('');
+  }
 }
 
 // ── KPI Row ────────────────────────────────────────────────
