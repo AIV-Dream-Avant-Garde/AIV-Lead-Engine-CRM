@@ -92,6 +92,12 @@ async function syncNow() {
 
   if (res && res.success) {
     if (res.serverTime) S.serverTimeOffset = new Date(res.serverTime) - Date.now();
+    // Persist whether the server-side admin gate is configured, so the login
+    // screen knows to retire the old in-browser admin PIN (read before next login).
+    if (typeof res.adminGateEnabled === 'boolean') {
+      S.config.adminGateEnabled = res.adminGateEnabled;
+      try { localStorage.setItem('aiv-admin-gate', res.adminGateEnabled ? '1' : '0'); } catch(e) {}
+    }
     // Merge incoming leads — but never clobber a lead with pending local edits
     // (still dirty / failed to push), so unsynced work isn't lost to an older
     // server copy.
