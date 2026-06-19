@@ -105,7 +105,7 @@ function copyCrmSecret() {
   navigator.clipboard.writeText(s).then(() => {
     const el = document.getElementById('crm-secret-display');
     if (el) { const orig = el.textContent; el.textContent = 'Copied!'; setTimeout(() => el.textContent = orig, 2000); }
-  });
+  }).catch(() => toast('Copy failed. Select the value and copy it manually.', 'error', 4000));
 }
 
 // Set this device's CRM secret to match the server (e.g. paste your main
@@ -143,7 +143,7 @@ function copyWebhookUrl() {
   navigator.clipboard.writeText(url).then(() => {
     const btn = document.querySelector('[onclick="copyWebhookUrl()"]');
     if (btn) { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy URL', 2000); }
-  });
+  }).catch(() => toast('Copy failed. Select the URL and copy it manually.', 'error', 4000));
 }
 
 function copyEl(elId, btnId, label) {
@@ -154,5 +154,5 @@ function copyEl(elId, btnId, label) {
     b.textContent = 'Copied!';
     b.classList.add('copied');
     setTimeout(() => { b.textContent = label || 'Copy'; b.classList.remove('copied'); }, 2500);
-  });
+  }).catch(() => toast('Copy failed. Select the text and copy it manually.', 'error', 4000));
 }

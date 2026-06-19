@@ -144,7 +144,7 @@ function renderSourceROI() {
         <td>${r.rate}%</td>
         <td>${fmtUSD(r.revenue)}</td>
       </tr>`).join('')
-    : '<tr><td colspan="5" class="notes-empty">No data</td></tr>';
+    : '<tr><td colspan="5" class="notes-empty">No closed deals yet. Sources rank here once you start winning business.</td></tr>';
 }
 
 // ── Team Leaderboard ───────────────────────────────────────
