@@ -287,7 +287,7 @@ function _updateSequence(leadId, patch) {
   if (!s) { s = { leadId, stepIndex: 0, enrolledAt: new Date().toISOString() }; S.sequences.push(s); }
   Object.assign(s, patch, { updatedAt: new Date().toISOString() });
   saveLocal();
-  if (S.config.scriptUrl) sheetsCall({ action:'saveSequence', ...s });
+  bgSave({ action:'saveSequence', ...s }, 'Sequence');
   renderSequences();
 }
 function pauseSequence(leadId)   { _updateSequence(leadId, { state:'paused:manual', pausedReason:'manual' }); toast('Sequence paused.', 'success'); }

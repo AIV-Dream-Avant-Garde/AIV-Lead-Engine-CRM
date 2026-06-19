@@ -33,6 +33,23 @@ function renderPipeline() {
   const kb = document.getElementById('kanban');
   if (!kb) return;
 
+  // Brand-new account: a friendly empty state beats seven empty columns.
+  if (S.leads.length === 0) {
+    kb.parentElement.querySelector('.pipeline-metrics')?.remove();
+    kb.insertAdjacentHTML('beforebegin', metricsHtml);
+    kb.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:48px 20px">
+      <div style="font-weight:600;color:var(--hl);margin-bottom:6px">Your pipeline is empty</div>
+      <div style="font-size:12px;color:var(--sub);margin-bottom:14px">${S.config.scriptUrl
+        ? 'Leads you scrape or import show up here, ready to drag through your stages.'
+        : 'Connect Apps Script in Settings, then scrape or import leads to fill your pipeline.'}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+        <button class="btn btn-primary" style="font-size:12px" onclick="navigate('scraper')">Scrape leads</button>
+        <button class="btn btn-ghost" style="font-size:12px" onclick="navigate('import')">Import CSV</button>
+      </div>
+    </div>`;
+    return;
+  }
+
   const columnsHtml = cols.map(col => {
     let cards = S.leads.filter(l => (l.status || 'New') === col.k);
     if (fc) cards = cards.filter(l => l.city === fc);
