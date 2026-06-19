@@ -1326,10 +1326,21 @@ function runInboundEmailScan() {
   if (ec < 0) return { logged: 0 };
 
   // email → lead row indices (a phone-deduped lead may still share an email).
-  const byEmail = {};
+  // Also build a domain → {rows, emails} map so a reply from a DIFFERENT mailbox
+  // at the same business domain (info@biz.com on file, owner answers from
+  // john@biz.com) still matches — but only when that domain is unambiguous (one
+  // business) and not a shared public provider.
+  const PUBLIC_EMAIL = {'gmail.com':1,'googlemail.com':1,'yahoo.com':1,'ymail.com':1,'outlook.com':1,'hotmail.com':1,'live.com':1,'msn.com':1,'icloud.com':1,'me.com':1,'mac.com':1,'aol.com':1,'proton.me':1,'protonmail.com':1,'gmx.com':1,'zoho.com':1};
+  const byEmail = {}, byDomain = {};
   for (let i = 1; i < rows.length; i++) {
     const e = String(rows[i][ec] || '').trim().toLowerCase();
-    if (e) (byEmail[e] = byEmail[e] || []).push(i);
+    if (!e || e.indexOf('@') < 0) continue;
+    (byEmail[e] = byEmail[e] || []).push(i);
+    const dom = e.split('@')[1];
+    if (dom && !PUBLIC_EMAIL[dom]) {
+      const d = byDomain[dom] = byDomain[dom] || { rows: [], emails: {} };
+      d.rows.push(i); d.emails[e] = 1;
+    }
   }
   if (!Object.keys(byEmail).length) return { logged: 0 };
 
@@ -1339,7 +1350,7 @@ function runInboundEmailScan() {
   const seen = new Set(iRows.slice(1).map(r => String(r[sidc] || '')).filter(Boolean));
 
   let logged = 0;
-  const threads = GmailApp.search('in:inbox newer_than:14d', 0, 40);
+  const threads = GmailApp.search('in:inbox newer_than:14d', 0, 60);
   for (const thread of threads) {
     for (const msg of thread.getMessages()) {
       const msgId = msg.getId();
@@ -1347,7 +1358,12 @@ function runInboundEmailScan() {
       const fromRaw = msg.getFrom() || '';
       const m = fromRaw.match(/<([^>]+)>/);
       const from = (m ? m[1] : fromRaw).trim().toLowerCase();
-      const idxs = byEmail[from];
+      let idxs = byEmail[from];
+      if (!idxs) {                                // same-domain fallback (one unambiguous business)
+        const dom = from.split('@')[1];
+        const d = dom && byDomain[dom];
+        if (d && Object.keys(d.emails).length === 1) idxs = d.rows;
+      }
       if (!idxs) continue;                       // not from a lead
       const body = String(msg.getPlainBody() || '').replace(/\s+\n/g, '\n').slice(0, 4000);
       const nowIso = new Date().toISOString();
