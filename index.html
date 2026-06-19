@@ -10,11 +10,11 @@
 <script src="https://cdn.jsdelivr.net/npm/@twilio/voice-sdk@2.9.0/dist/twilio.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-<link rel="stylesheet" href="css/base.css?v=20260618j">
-<link rel="stylesheet" href="css/layout.css?v=20260618j">
-<link rel="stylesheet" href="css/components.css?v=20260618j">
-<link rel="stylesheet" href="css/widgets.css?v=20260618j">
-<link rel="stylesheet" href="css/responsive.css?v=20260618j">
+<link rel="stylesheet" href="css/base.css?v=20260618k">
+<link rel="stylesheet" href="css/layout.css?v=20260618k">
+<link rel="stylesheet" href="css/components.css?v=20260618k">
+<link rel="stylesheet" href="css/widgets.css?v=20260618k">
+<link rel="stylesheet" href="css/responsive.css?v=20260618k">
 </head>
 <body>
 
@@ -234,6 +234,13 @@
       </div>
       <div style="font-family:'Geist Mono',monospace;font-size:12px;color:var(--accent);margin-top:6px;word-break:break-all;cursor:pointer" id="crm-secret-display" onclick="copyCrmSecret()" title="Click to copy">—</div>
       <div style="font-size:11px;color:var(--body);margin-top:5px">Copy this value and paste it as <code style="background:var(--surface-hi);padding:1px 5px;border-radius:3px">CRM_SECRET</code> in the Apps Script (Script properties), then redeploy.</div>
+      <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px">
+        <div style="font-size:11px;color:var(--body);margin-bottom:6px">On a <strong>second device</strong> (phone)? Paste the secret from your main device here so this one can sync too.</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <input type="text" id="crm-secret-input" placeholder="Paste CRM secret…" style="flex:1;min-width:160px;font-family:'Geist Mono',monospace;font-size:12px">
+          <button class="btn btn-primary btn-sm" onclick="applyCrmSecret()">Use this secret</button>
+        </div>
+      </div>
     </div>
     <div class="card" style="margin-top:12px;border-color:rgba(245,158,11,.25)">
       <div class="card-title" style="font-size:12px">Change admin PIN</div>
@@ -1112,33 +1119,33 @@ Content-Type: application/json
 </div>
 
 <!-- JS: load order matters — data → core → auth → locks → commission → features → main -->
-<script src="js/data/keywords.js?v=20260618j"></script>
-<script src="js/data/locations.js?v=20260618j"></script>
-<script src="js/data/states.js?v=20260618j"></script>
-<script src="js/data/constants.js?v=20260618j"></script>
-<script src="js/data/demo-data.js?v=20260618j"></script>
-<script src="js/data/outreach-templates.js?v=20260618j"></script>
-<script src="js/core/state.js?v=20260618j"></script>
-<script src="js/core/theme.js?v=20260618j"></script>
-<script src="js/core/utils.js?v=20260618j"></script>
-<script src="js/core/storage.js?v=20260618j"></script>
-<script src="js/core/api.js?v=20260618j"></script>
-<script src="js/auth/auth.js?v=20260618j"></script>
-<script src="js/locks.js?v=20260618j"></script>
-<script src="js/commission.js?v=20260618j"></script>
-<script src="js/features/scraper.js?v=20260618j"></script>
-<script src="js/features/dashboard.js?v=20260618j"></script>
-<script src="js/features/campaigns.js?v=20260618j"></script>
-<script src="js/features/outreach.js?v=20260618j"></script>
-<script src="js/features/inbox.js?v=20260618j"></script>
-<script src="js/features/import.js?v=20260618j"></script>
-<script src="js/features/leads.js?v=20260618j"></script>
-<script src="js/features/pipeline.js?v=20260618j"></script>
-<script src="js/features/calls.js?v=20260618j"></script>
-<script src="js/features/profile.js?v=20260618j"></script>
-<script src="js/features/admin.js?v=20260618j"></script>
-<script src="js/features/analytics.js?v=20260618j"></script>
-<script src="js/features/export.js?v=20260618j"></script>
-<script src="js/main.js?v=20260618j"></script>
+<script src="js/data/keywords.js?v=20260618k"></script>
+<script src="js/data/locations.js?v=20260618k"></script>
+<script src="js/data/states.js?v=20260618k"></script>
+<script src="js/data/constants.js?v=20260618k"></script>
+<script src="js/data/demo-data.js?v=20260618k"></script>
+<script src="js/data/outreach-templates.js?v=20260618k"></script>
+<script src="js/core/state.js?v=20260618k"></script>
+<script src="js/core/theme.js?v=20260618k"></script>
+<script src="js/core/utils.js?v=20260618k"></script>
+<script src="js/core/storage.js?v=20260618k"></script>
+<script src="js/core/api.js?v=20260618k"></script>
+<script src="js/auth/auth.js?v=20260618k"></script>
+<script src="js/locks.js?v=20260618k"></script>
+<script src="js/commission.js?v=20260618k"></script>
+<script src="js/features/scraper.js?v=20260618k"></script>
+<script src="js/features/dashboard.js?v=20260618k"></script>
+<script src="js/features/campaigns.js?v=20260618k"></script>
+<script src="js/features/outreach.js?v=20260618k"></script>
+<script src="js/features/inbox.js?v=20260618k"></script>
+<script src="js/features/import.js?v=20260618k"></script>
+<script src="js/features/leads.js?v=20260618k"></script>
+<script src="js/features/pipeline.js?v=20260618k"></script>
+<script src="js/features/calls.js?v=20260618k"></script>
+<script src="js/features/profile.js?v=20260618k"></script>
+<script src="js/features/admin.js?v=20260618k"></script>
+<script src="js/features/analytics.js?v=20260618k"></script>
+<script src="js/features/export.js?v=20260618k"></script>
+<script src="js/main.js?v=20260618k"></script>
 </body>
 </html>
