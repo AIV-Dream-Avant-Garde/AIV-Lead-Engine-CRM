@@ -189,6 +189,7 @@ function doGet(e) {
         scrapeTrigger: triggers.some(t => t.getHandlerFunction() === 'runScheduledScrapes'),
         reportTrigger: triggers.some(t => t.getHandlerFunction() === 'sendWeeklyReport'),
         cadenceTrigger: triggers.some(t => t.getHandlerFunction() === 'runCadence'),
+        residualTrigger: triggers.some(t => t.getHandlerFunction() === 'runMonthlyResiduals'),
         cadenceEnabled: getCadenceCfg_().enabled,
         cadenceConfig: getCadenceCfg_(),
         lastScrapeRun, lastCadenceRun,
@@ -562,7 +563,7 @@ function doPost(e) {
     }
     if (a === 'setTrigger') {
       const fn = b.fn;
-      if (fn !== 'runScheduledScrapes' && fn !== 'sendWeeklyReport' && fn !== 'runCadence') return err_('Invalid fn');
+      if (fn !== 'runScheduledScrapes' && fn !== 'sendWeeklyReport' && fn !== 'runCadence' && fn !== 'runMonthlyResiduals') return err_('Invalid fn');
       ScriptApp.getProjectTriggers()
         .filter(t => t.getHandlerFunction() === fn)
         .forEach(t => ScriptApp.deleteTrigger(t));
@@ -573,6 +574,8 @@ function doPost(e) {
           ScriptApp.newTrigger(fn).timeBased().onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(8).inTimezone('America/New_York').create();
         } else if (fn === 'runCadence') {
           ScriptApp.newTrigger(fn).timeBased().everyHours(1).create();
+        } else if (fn === 'runMonthlyResiduals') {
+          ScriptApp.newTrigger(fn).timeBased().onMonthDay(1).atHour(7).inTimezone('America/New_York').create();
         }
       }
       return ok({set: b.enabled, fn});
@@ -967,6 +970,55 @@ function crawlEmail_(website) {
     if (/(example\.|sentry|wix|\.png|\.jpg|\.gif|\.webp|godaddy|domain\.com|email@|your@|name@)/i.test(email)) return '';
     return email;
   } catch (e) { return ''; }
+}
+
+// ── Monthly residual commissions (time-triggered) ──────────────────────────
+// For each lead with an active residual whose closer is on a residual plan,
+// generate this month's commission row (one per lead per period). Dedups against
+// existing rows, so it's safe to run repeatedly. Set on a monthly trigger via
+// setTrigger('runMonthlyResiduals'). Mirrors the client generateResiduals().
+function runMonthlyResiduals() {
+  const period = Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM');
+  const ls = getSheet(SHEETS.leads, LEAD_HDR), lr = ls.getDataRange().getValues(), lh = lr[0] || LEAD_HDR;
+  const idc=lh.indexOf('id'), nc=lh.indexOf('name'), stc=lh.indexOf('status'), clc=lh.indexOf('closerId'),
+        pidc=lh.indexOf('providerId'), rac=lh.indexOf('residualActive'), rrc=lh.indexOf('residualRate'), rmc=lh.indexOf('residualMRR');
+  if (rac < 0) return { created: 0, period };   // older sheet without residual columns
+
+  const ts = getSheet(SHEETS.team, TEAM_HDR), tr = ts.getDataRange().getValues(), th = tr[0] || TEAM_HDR;
+  const tIdc=th.indexOf('id'), tNc=th.indexOf('name'), tCtc=th.indexOf('commissionType');
+  const team = {};
+  for (let i = 1; i < tr.length; i++) team[String(tr[i][tIdc])] = { name: tr[i][tNc], type: String(tr[i][tCtc] || '') };
+
+  const cs = getSheet(SHEETS.commissions, COMM_HDR), cr = cs.getDataRange().getValues(), ch = cr[0] || COMM_HDR;
+  const clic=ch.indexOf('leadId'), cpc=ch.indexOf('period');
+  const seen = new Set();
+  for (let i = 1; i < cr.length; i++) seen.add(String(cr[i][clic]) + '|' + String(cpc >= 0 ? (cr[i][cpc] || '') : ''));
+
+  const now = new Date().toISOString();
+  let created = 0;
+  for (let i = 1; i < lr.length; i++) {
+    const r = lr[i];
+    if (String(r[rac]).toLowerCase() !== 'true') continue;
+    if (String(r[stc]) !== 'Closed Won') continue;
+    const closer = team[String(r[clc])];
+    if (!closer || closer.type !== 'residual') continue;
+    const leadId = String(r[idc]);
+    if (seen.has(leadId + '|' + period)) continue;
+    const mrr = parseFloat(r[rmc] || 0), rate = parseFloat(r[rrc] || 0);
+    if (!mrr || !rate) continue;
+    const rec = {
+      id: Utilities.getUuid(), leadId, leadName: r[nc], dealValue: mrr, collectedAmount: '',
+      providerId: r[pidc] || '', providerName: '', providerRate: 0, providerAmount: 0,
+      closerId: String(r[clc]), closerName: closer.name, closerRate: rate, closerAmount: +(mrr * rate / 100).toFixed(2),
+      status: 'pending', paidAt: '', paidBy: '', paymentRef: '', createdAt: now, recurring: true, period,
+    };
+    cs.appendRow(COMM_HDR.map(k => rec[k] != null ? rec[k] : ''));
+    seen.add(leadId + '|' + period);
+    created++;
+  }
+  cfgSet('lastResidualRun', JSON.stringify({ ranAt: now, period, created }));
+  Logger.log('Monthly residuals: +' + created + ' for ' + period);
+  return { created, period };
 }
 
 // ── Low-level send helpers (shared by the message handlers + the cadence engine) ──

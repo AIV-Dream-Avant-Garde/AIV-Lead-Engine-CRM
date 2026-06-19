@@ -353,13 +353,25 @@ async function checkTriggerStatus() {
     S.triggerStatus = {
       scrape: !!res.scrapeTrigger, report: !!res.reportTrigger,
       cadence: !!res.cadenceTrigger, cadenceEnabled: !!res.cadenceEnabled,
+      residual: !!res.residualTrigger,
       cadenceConfig: res.cadenceConfig || null,
       lastScrapeRun: res.lastScrapeRun || null, lastCadenceRun: res.lastCadenceRun || null,
     };
     renderScheduledJobs();
     renderReportTrigger();
+    renderResidualTrigger();
     if (typeof renderCadenceEngine === 'function') renderCadenceEngine();
   }
+}
+
+// Reflect the monthly-residual auto-trigger state on its toggle button.
+function renderResidualTrigger() {
+  const btn = document.getElementById('auto-residuals-btn');
+  if (!btn) return;
+  const on = !!(S.triggerStatus && S.triggerStatus.residual);
+  btn.textContent = on ? 'Auto: monthly ✓' : 'Auto: off';
+  btn.classList.toggle('btn-success', on);
+  btn.classList.toggle('btn-ghost', !on);
 }
 
 // Run all active saved scrape jobs immediately (on-demand), then pull the new leads.
@@ -386,6 +398,7 @@ async function setTrigger(fn, enabled) {
     if (fn === 'runScheduledScrapes') S.triggerStatus.scrape = enabled;
     if (fn === 'sendWeeklyReport')    S.triggerStatus.report = enabled;
     if (fn === 'runCadence')          S.triggerStatus.cadence = enabled;
+    if (fn === 'runMonthlyResiduals') { S.triggerStatus.residual = enabled; toast(enabled ? 'Residuals will auto-generate on the 1st each month.' : 'Monthly auto-generate off.', enabled ? 'success' : 'warning'); renderResidualTrigger(); }
     renderScheduledJobs();
     renderReportTrigger();
     if (typeof renderCadenceEngine === 'function') renderCadenceEngine();
