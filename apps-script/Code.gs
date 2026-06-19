@@ -886,16 +886,26 @@ function runStateCampaigns() {
 
     let cursor = camp.cursor || 0;
     if (typeof camp.passAdded !== 'number') camp.passAdded = 0;   // persists across daily runs
+    // Skip tiles that returned no businesses at all (ocean / barren) — pruned after
+    // their first empty hit, then rechecked every ~14 days for new openings.
+    const dead = new Set(Array.isArray(camp.dead) ? camp.dead : []);
+    if (!camp.deadCheckedAt || (Date.now() - camp.deadCheckedAt) > 14*24*3600*1000) { dead.clear(); camp.deadCheckedAt = Date.now(); }
+    const wrapCheck = () => { if (cursor === 0) { if (camp.passAdded === 0) return true; camp.passAdded = 0; } return false; };
     let steps = 0;
     // Walk forward through (tile × keyword) points until the daily cap, the run
     // budget, or a full no-new-leads pass (→ exhausted).
     while (capLeft() > 0 && apiCalls < MAX_CALLS && (Date.now() - t0) < RUN_BUDGET_MS && steps < total) {
       const tileIdx = Math.floor(cursor / camp.keywords.length) % camp.tileCount;
       const kwIdx   = cursor % camp.keywords.length;
+      if (dead.has(tileIdx)) {   // known-empty tile: advance cheaply, no API call
+        cursor = (cursor + 1) % total; steps++;
+        if (wrapCheck()) { camp.exhausted = true; break; }
+        continue;
+      }
       const center  = campaignTileCenter_(camp.bounds, camp.rows, camp.cols, tileIdx);
       const keyword = camp.keywords[kwIdx];
 
-      let token = null, tries = 0, addedHere = 0;
+      let token = null, tries = 0, addedHere = 0, placesTotal = 0;
       const baseBody = {textQuery:keyword, locationBias:{circle:{center:{latitude:center.lat,longitude:center.lng},radius:parseFloat(camp.radius||25000)}}, maxResultCount:20, ...(camp.region?{regionCode:camp.region}:{})};
       do {
         if (apiCalls >= MAX_CALLS || (Date.now() - t0) > RUN_BUDGET_MS || capLeft() <= 0) break;
@@ -903,6 +913,7 @@ function runStateCampaigns() {
         const r = UrlFetchApp.fetch(url, {method:'post', headers:hdr, payload:JSON.stringify(body), muteHttpExceptions:true});
         apiCalls++;
         let d = {}; try { d = JSON.parse(r.getContentText()); } catch(e) {}
+        placesTotal += (d.places || []).length;
         (d.places||[]).forEach(p => {
           if (capLeft() <= 0) return;
           const phone = p.nationalPhoneNumber || '';
@@ -934,15 +945,17 @@ function runStateCampaigns() {
         Utilities.sleep(2000);
       } while (tries < 3);
 
+      if (placesTotal === 0) dead.add(tileIdx);   // no businesses here → prune the tile
       cursor = (cursor + 1) % total;
       steps++;
       camp.leadsFound = (camp.leadsFound || 0) + addedHere;
       camp.passAdded += addedHere;
       // A complete sweep of the grid (cursor wrapped to 0) that found nothing new
       // across the WHOLE pass — tracked across daily runs — means exhausted.
-      if (cursor === 0) { if (camp.passAdded === 0) { camp.exhausted = true; break; } camp.passAdded = 0; }
+      if (wrapCheck()) { camp.exhausted = true; break; }
     }
     camp.cursor = cursor;
+    camp.dead = [...dead];
     camp.lastRunAt = now;
   }
 
