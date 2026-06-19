@@ -268,7 +268,7 @@ pre{padding:18px;overflow-x:auto;font-family:'Geist Mono',monospace;font-size:12
 .tl-date{font-size:10px;color:var(--sub);margin-top:2px}
 
 /* PIPELINE DND */
-.pipeline-col.drop-target{border:2px dashed var(--accent)!important;background:rgba(var(--accent-rgb),.08)}
+.pipeline-col.drop-target{border:2px dashed var(--accent)!important;background:var(--acc-m)}
 .pipeline-card.dragging{opacity:.35;transform:scale(.98)}
 .pipeline-metrics{display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap}
 .pipeline-metric{background:var(--surface-hi);border:1px solid var(--border);border-radius:8px;padding:10px 16px;font-size:12px;color:var(--sub)}
