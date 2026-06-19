@@ -5,6 +5,8 @@ var failedAttempts = 0;
 var pinLockedUntil = 0;
 var sessionTimer        = null;
 var sessionWarningTimer = null;
+var loginMode      = 'pin';   // 'pin' (reps + legacy admin) | 'admin' (two-gate server login)
+var adminGate1     = '';      // first gate's digits while collecting the second
 
 // ── SHA-256 via WebCrypto ──────────────────────────────────
 async function sha256(s) {
@@ -18,7 +20,54 @@ function pinKey(k) {
   if (pinBuffer.length >= 4) return;
   pinBuffer += k;
   updatePinDots();
-  if (pinBuffer.length === 4) setTimeout(tryLogin, 120);
+  if (pinBuffer.length === 4) setTimeout(loginMode === 'admin' ? advanceAdminGate : tryLogin, 120);
+}
+
+// ── Admin two-gate, server-validated ───────────────────────
+function toggleAdminMode() { loginMode === 'admin' ? exitAdminMode() : enterAdminMode(); }
+
+function enterAdminMode() {
+  loginMode = 'admin'; adminGate1 = ''; pinBuffer = ''; updatePinDots();
+  setLoginLabel('Admin · gate 1 of 2', 'Enter your first 4 digits');
+  const a = document.getElementById('login-admin-link'); if (a) a.textContent = '← Back to PIN';
+}
+function exitAdminMode() {
+  loginMode = 'pin'; adminGate1 = ''; pinBuffer = ''; updatePinDots();
+  setLoginLabel('', 'Enter your PIN to sign in');
+  const a = document.getElementById('login-admin-link'); if (a) a.textContent = 'Admin sign-in →';
+}
+function setLoginLabel(badge, hint) {
+  const b = document.getElementById('login-mode-label');
+  if (b) { b.textContent = badge; b.style.display = badge ? 'block' : 'none'; }
+  const h = document.getElementById('login-hint'); if (h) h.textContent = hint;
+}
+function advanceAdminGate() {
+  if (!adminGate1) {                          // first gate captured → ask for the second
+    adminGate1 = pinBuffer; pinBuffer = ''; updatePinDots();
+    setLoginLabel('Admin · gate 2 of 2', 'Enter your second 4 digits');
+    return;
+  }
+  const code = adminGate1 + pinBuffer;
+  pinBuffer = ''; adminGate1 = ''; updatePinDots();
+  setLoginLabel('Admin · verifying…', 'Checking with the server…');
+  adminLoginSubmit(code);
+}
+async function adminLoginSubmit(code) {
+  let res;
+  try { res = await sheetsCall({ action:'adminLogin', code }); } catch(e) { res = null; }
+  if (res && res.ok && res.token) {
+    sessionStorage.setItem('aiv-admin-token', res.token);
+    loginMode = 'pin';
+    startSession({ userId:'admin', userName:(res.name || S.config.adminName || 'Andres Toro'), role:'admin', closerRate:0, adminToken:res.token });
+    const a = document.getElementById('login-admin-link'); if (a) a.textContent = 'Admin sign-in →';
+    return;
+  }
+  updatePinDots('error');
+  adminGate1 = '';                            // restart at gate 1
+  if (res && res.needsSetup)            setLoginLabel('Admin · gate 1 of 2', 'Gate not set up — run seedAdminGate() in Apps Script.');
+  else if (res && res.locked)           { const mins = Math.max(1, Math.ceil(((res.lockedUntil||0) - Date.now())/60000)); setLoginLabel('Admin · locked', 'Too many attempts. Locked ~' + mins + ' min.'); }
+  else if (res && typeof res.remaining === 'number') setLoginLabel('Admin · gate 1 of 2', 'Incorrect code. ' + res.remaining + ' attempts left.');
+  else                                  setLoginLabel('Admin · gate 1 of 2', (res && res.error) ? ('Error: ' + res.error) : 'Could not reach the server.');
 }
 
 function pinDel() {
@@ -45,8 +94,10 @@ async function tryLogin() {
 
   const hash = await sha256(entered);
 
-  // Admin PIN check — a rotated PIN (S.config.adminHash) overrides the built-in default
-  if (hash === (S.config.adminHash || ADMIN_HASH)) {
+  // Admin PIN check — a rotated PIN (S.config.adminHash) overrides the built-in
+  // default. Retired once the server-side admin gate is live: admins then sign in
+  // via the two-gate flow, and this in-browser path no longer grants admin.
+  if (!S.config.adminGateEnabled && hash === (S.config.adminHash || ADMIN_HASH)) {
     startSession({userId:'admin', userName:(S.config.adminName || 'Andres Toro'), role:'admin', closerRate:0});
     return;
   }

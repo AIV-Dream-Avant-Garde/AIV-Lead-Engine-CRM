@@ -27,6 +27,9 @@ function saveLocal() {
 
 function loadLocal() {
   try { S.config = {...S.config, ...JSON.parse(localStorage.getItem('aiv-cfg')  || '{}')}; } catch(e) {}
+  // Whether the server admin gate is live (set on last sync) — read at login time
+  // to decide if the old in-browser admin PIN path is still allowed.
+  S.config.adminGateEnabled = localStorage.getItem('aiv-admin-gate') === '1';
   try { S.leads  = JSON.parse(localStorage.getItem('aiv-leads') || '[]').map(l => ({...l, country: l.country || DEFAULT_COUNTRY, _synced: l._synced === true})); } catch(e) {}
   try { S.calls  = JSON.parse(localStorage.getItem('aiv-calls') || '[]'); } catch(e) {}
   try { S.interactions = JSON.parse(localStorage.getItem('aiv-interactions') || '[]'); } catch(e) { S.interactions = []; }

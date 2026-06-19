@@ -70,6 +70,45 @@ function seedProperties() {
   Logger.log('Seeded ' + n + ' Script properties. You can now blank the values above.');
 }
 
+// ── Admin gate (server-validated two-gate login) ─────────────────────────────
+// ONE-TIME SETUP: in the Apps Script editor, put your chosen digits below and Run
+// seedAdminGate once (then blank it again). The plaintext code is never stored —
+// only its salted hash. The admin then logs in by entering these digits across
+// the two gates on the CRM login screen; validation + lockout happen server-side.
+function seedAdminGate() {
+  const code = '';                 // ← your full admin code (e.g. two 4-digit gates = '12345678'); blank after running
+  if (!/^\d{6,12}$/.test(code)) { Logger.log('Set `code` to 6–12 digits, then Run again.'); return; }
+  PROPS.setProperty('ADMIN_GATE_HASH', sha256Hex_(code + '|' + CRM_SECRET));
+  PROPS.deleteProperty('adminAuthState');
+  Logger.log('Admin gate set. Blank the code above and redeploy. Old in-browser admin PIN is now retired.');
+}
+
+function sha256Hex_(s) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(s), Utilities.Charset.UTF_8)
+    .map(function(b){ return ('0' + (b & 0xff).toString(16)).slice(-2); }).join('');
+}
+function hmacHex_(s) {
+  return Utilities.computeHmacSha256Signature(String(s), String(CRM_SECRET))
+    .map(function(b){ return ('0' + (b & 0xff).toString(16)).slice(-2); }).join('');
+}
+// Stateless admin session token: "exp.sig" where sig = HMAC(exp, CRM_SECRET).
+function issueAdminToken_(hours) {
+  const exp = Date.now() + (hours || 8) * 3600 * 1000;
+  return exp + '.' + hmacHex_('admin:' + exp);
+}
+function verifyAdminToken_(tok) {
+  const parts = String(tok || '').split('.');
+  if (parts.length !== 2) return false;
+  const exp = parseInt(parts[0], 10);
+  if (!exp || Date.now() > exp) return false;
+  const expect = hmacHex_('admin:' + exp);
+  // length-equal compare (inputs are fixed-length hex, so this is constant-ish)
+  if (parts[1].length !== expect.length) return false;
+  let diff = 0;
+  for (let i = 0; i < expect.length; i++) diff |= parts[1].charCodeAt(i) ^ expect.charCodeAt(i);
+  return diff === 0;
+}
+
 // ── CADENCE ENGINE config (Cadence Engine) ────────────────────────────
 // Autonomous templated outreach (deterministic; no LLM). SAFETY: inert until
 // CADENCE_ENABLED = true. While false the engine DRY-RUNS — it logs what it
@@ -178,7 +217,7 @@ function doGet(e) {
       let interactions = toObjs(getSheet(SHEETS.interactions,INTERACTION_HDR));
       if(since){const sd=new Date(since);interactions=interactions.filter(i=>!i.createdAt||new Date(i.createdAt)>=sd);}
       const sequences = toObjs(getSheet(SHEETS.sequences,SEQUENCE_HDR));
-      return ok({leads,calls,team,commissions:comms,scripts,scheduledJobs,stateCampaigns,interactions,sequences,serverTime:new Date().toISOString()});
+      return ok({leads,calls,team,commissions:comms,scripts,scheduledJobs,stateCampaigns,interactions,sequences,adminGateEnabled:!!PROP_('ADMIN_GATE_HASH'),serverTime:new Date().toISOString()});
     }
     if (a === 'getToken') return ok({token:createToken(e.parameter.identity||'agent')});
     if (a === 'checkTriggers') {
@@ -250,6 +289,35 @@ function doPost(e) {
     if (String(b._secret).trim() !== String(CRM_SECRET).trim()) {
       return err_('Unauthorized — set the CRM_SECRET Script property to the value shown in Settings.');
     }
+
+    // Server-validated admin login (two-gate). Validates the combined code against
+    // ADMIN_GATE_HASH with a 5-try / 15-min lockout, and returns a short-lived
+    // token on success. State is held in the 'adminAuthState' Script property,
+    // guarded by a script lock to keep the attempt counter race-free.
+    if (a === 'adminLogin') {
+      const gateHash = PROP_('ADMIN_GATE_HASH');
+      if (!gateHash) return ok({ ok:false, needsSetup:true });
+      const lock = LockService.getScriptLock();
+      try { lock.waitLock(5000); } catch (e) { return ok({ ok:false, error:'busy' }); }
+      try {
+        let st = {}; try { st = JSON.parse(PROP_('adminAuthState') || '{}'); } catch (e) {}
+        const now = Date.now();
+        if (st.lockUntil && now < st.lockUntil) {
+          return ok({ ok:false, locked:true, lockedUntil:st.lockUntil });
+        }
+        const ok_ = sha256Hex_(String(b.code || '') + '|' + CRM_SECRET) === gateHash;
+        if (ok_) {
+          PROPS.deleteProperty('adminAuthState');
+          return ok({ ok:true, token:issueAdminToken_(8), name:PROP_('ADMIN_NAME','Andres Toro') });
+        }
+        const fails = (st.fails || 0) + 1;
+        const next = { fails:fails };
+        if (fails >= 5) { next.lockUntil = now + 15*60*1000; next.fails = 0; }
+        PROPS.setProperty('adminAuthState', JSON.stringify(next));
+        return ok({ ok:false, remaining: Math.max(0, 5 - fails), locked: !!next.lockUntil, lockedUntil: next.lockUntil || 0 });
+      } finally { lock.releaseLock(); }
+    }
+
     if (a === 'push') {
       // Dedup by id (the lead's stable unique key), NOT by phone. Phone-keying
       // silently dropped every lead with a blank/'N/A' phone — they all collide
