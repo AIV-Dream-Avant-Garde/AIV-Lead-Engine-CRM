@@ -204,12 +204,22 @@ function renderTable() {
   });
 
   if (!slice.length) {
+    const trulyEmpty = !q && !hasFilters && S.leads.length === 0;
+    const inner = trulyEmpty
+      ? `<div style="font-weight:600;color:var(--hl);margin-bottom:4px">No leads yet</div>
+         <div style="font-size:12px;color:var(--sub);margin-bottom:14px">${S.config.scriptUrl ? 'Get your first leads in three ways:' : 'First, connect Apps Script in Settings — then get leads in three ways:'}</div>
+         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+           <button class="btn btn-primary" style="font-size:12px" onclick="navigate('scraper')">Scrape leads</button>
+           <button class="btn btn-ghost" style="font-size:12px" onclick="navigate('import')">Import CSV</button>
+           <button class="btn btn-ghost" style="font-size:12px" onclick="openAddLead()">Add manually</button>
+         </div>`
+      : `<div style="font-weight:600;color:var(--hl);margin-bottom:4px">No results</div>
+         <div style="font-size:12px;color:var(--sub);margin-bottom:12px">${q ? 'No leads found for "' + esc(q) + '"' : 'No leads match the current filters'}</div>
+         <button class="btn btn-ghost" style="font-size:12px" onclick="clearFilters()">Clear filters</button>`;
     tbody.innerHTML = `<tr><td colspan="13" class="table-empty">
       <div style="padding:40px;text-align:center">
         <div style="margin-bottom:8px;opacity:.35"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:32px;height:32px"><circle cx="7" cy="7" r="5"/><path d="M11 11l3.5 3.5"/></svg></div>
-        <div style="font-weight:600;color:var(--hl);margin-bottom:4px">No results</div>
-        <div style="font-size:12px;color:var(--sub);margin-bottom:12px">${q ? 'No leads found for "' + esc(q) + '"' : 'No leads match the current filters'}</div>
-        ${q || hasFilters ? '<button class="btn btn-ghost" style="font-size:12px" onclick="clearFilters()">Clear filters</button>' : ''}
+        ${inner}
       </div>
     </td></tr>`;
   } else {
