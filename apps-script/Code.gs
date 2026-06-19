@@ -38,15 +38,24 @@ const AI_MAX_REPLIES     = 3;     // cap AI back-and-forths per lead (anti-loop)
 
 // Shared positioning brief — fed to the AI personalization + reply prompts so
 // the copy reflects what Axius actually does (from the brand/capability docs).
-const AXIUS_BRIEF = 'Axius is a Technology Ownership Practice: the outsourced technology department for a growing business, ' +
-  'delivered by one accountable operator, plus AI systems and on-demand specialists. Instead of hiring a tech person or ' +
-  'juggling agencies, freelancers and subscriptions, the client gets their whole technology function for one monthly figure ' +
-  '(the entry tier is about $2,500/month, less than a single hire). It covers eight areas: sales and prospecting (lead capture, ' +
-  'follow-up, reactivation); customer experience (support automation, inbox unification); internal operations (cross-tool sync, ' +
-  'document automation); AI implementation (lead scoring, agents, automations); data and analytics (dashboards, reporting); ' +
-  'web and storefront (websites, e-commerce); custom software (internal tools, integrations); and finance/back-office ' +
-  '(invoicing, reconciliation). Everything stays in the client\'s own accounts, so they are never locked in. ' +
-  'Tagline: run your business, not your technology.';
+const AXIUS_BRIEF = 'Axius is a Technology Ownership Practice. Never call it an agency, contractor, firm, or software vendor. ' +
+  'It gives a growing business one accountable owner for the technology that runs it: the software, automations, data, and vendors. ' +
+  'Tagline: run your business, not your technology. The model is one named operator (single point of contact, accountable for outcomes), ' +
+  'plus AI systems that carry the repetitive work, plus vetted specialists the operator manages, so the client never coordinates a vendor. ' +
+  'The client gets their whole technology function for one flat monthly figure that costs less than a single hire (entry tier about ' +
+  '$2,500/month, but lead with value, never with price). It covers eight areas: sales and prospecting (lead capture, follow-up, ' +
+  'missed-call recovery); customer experience (support automation, inbox unification); internal operations (cross-tool sync, document ' +
+  'automation, cutting duplicate software); AI implementation (agents, lead scoring, multi-step automation); data and analytics ' +
+  '(dashboards, reporting); web and storefront (websites, e-commerce); custom software (internal tools, integrations); finance and ' +
+  'back office (invoicing, reconciliation, quote-to-invoice). Pick the one or two that fit the business; most engage a few at a time. ' +
+  'Trust commitments you can state plainly: everything lives in the client\'s own accounts, code and credentials and documentation, ' +
+  'nothing held, so they can leave anytime fully operational; agreed work lands in its window or the next month is free; cancel with ' +
+  'thirty days notice. The real pains it solves: no one owns the whole tech setup, so it defaults to the owner; the operation only works ' +
+  'because specific people remember how it works; manual work that should be automated; disconnected tools and re-entered data; software ' +
+  'and vendor sprawl nobody has mapped; things break with no clear owner. Standing offer: a thirty minute look and a one page read either ' +
+  'way, no pitch, no pressure, a clear picture of where their systems leak and what to fix first. Guardrails: never promise specific ' +
+  'revenue or guaranteed numbers, speak of value as influenced not caused, never invent client names, metrics, or case studies. ' +
+  'Voice: editorial, restrained, declarative, concrete, second person. Short sentences. Confidence without volume. No hype or buzzwords.';
 
 // ── ONE-TIME SETUP ───────────────────────────────────────────────────────────
 // Fill your real values below and Run this once (Run ▸ seedProperties). It writes
@@ -1170,17 +1179,17 @@ const CADENCE_STEPS = {
   'United States': {
     email: [
       { variants: [
-        "Hi there. Most businesses cover their tech in pieces: a developer here, an agency there, a stack of subscriptions, someone internal filling the gaps. We replace all of that. One team that owns your whole tech setup, for one monthly cost that usually runs less than a single hire. Want me to show you what that'd look like for {business}?\n\n{agent}\n{company}",
-        "Hi, I'm {agent}, I run {company}. Instead of hiring someone for your tech, or juggling a few vendors, we become your entire technology team. One operator, AI systems, and specialists when you need them, all for one monthly figure. Worth a quick conversation about {business}?\n\n{agent}\n{company}",
-        "Hi there. Quick one for {business}. We take over everything technical, your software, automations, data and vendors, and run it as one team for a flat monthly cost. For most businesses it lands under what a single employee would. Open to hearing more?\n\n{agent}\n{company}",
+        "Hi there. A question most owners can't answer cleanly: who owns the technology behind {business}? The software, the automations, the data, the vendors. Usually it's no one, or it's you on top of running the place. That's what we do. Axius becomes the technology function behind a business, so the owner stops being the one holding it together. One person accountable, not an agency to manage. Curious what that would look like for {business}?\n\n{agent}\n{company}",
+        "Hi, I'm {agent}, I run {company}. Most businesses cover technology in pieces. A developer here, a few subscriptions, a vendor or two, someone internal filling the gaps. We replace that with one accountable owner for the whole thing. Your systems, automations, data and vendors, run as one operation for a flat monthly figure that lands under a single hire. I'll map what that covers for {business} and send you a one page read either way. Open to it?\n\n{agent}\n{company}",
+        "Hi there. One thing I see in most growing businesses: the technology works only because certain people remember how it works. Lose them and things stall. {business} probably runs on a handful of tools and whoever set them up. We take that over. One owner for your systems, automations, data and vendors, documented and run so it never hangs on one person again. Want me to show you where I'd start?\n\n{agent}\n{company}",
       ] },
       { variants: [
-        "Hi again, following up. How it works: one contact, one monthly bill, and we run your software, automations, data and vendors end to end. It all stays in your accounts, so you're never locked in. For most businesses it costs less than one full-time person. Happy to walk through what we'd cover at {business}. Got fifteen minutes?\n\n{agent}\n{company}",
-        "Circling back. Most businesses don't realize how much they're already spending across tools, freelancers and vendors until it's all in one place. We pull it into one team and one bill, usually for less. Want to see how that'd shake out for {business}?\n\n{agent}\n{company}",
+        "Following up. The shape of it is simple. One contact, one monthly figure, and we run your software, automations, data and vendors end to end. Everything stays in your accounts, so you're never locked in. For most businesses it costs less than one full time person, and it takes off your plate the part of the job you never wanted. Happy to walk through what we'd cover at {business}. Fifteen minutes?\n\n{agent}\n{company}",
+        "Circling back on {business}. Most owners are surprised how much is already going out across tools, freelancers and vendors once it's all in one view. We pull it into one operation and one bill, usually for less, and put one name on the result. I can show you roughly how that shakes out for you. Worth a short look?\n\n{agent}\n{company}",
       ] },
       { variants: [
-        "Last one from me for now. If it helps, I'll put together a quick read on what {business} is spending across its tech and vendors today, and what it'd look like handled as one team for less. No strings. Want it?\n\n{agent}\n{company}",
-        "Hi again. Give me fifteen minutes and I'll lay out what running {business}'s tech as one team would cover, and roughly what that'd cost next to what you're paying now. Worst case you get a clearer picture of your setup. Up for it?\n\n{agent}\n{company}",
+        "Last note from me for now. If it's useful, I'll put together a quick read on what {business} spends across its tech and vendors today, and what the same thing looks like run as one operation for less. No strings, yours either way. Want it?\n\n{agent}\n{company}",
+        "One more from me. Give me fifteen minutes and I'll lay out what running {business}'s technology as one operation would cover, and what it would cost next to what you pay now. Worst case, you walk away with a clearer picture of where your systems leak. Up for it?\n\n{agent}\n{company}",
       ] },
     ],
   },
@@ -1494,13 +1503,14 @@ function geminiPersonalizeEmail_(lead, cfg) {
 
   const system = 'You are ' + agent + ', the operator behind ' + company + '. ' + AXIUS_BRIEF + ' ' +
     'Write the FIRST cold email to this business owner. Goal: a relevant, human note that earns a reply. ' +
-    'Think about what a business of this type in this place actually needs, then pick the ONE or TWO of our areas that fit ' +
-    'best and weave them in naturally. Do NOT list all eight areas or name any framework. You may reference ONLY the facts ' +
-    'below (their type, city, rating/reviews); do NOT invent specifics, owner names, numbers, pricing, or claims you cannot know. ' +
+    'Open by naming a real, specific technology pain a business of this type tends to have (use the pains above), in plain words. ' +
+    'Do not open with a compliment about their work or rating. Then pick the ONE or TWO areas that fit best and say in a line what ' +
+    'owning that would change for them. Do NOT list all eight areas, name any framework, or lead with price. You may reference ONLY ' +
+    'the facts below (their type, city, rating/reviews); do NOT invent specifics, owner names, numbers, pricing, or claims you cannot know. ' +
     'WRITE LIKE A REAL PERSON, not AI: no em dashes at all, no "I hope this finds you well", no rule-of-three lists, no buzzwords, ' +
     'no over-polished symmetry. Use contractions. Vary sentence length. Keep it 45 to 85 words. ' +
-    'End with a short, low-friction question that invites a reply (not a hard ask, and NO booking link). ' +
-    'Plain text, no subject line. Sign off on two lines: ' + agent + ', then ' + company + '.';
+    'End with a short, low-friction question that invites a reply. You may offer a quick look or a one page read either way, but NO ' +
+    'booking link and no hard ask. Plain text, no subject line. Sign off on two lines: ' + agent + ', then ' + company + '.';
   const prompt = 'Facts you may use:\n' + facts.join('\n') + '\n\nWrite the email now.';
   return geminiGenerate_(system, prompt);
 }
@@ -1537,8 +1547,11 @@ function runAiReplies() {
   const company = cfg.company, agent = cfg.agentName;
   const system = 'You are ' + agent + ', the named operator behind ' + company + '. ' + AXIUS_BRIEF + ' ' +
     'When relevant, you can speak to the specific areas that fit their business, but keep it natural and never list them all. ' +
-    'You are replying to a business owner who answered a cold email. Goal: get them to book a short call. ' +
-    'If they ask about price, do NOT quote a number; say it depends on what they need and that you\'ll scope it on the call. ' +
+    'You are replying to a business owner who answered a cold email. Goal: get them to book a short call. Lead with value, never price. ' +
+    'Handle pushback with the trust commitments above, briefly and plainly: if they ask about price, do NOT quote a number, say it ' +
+    'depends on scope and you\'ll size it on the call; if they worry about being locked in or trust, note everything stays in their own ' +
+    'accounts and they can leave anytime fully operational; if they say they already have someone or a vendor, the point is one ' +
+    'accountable owner for the whole thing, not another point fix, and one person quietly holding it together is exactly the risk. ' +
     'WRITE LIKE A REAL PERSON typing a quick email, NOT like AI. Hard rules: do NOT use em dashes (—) at all; use periods, ' +
     'commas or just two sentences instead. Avoid the obvious AI tells: no "I hope this finds you well", no rule-of-three ' +
     'lists, no "Even if X, you\'ll Y", no "Worth a quick chat?" formula, no buzzwords, no over-polished symmetry. ' +
