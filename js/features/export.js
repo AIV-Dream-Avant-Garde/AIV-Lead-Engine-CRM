@@ -108,6 +108,21 @@ function copyCrmSecret() {
   });
 }
 
+// Set this device's CRM secret to match the server (e.g. paste your main
+// device's secret on a phone so it can authenticate + sync too).
+function applyCrmSecret() {
+  const el = document.getElementById('crm-secret-input');
+  const v = (el && el.value || '').trim();
+  if (v.length < 8) { toast('Paste the full CRM secret from your main device first.', 'error'); return; }
+  S.config.crmSecret = v;
+  saveLocal();
+  const disp = document.getElementById('crm-secret-display');
+  if (disp) disp.textContent = v;
+  if (el) el.value = '';
+  toast('Secret applied. Syncing this device…', 'success');
+  if (typeof syncNow === 'function') syncNow();
+}
+
 // Rotate the CRM secret: generate a fresh value, show it, copy it. Sync stays
 // broken until the matching CRM_SECRET Script property is updated + redeployed,
 // so we warn clearly and copy it to the clipboard ready to paste.
