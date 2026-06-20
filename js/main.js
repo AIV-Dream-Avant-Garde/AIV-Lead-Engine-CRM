@@ -85,6 +85,31 @@ function toggleSidebar(force) {
   }, 320);
 }
 
+// Desktop: collapse the sidebar to an icon rail (persisted). On mobile (≤860px)
+// the hamburger drawer is used and the toggle is hidden, so this is desktop-only.
+function toggleSidebarCollapse(force) {
+  const collapsed = force === undefined ? !document.body.classList.contains('sb-collapsed') : !!force;
+  document.body.classList.toggle('sb-collapsed', collapsed);
+  try { localStorage.setItem('aiv-sb-collapsed', collapsed ? '1' : '0'); } catch (e) {}
+  const btn = document.querySelector('.sb-collapse-btn');
+  if (btn) btn.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+  // The rail resize changes content width — re-measure any maps once it settles.
+  setTimeout(() => {
+    try { if (window._dshMap) _dshMap.invalidateSize(); } catch (e) {}
+    try { if (window._scMap)  _scMap.invalidateSize();  } catch (e) {}
+  }, 220);
+}
+
+// Restore the saved collapse state + give each nav item a hover tooltip (its
+// label), so the icon rail stays legible when collapsed. Safe to call once on init.
+function initSidebarCollapse() {
+  try { if (localStorage.getItem('aiv-sb-collapsed') === '1') document.body.classList.add('sb-collapsed'); } catch (e) {}
+  document.querySelectorAll('.nav-item').forEach(n => {
+    const label = [...n.childNodes].filter(c => c.nodeType === 3).map(c => c.textContent.trim()).join(' ').trim();
+    if (label && !n.title) n.title = label;
+  });
+}
+
 // ── navigate — consolidated (all section logic merged) ─────
 function navigate(id) {
   document.body.classList.remove('sb-open');   // close the mobile drawer on navigation
@@ -211,6 +236,8 @@ function showShortcutsModal() {
 (function init() {
   // 0. Apply the saved theme (light default / dark) + sync the toggle icon.
   if (typeof initTheme === 'function') initTheme();
+  // 0b. Restore the collapsed-sidebar preference + add nav tooltips.
+  if (typeof initSidebarCollapse === 'function') initSidebarCollapse();
   // 1. Load all data from localStorage
   loadLocal();
   try { S.auditLog    = JSON.parse(localStorage.getItem('aiv-audit')          || '[]'); } catch(e) { S.auditLog=[]; }

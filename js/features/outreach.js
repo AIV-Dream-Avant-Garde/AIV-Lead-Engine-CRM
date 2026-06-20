@@ -397,8 +397,10 @@ function renderCadenceEngine() {
       <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
         <div style="font-size:12px;font-weight:600;color:var(--hl);margin-bottom:3px">Preview on real leads</div>
         <div style="font-size:11px;color:var(--sub);margin-bottom:8px">Renders the exact outreach for the leads you <strong>select in the Leads tab</strong> (the AI-personalized first email + the follow-up templates) and shows it right here, just as that business would receive it. If you don't select any, it uses your first few leads. <strong>This never sends anything to the leads.</strong> The email box below is optional and only sends copies to <em>your own</em> inbox so you can read them in a real mail client.</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <input type="email" id="cad-test-email" placeholder="optional — email copies to my own inbox" style="flex:1;min-width:200px;font-size:16px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <div class="field" style="flex:1;min-width:200px;margin:0">
+            <input type="email" id="cad-test-email" placeholder="optional: email copies to your inbox">
+          </div>
           <button class="btn btn-primary btn-xs" id="cad-test-btn" onclick="sendCadenceTest()">Generate preview</button>
         </div>
         <div id="cad-preview-output" style="margin-top:10px"></div>

@@ -25,6 +25,7 @@
   body.sb-open .sb-backdrop{display:block}
   .main{margin-left:0}
   .mobile-menu-btn{display:inline-flex}
+  .sb-collapse-btn{display:none}     /* desktop-only; mobile uses the drawer */
   .topbar{padding:0 14px}
   .content-area{padding:20px 14px 48px}
   .section-title{font-size:22px}
