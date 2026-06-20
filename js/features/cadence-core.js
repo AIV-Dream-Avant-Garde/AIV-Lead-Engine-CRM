@@ -38,12 +38,12 @@ const CADENCE_STEPS = {
         "Hi there. One thing I see in most growing businesses: the technology works only because certain people remember how it works. Lose them and things stall. {business} probably runs on a handful of tools and whoever set them up. We take that over. One owner for your systems, automations, data and vendors, documented and run so it never hangs on one person again. Want me to show you where I'd start?\n\n{agent}\n{company}",
       ] },
       { variants: [
-        "Following up. The shape of it is simple. One contact, one monthly figure, and we run your software, automations, data and vendors end to end. Everything stays in your accounts, so you're never locked in. For most businesses it costs less than one full time person, and it takes off your plate the part of the job you never wanted. Happy to walk through what we'd cover at {business}. Fifteen minutes?\n\n{agent}\n{company}",
-        "Circling back on {business}. Most owners are surprised how much is already going out across tools, freelancers and vendors once it's all in one view. We pull it into one operation and one bill, usually for less, and put one name on the result. I can show you roughly how that shakes out for you. Worth a short look?\n\n{agent}\n{company}",
+        "Following up on {business}. The whole idea is simple. One person owns your software, automations, data and vendors and runs it as one operation. It stays in your accounts, so you're never locked in, and it usually costs less than one hire. Open to a quick call Wednesday or Thursday?\n\n{agent}\n{company}",
+        "Circling back. Most owners are surprised how much is already going out across tools and vendors once it's all in one view. We pull it into one operation, usually for less, with one name on the result. Worth fifteen minutes this week?\n\n{agent}\n{company}",
       ] },
       { variants: [
-        "Last note from me for now. If it's useful, I'll put together a quick read on what {business} spends across its tech and vendors today, and what the same thing looks like run as one operation for less. No strings, yours either way. Want it?\n\n{agent}\n{company}",
-        "One more from me. Give me fifteen minutes and I'll lay out what running {business}'s technology as one operation would cover, and what it would cost next to what you pay now. Worst case, you walk away with a clearer picture of where your systems leak. Up for it?\n\n{agent}\n{company}",
+        "Last note from me on this. If it helps, I'll send a quick one page read on what {business} spends across its tech and vendors today versus running it as one operation. No strings, yours either way. Want it?\n\n{agent}\n{company}",
+        "One more and I'll leave it. Fifteen minutes and I'll show you what running {business}'s technology as one operation would cover, and what it'd cost next to today. Worst case you get a clearer picture. Open to it?\n\n{agent}\n{company}",
       ] },
     ],
   },

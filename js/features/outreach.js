@@ -396,7 +396,7 @@ function renderCadencePreviews(res, out, to) {
   const head = '<div style="font-size:11px;color:var(--sub);margin:4px 0 8px">Signed by <strong>' + esc(res.agent || '') + '</strong> · ' + esc(res.company || '') + ' · AI personalization ' + (res.aiOn ? 'ON' : 'OFF') + (to ? ' · copies sent to your inbox (' + esc(to) + ')' : '') + '</div>';
   const cards = previews.map(p => {
     const tag = p.step === 1
-      ? ('First email · ' + esc(p.leadName || 'lead') + (p.city ? (', ' + esc(p.city)) : '') + ' · ' + (p.personalized ? 'AI-personalized' : 'template'))
+      ? ('First email · ' + esc(p.leadName || 'lead') + (p.city ? (', ' + esc(p.city)) : '') + (p.segment ? ' · ' + esc(p.segment) + ' angle' : '') + ' · ' + (p.personalized ? 'AI-personalized' : 'template'))
       : ('Follow-up ' + p.step + ' · template');
     return '<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--surface)">'
       + '<div style="font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--accent)">' + tag + '</div>'
