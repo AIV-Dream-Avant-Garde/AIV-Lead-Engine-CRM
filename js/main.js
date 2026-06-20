@@ -97,7 +97,7 @@ function navigate(id) {
     dashboard:'Dashboard',
     setup:'Settings', scraper:'Scraper', import:'Import CSV', responder:'Reply now', leads:'Leads',
     pipeline:'Pipeline', llamadas:'Calls', export:'Export',
-    perfil:'My Profile', admin:'Admin', analytics:'Analytics',
+    perfil:'My Profile', admin:'Admin', analytics:'Analytics', outreach:'Outreach',
   };
   const el = document.getElementById('tb-section');
   if (el) el.textContent = labels[id] || id;
