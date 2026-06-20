@@ -296,6 +296,39 @@ function unenrollSequence(leadId){ if (!confirm('Remove this lead from the seque
 
 // ── Cadence engine status + editable config (the deterministic backend engine) ─
 // Reads trigger/live state + effective config from S.triggerStatus (checkTriggerStatus).
+// A quick pre-launch checklist (read-only) so the operator can see whether the
+// setup is actually ready before flipping the autopilot live.
+function _readinessSendable(l) {
+  const e = String(l && l.email || '').trim().toLowerCase();
+  return !!e && e !== 'n/a' && /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(e) && !/^(no-?reply|do-?not-?reply|postmaster|mailer-daemon)@/.test(e);
+}
+function renderLaunchReadiness() {
+  const c = (S.triggerStatus && S.triggerStatus.cadenceConfig) || {};
+  const ts = S.triggerStatus || {};
+  const leads = S.leads || [];
+  const withEmail = leads.filter(_readinessSendable).length;
+  const newPool = leads.filter(l => (l.status || 'New') === 'New' && _readinessSendable(l)).length;
+  const cov = leads.length ? Math.round(withEmail / leads.length * 100) : 0;
+  const rows = [
+    { ok: !!S.config.scriptUrl, label: 'Apps Script connected', detail: S.config.scriptUrl ? 'Backend reachable.' : 'Connect it in Settings first.' },
+    { ok: cov >= 30, warn: cov > 0 && cov < 30, label: 'Email coverage', detail: withEmail + ' of ' + leads.length + ' leads have a usable email (' + cov + '%).' + (cov < 30 ? ' Low — the engine is email-first.' : '') },
+    { ok: newPool > 0, label: 'Leads ready to email', detail: newPool + ' New lead' + (newPool === 1 ? '' : 's') + ' with an email.' },
+    { ok: !!c.postalAddress, label: 'CAN-SPAM mailing address', detail: c.postalAddress ? 'Set.' : 'Required in the footer — set it in the field above.' },
+    { ok: !c.aiPersonalize, warn: !!c.aiPersonalize, label: 'AI off for clean A/B', detail: c.aiPersonalize ? 'On — turn it off to A/B your subject lines cleanly.' : 'Off — your ranked options A/B cleanly.' },
+    { info: true, label: 'Send mode', detail: ts.cadenceEnabled ? 'LIVE (sending).' : 'Simulation (dry-run).' },
+    { info: true, label: 'Hourly trigger', detail: ts.cadence ? 'Active.' : 'Inactive — autopilot is paused.' },
+    { manual: true, label: 'Deliverability DNS', detail: 'Confirm SPF + DKIM + DMARC on your sending domain in Resend (can\'t be checked from here).' },
+  ];
+  const icon = r => r.manual ? '◇' : r.info ? '·' : r.warn ? '▲' : r.ok ? '✓' : '✕';
+  const color = r => (r.manual || r.info) ? 'var(--sub)' : r.warn ? 'var(--amber)' : r.ok ? 'var(--pos)' : 'var(--red)';
+  return '<div class="card" style="margin-bottom:12px"><div class="card-title">Launch readiness</div>' +
+    '<div class="card-sub" style="margin-bottom:6px">A quick check before you flip the autopilot live.</div>' +
+    rows.map(r => '<div style="display:flex;gap:8px;align-items:flex-start;font-size:12px;margin-top:6px">' +
+      '<span style="color:' + color(r) + ';font-weight:700;min-width:14px;text-align:center">' + icon(r) + '</span>' +
+      '<span><strong style="color:var(--hl)">' + esc(r.label) + '.</strong> <span style="color:var(--sub)">' + esc(r.detail) + '</span></span></div>').join('') +
+    '</div>';
+}
+
 function renderCadenceEngine() {
   const wrap = document.getElementById('admin-seq-engine'); if (!wrap) return;
   const ts = S.triggerStatus || {};
@@ -310,7 +343,7 @@ function renderCadenceEngine() {
   const lastLine = lr && lr.ranAt
     ? `<div style="font-size:11px;color:var(--sub);margin-top:8px">Last run: ${fmtD(lr.ranAt)} ${fmtT(lr.ranAt)} · ${lr.mode==='live'?'enrolled':'would enroll'} ${lr.enrolled||0} · ${lr.mode==='live'?'sent':'would send'} ${lr.sent||0}</div>`
     : `<div style="font-size:11px;color:var(--sub);margin-top:8px">No runs recorded yet.</div>`;
-  wrap.innerHTML = `
+  wrap.innerHTML = renderLaunchReadiness() + `
     <div class="card" style="background:var(--surface-hi);padding:12px 14px;margin-bottom:12px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <span style="font-size:13px;font-weight:600;color:var(--hl)">Cadence engine</span>
