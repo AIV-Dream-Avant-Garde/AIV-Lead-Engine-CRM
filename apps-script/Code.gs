@@ -1323,50 +1323,52 @@ const CADENCE_STEPS = {
   },
 };
 
-// ── Per-industry angle engine ────────────────────────────────────────────────
-// The email opens with a relevant ENTRY into the reader's world (their industry
-// has quietly become a technology business too), then opens up to the full Axius
-// value in the shared CORE below. The opener is the only segment-specific part;
-// the core carries the real offer (their whole technology team, fast, affordable,
-// scalable, nothing held) and the why. `keys` match the lead's keyword/category/
-// name; `noun` is what we call their business in prose.
+// ── Outreach copy engine ─────────────────────────────────────────────────────
+// One sincere, human email from a real operator to a business owner. It leads
+// with THEM, is honest that it's a cold note, shows genuine understanding of
+// their world (the per-industry `detail` is the only segment-specific part), and
+// frames the offer as lifting a weight off them, not as a pitch about us. The AI
+// version makes it feel hand-written to the specific business; this is also the
+// reliable fallback. `keys` match the lead's keyword/category/name.
 const INDUSTRY_ANGLES = [
-  { seg:'dental', noun:'practice', keys:['dent','orthodont','endodont','periodont','oral surg'],
-    opener:"A dental practice today runs on almost as much software as it does dentistry. The booking, the reminders, the new-patient follow-up, a stack of tools that barely talk to each other. And keeping all of it running quietly became someone's second job." },
-  { seg:'medical', noun:'practice', keys:['clinic','medical','doctor','physician','dermatolog','chiro','vet','veterinar','optomet','physical therap','pediatr','urgent care','wellness','health'],
-    opener:"A practice today runs on almost as much software as it does medicine. Scheduling, intake, reminders, records, a handful of systems that barely talk to each other. And keeping all of it running quietly became someone's second job." },
-  { seg:'restaurant', noun:'restaurant', keys:['restaurant','cafe','coffee','bar ','pub','food','pizz','grill','bakery','cater','diner','eatery','bistro','taco','sushi','kitchen','brew'],
-    opener:"A restaurant today runs on almost as much technology as it does food. Scheduling, reservations, the delivery apps, the weekly numbers, all of it leaning on whoever happens to be holding it together that day." },
-  { seg:'home', noun:'business', keys:['contract','plumb','hvac','roof','electric','construction','landscap','remodel','paint','clean','pest','garage','fenc','lawn','handyman','flooring','concrete','solar','restoration','septic','window','door','gutter','tree'],
-    opener:"A {category} today runs on almost as much technology as it does trade work. The leads coming in from three different places, the follow-up, the quotes, the invoicing, all of it depending on someone remembering to keep up." },
-  { seg:'beauty', noun:'salon', keys:['salon','spa','barber','nail','beauty','hair','lash','brow','tattoo','massage','wax','aesthet','medspa','skin'],
-    opener:"A salon today runs on almost as much technology as it does talent. Booking, reminders, reviews, a few apps that barely talk, and the no-shows and follow-ups that slip through when everyone is busy." },
-  { seg:'auto', noun:'shop', keys:['auto','car ','tire','mechanic','body shop','dealer','detailing','transmission','collision','muffler','brake','automotive','vehicle','motor'],
-    opener:"A shop today runs on almost as much technology as it does mechanics. The calls, the scheduling, the service reminders, a few systems that barely talk to each other. And keeping it all moving became someone's second job." },
-  { seg:'retail', noun:'shop', keys:['retail','shop','store','boutique','ecommerce','e-commerce','apparel','clothing','jewel','furniture','grocery','market','goods','supply','outlet'],
-    opener:"A shop today runs on almost as much technology as it does product. Point of sale, inventory, the online store, the spreadsheets, none of them quite agreeing. And keeping it all straight became someone's second job." },
-  { seg:'professional', noun:'firm', keys:['law','attorney','lawyer','legal','account','cpa','tax','insur','real estate','realtor','mortgage','financ','consult','architect','engineer','notary','title','escrow','advis','broker'],
-    opener:"A {category} today runs on almost as much technology as it does expertise. Intake, follow-up, documents, a few systems that barely talk, and the new clients who go cold while someone gets to them." },
-  { seg:'fitness', noun:'studio', keys:['gym','fitness','yoga','pilates','crossfit','train','martial','dance','studio','athletic','wellness center','cycling'],
-    opener:"A studio today runs on almost as much technology as it does training. Memberships, class booking, billing, the retention follow-up that only happens when someone finds the time, which is rarely." },
-  { seg:'hospitality', noun:'property', keys:['hotel','motel','inn','resort','lodge','hostel','bnb','bed and breakfast','suites','vacation rental'],
-    opener:"A property today runs on almost as much technology as it does hospitality. Bookings from a handful of channels, guest messages scattered across inboxes, the reports stitched together by hand." },
+  { seg:'dental', keys:['dent','orthodont','endodont','periodont','oral surg'],
+    detail:"The booking, the reminders, the new-patient follow-up, a handful of tools that don't quite talk to each other" },
+  { seg:'medical', keys:['clinic','medical','doctor','physician','dermatolog','chiro','vet','veterinar','optomet','physical therap','pediatr','urgent care','wellness','health'],
+    detail:"Scheduling, intake, reminders, records, a handful of systems that don't quite talk to each other" },
+  { seg:'restaurant', keys:['restaurant','cafe','coffee','bar ','pub','food','pizz','grill','bakery','cater','diner','eatery','bistro','taco','sushi','kitchen','brew'],
+    detail:"Scheduling, reservations, the delivery apps, the weekly numbers, all of it leaning on whoever's around that day" },
+  { seg:'home', keys:['contract','plumb','hvac','roof','electric','construction','landscap','remodel','paint','clean','pest','garage','fenc','lawn','handyman','flooring','concrete','solar','restoration','septic','window','door','gutter','tree'],
+    detail:"Leads coming in from a few different places, the follow-up, the quotes, the invoicing, all of it riding on someone remembering" },
+  { seg:'beauty', keys:['salon','spa','barber','nail','beauty','hair','lash','brow','tattoo','massage','wax','aesthet','medspa','skin'],
+    detail:"Booking, reminders, reviews, a few apps that don't talk, and the no-shows that slip through when it's busy" },
+  { seg:'auto', keys:['auto','car ','tire','mechanic','body shop','dealer','detailing','transmission','collision','muffler','brake','automotive','vehicle','motor'],
+    detail:"The calls, the scheduling, the service reminders, a few systems that don't quite talk to each other" },
+  { seg:'retail', keys:['retail','shop','store','boutique','ecommerce','e-commerce','apparel','clothing','jewel','furniture','grocery','market','goods','supply','outlet'],
+    detail:"Point of sale, inventory, the online store, the spreadsheets, none of them quite agreeing" },
+  { seg:'professional', keys:['law','attorney','lawyer','legal','account','cpa','tax','insur','real estate','realtor','mortgage','financ','consult','architect','engineer','notary','title','escrow','advis','broker'],
+    detail:"Intake, follow-up, documents, a few systems that don't talk, and the good leads that go cold while someone catches up" },
+  { seg:'fitness', keys:['gym','fitness','yoga','pilates','crossfit','train','martial','dance','studio','athletic','wellness center','cycling'],
+    detail:"Memberships, class booking, billing, and the member follow-up that only happens when there's time" },
+  { seg:'hospitality', keys:['hotel','motel','inn','resort','lodge','hostel','bnb','bed and breakfast','suites','vacation rental'],
+    detail:"Bookings from a handful of channels, guest messages scattered across inboxes, the reports stitched together by hand" },
 ];
 const INDUSTRY_DEFAULT = {
-  seg:'default', noun:'business',
-  opener:"Most owners didn't get into business to spend their evenings wrangling software, vendors, and automations that don't quite work together. But somewhere along the way, that quietly became part of the job.",
+  seg:'default',
+  detail:"The software, the follow-up, the vendors, a dozen tools that half-work and don't talk to each other",
 };
-// The shared heart of the first email: the full offer + the why, in human prose.
-// {noun} is the reader's business word; {company}/{business} fill via cadenceRender.
-const AXIUS_CORE =
-  "That's why {company} exists. We become the technology team behind your business. One person who owns the whole thing, with the systems and specialists to actually run it, for less than the cost of a single hire. Someone is finally accountable for all of it, and it isn't you. Everything stays in your name, so this is never a vendor you're stuck with.\n\n" +
-  "The point is simple. You get back to running your {noun}, not its software, and it grows without everything breaking.\n\n" +
-  "If that's worth ten minutes, I'd love to show you what it could look like for {business}. Are you around later this week?";
-// Broad, personal, curiosity-driven subjects (rotated per lead). Not one-pain.
+// The sincere first email. {detail} is the industry-specific line; {business}
+// fills via cadenceRender. Leads with the reader, honest, warm, low-pressure.
+const SINCERE_TEMPLATE =
+  "Hi there,\n\n" +
+  "I came across {business} and wanted to reach out, one owner to another.\n\n" +
+  "Most owners I meet are great at what they do, but somewhere along the way the technology side turned into a second job they never wanted. {detail}. It quietly lands on you, on top of everything else.\n\n" +
+  "What I'd really like to do is take that off your plate. Not sell you one more app, but actually own and run the whole technology side for you, the way a good in-house team would, for less than the cost of one hire. So you can get back to the part you actually love.\n\n" +
+  "I know this is out of the blue, and I don't want to waste your time. If you're open to it, I'd love fifteen minutes to understand how {business} runs and tell you honestly whether we can help. No pressure, and you'll walk away with something useful either way.";
+// Personal, low-key subjects (rotated per lead). Sincere, not salesy.
 const SUBJECT_LINES = [
-  "Who actually runs {business}'s tech?",
-  "{business}'s other full-time job",
-  "Running {business}, not its software",
+  "A note for {business}",
+  "Reaching out about {business}",
+  "Quick question about {business}",
 ];
 // Match a lead to its industry angle by scanning keyword/category/source/name.
 function pickIndustryAngle_(lead) {
@@ -1378,14 +1380,14 @@ function pickIndustryAngle_(lead) {
   }
   return INDUSTRY_DEFAULT;
 }
-// Build the FIRST email: relevant industry opener + the shared value core, signed
-// off. The AI version refines this; this is also the reliable fallback.
+// Build the FIRST email: sincere template with the industry detail woven in.
+// The AI version makes it hand-written; this is the reliable fallback.
 function composeFirstEmail_(lead, company, agent) {
   const a = pickIndustryAngle_(lead);
-  const raw = ('Hi there,\n\n' + a.opener + '\n\n' + AXIUS_CORE).replace(/\{noun\}/g, a.noun || 'business');
+  const raw = SINCERE_TEMPLATE.replace(/\{detail\}/g, a.detail || INDUSTRY_DEFAULT.detail);
   return cadenceRender(raw, lead, company, agent) + '\n\n' + agent + '\n' + company;
 }
-// Subject line for a lead's first email — broad + personal, rotated per lead.
+// Subject line for a lead's first email — personal + low-key, rotated per lead.
 function cadenceSubjectFor_(lead, company, agent) {
   const subj = SUBJECT_LINES[pickVariant(lead.id, 7, SUBJECT_LINES.length)] || CADENCE_EMAIL_SUBJECT;
   return cadenceRender(subj, lead, company, agent);
@@ -1659,24 +1661,26 @@ function geminiPersonalizeEmail_(lead, cfg) {
   if (lead.website && String(lead.website) !== 'N/A') facts.push('Has a website: ' + lead.website);
   if (!facts.length) return '';   // nothing to personalize on — use the template
 
-  // The segment angle is the BRIEF. The AI refines this proven, true opener to the
-  // specific business — it does not invent a new angle from scratch.
   const angle = pickIndustryAngle_(lead);
-  const system = 'You are ' + agent + ', the operator behind ' + company + '. ' + AXIUS_BRIEF + ' ' +
-    'Rewrite the BASELINE first email below so it reads like a sincere, thoughtful person wrote it personally to this owner. ' +
-    'Keep everything that matters: the relevant industry opener, and the full offer (we become their whole technology team, one ' +
-    'accountable owner plus systems and specialists, for less than a single hire, fast, everything stays in their name, so they get ' +
-    'back to running their business while it grows). Do NOT shrink it to one feature or one pain point. The goal is that they finish ' +
-    'reading and feel understood and genuinely want to talk to us. ' +
-    'You may lightly weave in the real facts below to make it feel hand-written, but do NOT invent specifics, owner names, numbers, ' +
-    'pricing, results, or claims you cannot know, do NOT open with a compliment about their rating, and do NOT name any framework or lead with price. ' +
-    'WRITE LIKE A REAL HUMAN, warm and direct, not AI: no em dashes at all, no "I hope this finds you well", no buzzwords, no rule-of-three ' +
-    'lists, no over-polished symmetry. Use contractions. Vary sentence length, let it breathe in short paragraphs. Around 90 to 130 words. ' +
-    'End with a warm, specific, low-pressure question (a quick call this week). NO booking link. Plain text, no subject line. Do NOT add a ' +
-    'sign-off, signature, or your name — end right after the question. The signature is added automatically.';
-  const prompt = 'Industry: ' + (lead.keyword || angle.seg) + '\n\nBASELINE email (keep its meaning and full value, make it more human and specific to this business):\n' +
+  const system = 'You are ' + agent + ', a real person and the operator behind ' + company + ', writing one sincere cold email to a ' +
+    'local business owner. ' + AXIUS_BRIEF + ' ' +
+    'THE TONE IS EVERYTHING. This must feel like a genuine, humble note from one person to another, NOT marketing and NOT a pitch about ' +
+    'us. Lead with THEM. Be honest that it is a cold email. Show you actually understand what their days are like as an owner. Make the ' +
+    'offer about lifting a weight off them, not about how great we are. They should finish it feeling respected and a little relieved that ' +
+    'someone gets it, not sold to. ' +
+    'Rewrite the BASELINE below in that spirit. Keep its shape: open with the reader and {business}, name the real day-to-day tech burden ' +
+    'for their kind of business, then offer to actually own and run the whole technology side for them (for less than one hire, everything ' +
+    'stays in their name), and close with a low-pressure ask. Keep the full idea (their whole technology side handled, one accountable ' +
+    'owner), do not shrink it to one feature, and do not turn it into a list of services or lead with price. ' +
+    'You may weave in the real facts below to make it feel hand-written, but NEVER invent specifics, owner names, numbers, pricing, or ' +
+    'results, and do not flatter their rating. WRITE LIKE A WARM, HONEST HUMAN: contractions, plain words, short breathing paragraphs, ' +
+    'varied sentence length. NO em dashes, no "I hope this finds you well", no buzzwords, no rule-of-three, no salesy polish. ' +
+    'Around 110 to 150 words. End right after a warm, low-pressure question. Plain text, no subject line, and do NOT sign off or add your ' +
+    'name; the signature is added automatically.';
+  const prompt = 'Their business: ' + (lead.name || '') + (lead.keyword ? ' (' + lead.keyword + ')' : '') +
+    '\n\nBASELINE email to make more human and personal (keep its sincerity and full meaning):\n' +
     composeFirstEmail_(lead, company, agent).replace(/\n+[^\n]*\n[^\n]*$/, '').trim() +
-    '\n\nReal facts you may use:\n' + facts.join('\n') + '\n\nWrite the refined email now.';
+    '\n\nReal facts you may use, sparingly and only if natural:\n' + facts.join('\n') + '\n\nWrite the email now.';
   const draft = geminiGenerate_(system, prompt);
   if (!draft) return '';   // generation failed → caller falls back to the template
   // Append the sign-off deterministically — never rely on the model to add it.
