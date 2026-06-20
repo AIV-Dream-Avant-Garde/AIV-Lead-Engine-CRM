@@ -41,6 +41,31 @@
 /* MAIN */
 .main{margin-left:var(--sw);flex:1;min-width:0;display:flex;flex-direction:column;height:100vh;position:relative;z-index:1}
 .content-area{min-width:0}
+
+/* ── Collapsible sidebar (desktop icon-rail) ─────────────────────────────── */
+.sidebar{transition:width .2s ease}
+.main{transition:margin-left .2s ease}
+.sb-collapse-btn{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border:1px solid var(--border-hi);background:var(--surface);border-radius:7px;color:var(--sub);cursor:pointer;flex-shrink:0;margin-right:10px;transition:color .15s,background .15s}
+.sb-collapse-btn:hover{color:var(--hl);background:var(--surface-hi)}
+@media (min-width:861px){
+  body.sb-collapsed .sidebar{width:64px}
+  body.sb-collapsed .main{margin-left:64px}
+  body.sb-collapsed .sb-logo{padding:18px 0}
+  body.sb-collapsed .sb-logo-mark{justify-content:center;gap:0;font-size:0}
+  body.sb-collapsed .sb-logo-dot{width:9px;height:9px}
+  body.sb-collapsed .sb-logo-sub{display:none}
+  body.sb-collapsed .sb-sec-label{display:none}
+  body.sb-collapsed .sb-nav{padding:12px 8px}
+  body.sb-collapsed .nav-item{justify-content:center;gap:0;font-size:0;padding:10px 0}
+  body.sb-collapsed .nav-item.active{padding-left:0}
+  body.sb-collapsed .nav-item svg{width:17px;height:17px}
+  body.sb-collapsed .nav-badge{display:none}
+  body.sb-collapsed .sb-user{justify-content:center;padding:10px 0}
+  body.sb-collapsed .sb-user-info,body.sb-collapsed .sb-logout{display:none}
+  body.sb-collapsed .sb-footer{padding:12px 6px;text-align:center}
+  body.sb-collapsed .sync-status{justify-content:center}
+  body.sb-collapsed .sync-status span,body.sb-collapsed .sb-version,body.sb-collapsed .sync-progress{display:none}
+}
 .topbar{height:52px;background:var(--topbar-bg);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 28px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;z-index:40}
 .tb-left{display:flex;align-items:center;gap:16px}
 .tb-bc{font-size:12px;color:var(--sub);display:flex;align-items:center;gap:6px}
