@@ -12,12 +12,26 @@ async function sheetsCall(params) {
     const r = await fetch(url + '?action=' + params.action, {
       method:'POST', redirect:'follow',
       headers:{'Content-Type':'text/plain'},
-      body: JSON.stringify({...params, _secret: S.config.crmSecret}),
+      body: JSON.stringify({...params, _secret: S.config.crmSecret, adminToken: (S.session && S.session.adminToken) || ''}),
     });
-    return await r.json();
+    const data = await r.json();
+    // The server rejected our admin token (expired/missing) on an admin-only
+    // action — the admin needs to sign in again via the two-gate flow.
+    if (data && data.code === 401 && S.session && S.session.role === 'admin') handleAdminAuthExpired();
+    return data;
   } catch(e) {
     return {success:false, error:e.message};
   }
+}
+
+// Admin token no longer valid: drop the session so the next action goes through
+// a fresh two-gate sign-in. Guarded so we only fire once per expiry.
+var _adminAuthExpiring = false;
+function handleAdminAuthExpired() {
+  if (_adminAuthExpiring) return;
+  _adminAuthExpiring = true;
+  toast('Admin session expired. Please sign in again.', 'error', 6000);
+  setTimeout(() => { _adminAuthExpiring = false; if (typeof logout === 'function') logout(); }, 1200);
 }
 
 // Fire a backend save the user expects to persist, and surface a failure. These
