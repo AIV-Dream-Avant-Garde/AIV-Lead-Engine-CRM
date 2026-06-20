@@ -10,11 +10,11 @@
 <script src="https://cdn.jsdelivr.net/npm/@twilio/voice-sdk@2.9.0/dist/twilio.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-<link rel="stylesheet" href="css/base.css?v=20260620k">
-<link rel="stylesheet" href="css/layout.css?v=20260620k">
-<link rel="stylesheet" href="css/components.css?v=20260620k">
-<link rel="stylesheet" href="css/widgets.css?v=20260620k">
-<link rel="stylesheet" href="css/responsive.css?v=20260620k">
+<link rel="stylesheet" href="css/base.css?v=20260620l">
+<link rel="stylesheet" href="css/layout.css?v=20260620l">
+<link rel="stylesheet" href="css/components.css?v=20260620l">
+<link rel="stylesheet" href="css/widgets.css?v=20260620l">
+<link rel="stylesheet" href="css/responsive.css?v=20260620l">
 </head>
 <body>
 
@@ -57,8 +57,14 @@
 <!-- SIDEBAR -->
 <aside class="sidebar" role="navigation" aria-label="Main navigation">
   <div class="sb-logo">
-    <div class="sb-logo-mark"><div class="sb-logo-dot"></div>AXIUS</div>
-    <div class="sb-logo-sub">Lead Engine &amp; CRM</div>
+    <div class="sb-logo-text">
+      <div class="sb-logo-mark"><div class="sb-logo-dot"></div>AXIUS</div>
+      <div class="sb-logo-sub">Lead Engine &amp; CRM</div>
+    </div>
+    <button class="sb-collapse-btn" aria-label="Collapse sidebar" title="Collapse sidebar" onclick="toggleSidebarCollapse()">
+      <svg class="ico-collapse" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M6.5 3v10"/></svg>
+      <svg class="ico-expand" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M9.5 3v10"/></svg>
+    </button>
   </div>
   <div class="sb-user" id="sb-user-row" style="display:none">
     <div class="sb-avatar" id="sb-avatar">?</div>
@@ -155,9 +161,6 @@
     <div class="tb-left">
       <button class="mobile-menu-btn" aria-label="Open menu" onclick="toggleSidebar()">
         <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 4h12M2 8h12M2 12h12"/></svg>
-      </button>
-      <button class="sb-collapse-btn" aria-label="Collapse sidebar" title="Collapse sidebar" onclick="toggleSidebarCollapse()">
-        <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M6.5 3v10"/></svg>
       </button>
       <div class="tb-bc">AXIUS / <span id="tb-section">Dashboard</span></div>
       <span class="tb-sync-time" id="tb-sync-time"></span>
@@ -1164,33 +1167,33 @@ Content-Type: application/json
 </div>
 
 <!-- JS: load order matters — data → core → auth → locks → commission → features → main -->
-<script src="js/data/keywords.js?v=20260620k"></script>
-<script src="js/data/locations.js?v=20260620k"></script>
-<script src="js/data/states.js?v=20260620k"></script>
-<script src="js/data/constants.js?v=20260620k"></script>
-<script src="js/data/demo-data.js?v=20260620k"></script>
-<script src="js/data/outreach-templates.js?v=20260620k"></script>
-<script src="js/core/state.js?v=20260620k"></script>
-<script src="js/core/theme.js?v=20260620k"></script>
-<script src="js/core/utils.js?v=20260620k"></script>
-<script src="js/core/storage.js?v=20260620k"></script>
-<script src="js/core/api.js?v=20260620k"></script>
-<script src="js/auth/auth.js?v=20260620k"></script>
-<script src="js/locks.js?v=20260620k"></script>
-<script src="js/commission.js?v=20260620k"></script>
-<script src="js/features/scraper.js?v=20260620k"></script>
-<script src="js/features/dashboard.js?v=20260620k"></script>
-<script src="js/features/campaigns.js?v=20260620k"></script>
-<script src="js/features/outreach.js?v=20260620k"></script>
-<script src="js/features/inbox.js?v=20260620k"></script>
-<script src="js/features/import.js?v=20260620k"></script>
-<script src="js/features/leads.js?v=20260620k"></script>
-<script src="js/features/pipeline.js?v=20260620k"></script>
-<script src="js/features/calls.js?v=20260620k"></script>
-<script src="js/features/profile.js?v=20260620k"></script>
-<script src="js/features/admin.js?v=20260620k"></script>
-<script src="js/features/analytics.js?v=20260620k"></script>
-<script src="js/features/export.js?v=20260620k"></script>
-<script src="js/main.js?v=20260620k"></script>
+<script src="js/data/keywords.js?v=20260620l"></script>
+<script src="js/data/locations.js?v=20260620l"></script>
+<script src="js/data/states.js?v=20260620l"></script>
+<script src="js/data/constants.js?v=20260620l"></script>
+<script src="js/data/demo-data.js?v=20260620l"></script>
+<script src="js/data/outreach-templates.js?v=20260620l"></script>
+<script src="js/core/state.js?v=20260620l"></script>
+<script src="js/core/theme.js?v=20260620l"></script>
+<script src="js/core/utils.js?v=20260620l"></script>
+<script src="js/core/storage.js?v=20260620l"></script>
+<script src="js/core/api.js?v=20260620l"></script>
+<script src="js/auth/auth.js?v=20260620l"></script>
+<script src="js/locks.js?v=20260620l"></script>
+<script src="js/commission.js?v=20260620l"></script>
+<script src="js/features/scraper.js?v=20260620l"></script>
+<script src="js/features/dashboard.js?v=20260620l"></script>
+<script src="js/features/campaigns.js?v=20260620l"></script>
+<script src="js/features/outreach.js?v=20260620l"></script>
+<script src="js/features/inbox.js?v=20260620l"></script>
+<script src="js/features/import.js?v=20260620l"></script>
+<script src="js/features/leads.js?v=20260620l"></script>
+<script src="js/features/pipeline.js?v=20260620l"></script>
+<script src="js/features/calls.js?v=20260620l"></script>
+<script src="js/features/profile.js?v=20260620l"></script>
+<script src="js/features/admin.js?v=20260620l"></script>
+<script src="js/features/analytics.js?v=20260620l"></script>
+<script src="js/features/export.js?v=20260620l"></script>
+<script src="js/main.js?v=20260620l"></script>
 </body>
 </html>

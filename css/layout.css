@@ -2,7 +2,7 @@
 
 /* SIDEBAR */
 .sidebar{width:var(--sw);background:var(--sidebar-bg);color:var(--sidebar-fg);border-right:1px solid var(--sidebar-line);position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;z-index:50}
-.sb-logo{padding:22px 18px 16px;border-bottom:1px solid var(--sidebar-line)}
+.sb-logo{padding:18px 12px 16px 18px;border-bottom:1px solid var(--sidebar-line);display:flex;align-items:center;justify-content:space-between;gap:8px}
 .sb-logo-mark{font-family:'Fraunces',serif;font-size:24px;letter-spacing:-1px;color:var(--sidebar-fg);display:flex;align-items:center;gap:7px;margin-bottom:3px}
 .sb-logo-dot{width:7px;height:7px;border-radius:50%;background:var(--sidebar-fg);opacity:.85;flex-shrink:0}
 .sb-logo-sub{font-size:9px;font-weight:600;letter-spacing:2.5px;text-transform:uppercase;color:var(--sidebar-muted)}
@@ -42,18 +42,19 @@
 .main{margin-left:var(--sw);flex:1;min-width:0;display:flex;flex-direction:column;height:100vh;position:relative;z-index:1}
 .content-area{min-width:0}
 
-/* ── Collapsible sidebar (desktop icon-rail) ─────────────────────────────── */
+/* ── Collapsible sidebar (desktop icon-rail; toggle lives in the header) ──── */
 .sidebar{transition:width .2s ease}
 .main{transition:margin-left .2s ease}
-.sb-collapse-btn{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border:1px solid var(--border-hi);background:var(--surface);border-radius:7px;color:var(--sub);cursor:pointer;flex-shrink:0;margin-right:10px;transition:color .15s,background .15s}
-.sb-collapse-btn:hover{color:var(--hl);background:var(--surface-hi)}
+.sb-collapse-btn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:none;background:none;border-radius:7px;color:var(--sidebar-muted);cursor:pointer;flex-shrink:0;transition:color .15s,background .15s}
+.sb-collapse-btn:hover{color:var(--sidebar-fg);background:var(--sidebar-active-bg)}
+.sb-collapse-btn .ico-expand{display:none}
 @media (min-width:861px){
   body.sb-collapsed .sidebar{width:64px}
   body.sb-collapsed .main{margin-left:64px}
-  body.sb-collapsed .sb-logo{padding:18px 0}
-  body.sb-collapsed .sb-logo-mark{justify-content:center;gap:0;font-size:0}
-  body.sb-collapsed .sb-logo-dot{width:9px;height:9px}
-  body.sb-collapsed .sb-logo-sub{display:none}
+  body.sb-collapsed .sb-logo{padding:18px 0;justify-content:center}
+  body.sb-collapsed .sb-logo-text{display:none}
+  body.sb-collapsed .sb-collapse-btn .ico-collapse{display:none}
+  body.sb-collapsed .sb-collapse-btn .ico-expand{display:block}
   body.sb-collapsed .sb-sec-label{display:none}
   body.sb-collapsed .sb-nav{padding:12px 8px}
   body.sb-collapsed .nav-item{justify-content:center;gap:0;font-size:0;padding:10px 0}
