@@ -333,7 +333,7 @@ function doPost(e) {
     // commissions) are intentionally NOT in this set. code 401 → client re-login.
     var ADMIN_ONLY = { saveTeamMember:1, cancelCommission:1, adjustCollected:1, markCommissionPaid:1,
       saveCadenceConfig:1, saveScheduledJobs:1, saveStateCampaigns:1, saveReportEmail:1,
-      setTrigger:1, runCadenceNow:1, runScrapesNow:1, saveScript:1, deleteScript:1 };
+      setTrigger:1, runCadenceNow:1, runScrapesNow:1, saveScript:1, deleteScript:1, previewOutreach:1 };
     if (ADMIN_ONLY[a] && !verifyAdminToken_(b.adminToken)) {
       return err_('Admin sign-in required for this action.', 401);
     }
@@ -544,6 +544,44 @@ function doPost(e) {
       if (leadOptedOut(b.leadId)) return err_('lead opted out');   // server-side safety net
       const r = resendSend_(email, subject, msgBody);
       return r.sid ? ok({sid:r.sid, status:r.status}) : err_(r.error || 'email failed');
+    }
+    if (a === 'previewOutreach') {
+      // QA tool: render the cadence email for REAL leads exactly as the autopilot
+      // would (AI-personalized first email when aiPersonalize is on), and send the
+      // previews to the operator's own address — never to the leads. Subjects are
+      // tagged with the business name so they can cross-reference. Cost-capped.
+      const to = String(b.to || '').trim();
+      if (!/.+@.+\..+/.test(to)) return err_('A valid email address is required.');
+      const ids = (b.leadIds || []).slice(0, 8);   // cap Gemini/Resend cost per preview
+      if (!ids.length) return err_('Select at least one lead with an email.');
+      const cfg = getCadenceCfg_();
+      const agent = cfg.agentName || 'Andres', company = cfg.company || 'Axius';
+      const leads = toObjs(getSheet(SHEETS.leads, LEAD_HDR));
+      const byId = {}; leads.forEach(function(l){ byId[String(l.id)] = l; });
+      let sent = 0; const chosen = [];
+      // First email per selected lead — personalized just like a real send.
+      for (const id of ids) {
+        const lead = byId[String(id)]; if (!lead || !String(lead.email || '').trim()) continue;
+        const steps = cadenceSteps(lead); if (!steps.length) continue;
+        chosen.push(lead);
+        const v0 = (steps[0].variants || []);
+        let body = cadenceRender(v0[pickVariant(lead.id, 0, v0.length)] || '', lead, company, agent);
+        if (cfg.aiPersonalize) { try { const p = geminiPersonalizeEmail_(lead, cfg); if (p) body = p; } catch (e) { Logger.log('preview personalize: ' + e.message); } }
+        const subj = '[Preview · email 1] ' + (lead.name || 'lead') + (lead.city ? (', ' + lead.city) : '');
+        const r = resendSend_(to, subj, body); if (r.sid) sent++;
+      }
+      // Follow-up steps (templates, not personalized) rendered for the first lead,
+      // so the operator sees the whole sequence in one go.
+      if (chosen.length) {
+        const lead = chosen[0], steps = cadenceSteps(lead);
+        for (let s = 1; s < steps.length; s++) {
+          const v = (steps[s].variants || []);
+          const body = cadenceRender(v[pickVariant(lead.id, s, v.length)] || '', lead, company, agent);
+          const subj = '[Preview · follow-up ' + (s + 1) + '] template, e.g. ' + (lead.name || 'lead');
+          const r = resendSend_(to, subj, body); if (r.sid) sent++;
+        }
+      }
+      return ok({ sent, leads: chosen.length });
     }
     if (a === 'runCadenceNow') {
       // On-demand cadence pass (dry-run while CADENCE_ENABLED=false). Lets the
