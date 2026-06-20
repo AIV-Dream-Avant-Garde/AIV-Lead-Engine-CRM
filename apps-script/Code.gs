@@ -327,6 +327,17 @@ function doPost(e) {
       } finally { lock.releaseLock(); }
     }
 
+    // Admin-only actions require a valid admin token (issued by adminLogin), so a
+    // rep — or anyone holding the shared CRM secret — can't drive admin endpoints
+    // directly. Reps' day-to-day actions (leads, calls, outreach, their own
+    // commissions) are intentionally NOT in this set. code 401 → client re-login.
+    var ADMIN_ONLY = { saveTeamMember:1, cancelCommission:1, adjustCollected:1, markCommissionPaid:1,
+      saveCadenceConfig:1, saveScheduledJobs:1, saveStateCampaigns:1, saveReportEmail:1,
+      setTrigger:1, runCadenceNow:1, runScrapesNow:1, saveScript:1, deleteScript:1 };
+    if (ADMIN_ONLY[a] && !verifyAdminToken_(b.adminToken)) {
+      return err_('Admin sign-in required for this action.', 401);
+    }
+
     if (a === 'push') {
       // Dedup by id (the lead's stable unique key), NOT by phone. Phone-keying
       // silently dropped every lead with a blank/'N/A' phone — they all collide
