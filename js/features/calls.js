@@ -46,6 +46,15 @@ async function initTwilio() {
   }
 }
 
+// Auto-connect Twilio when the operator opens Calls — the keys live on the
+// server, so there's no manual step. Fires once per session: skips if already
+// connected, in demo mode, or before the Apps Script URL is set. The manual
+// "Connect Twilio" button in Settings remains as a reconnect fallback.
+function autoConnectTwilio() {
+  if (S.demoMode || !S.config.scriptUrl || CALL.device) return;
+  if (typeof initTwilio === 'function') initTwilio();
+}
+
 // ── makeCall — consolidated (auto-claim + consent + script) ─
 function makeCall(leadId) {
   const l = S.leads.find(x => x.id === leadId);

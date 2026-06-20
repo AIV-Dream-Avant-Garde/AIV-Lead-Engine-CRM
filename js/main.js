@@ -132,7 +132,7 @@ function navigate(id) {
   if (id === 'analytics') renderAnalytics();
   if (id === 'responder') renderResponder();
   if (id === 'leads')     { S.page = 1; renderTable(); }
-  if (id === 'llamadas')  renderCallsSection();
+  if (id === 'llamadas')  { renderCallsSection(); if (typeof autoConnectTwilio === 'function') autoConnectTwilio(); }
   if (id === 'perfil')    renderPerfil();
   if (id === 'admin') {
     if (S.session?.role !== 'admin') { toast('Access restricted.', 'error'); navigate('leads'); return; }
