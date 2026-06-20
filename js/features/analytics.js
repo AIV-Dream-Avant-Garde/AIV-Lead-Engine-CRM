@@ -4,10 +4,51 @@ function renderAnalytics() {
   if (!S.session) return;
   renderAnalyticsKPIs();
   renderOutreach();
+  renderSubjectPerformance();
   renderFunnel();
   renderSourceROI();
   renderLeaderboard();
   renderCallPerformance();
+}
+
+// ── Subject-line performance (data only) ───────────────────
+// The first email rotates between subject lines per lead, by a stable hash of the
+// lead id (mirrors the engine's pickVariant(lead.id, 7, N)). We re-derive which
+// subject each emailed lead got and show the reply rate per subject — so you can
+// see which line actually earns replies. Labels mirror Code.gs SUBJECT_LINES (for
+// display only; keep this list + order in sync when you change the subjects).
+const SUBJECT_LABELS = [
+  "A note for {business}",
+  "Reaching out about {business}",
+  "Quick question about {business}",
+];
+function cadencePickVariant_(leadId, stepIndex, n) {
+  if (!n || n <= 1) return 0;
+  const s = String(leadId || '') + ':' + String(stepIndex || 0);
+  let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h % n;
+}
+function renderSubjectPerformance() {
+  const el = document.getElementById('analytics-subject-perf');
+  if (!el) return;
+  const ix = S.interactions || [];
+  // Leads that received the FIRST cadence email (step 0). The subject is constant
+  // per lead, so this is the right denominator for subject reply rate.
+  const firstEmailed = {};
+  ix.forEach(i => { if (i.channel === 'email' && i.direction === 'out' && i.createdBy === 'cadence' && i.stepTag === 'seq:0') firstEmailed[i.leadId] = 1; });
+  const replied = new Set(ix.filter(i => i.channel === 'email' && i.direction === 'in').map(i => i.leadId));
+  const n = SUBJECT_LABELS.length;
+  const stat = Array.from({ length: n }, () => ({ sent: 0, replied: 0 }));
+  Object.keys(firstEmailed).forEach(leadId => {
+    const idx = cadencePickVariant_(leadId, 7, n);
+    stat[idx].sent++;
+    if (replied.has(leadId)) stat[idx].replied++;
+  });
+  const total = stat.reduce((s, x) => s + x.sent, 0);
+  if (!total) { el.innerHTML = '<div class="notes-empty">No first emails sent yet. Each subject line\'s reply rate shows here once the cadence runs.</div>'; return; }
+  el.innerHTML = '<table class="data-table"><thead><tr><th>Subject line</th><th>Sent</th><th>Replied</th><th>Reply rate</th></tr></thead><tbody>' +
+    stat.map((x, i) => '<tr><td>' + esc(SUBJECT_LABELS[i]) + '</td><td>' + x.sent + '</td><td>' + x.replied + '</td><td><strong>' + (x.sent ? Math.round(x.replied / x.sent * 100) : 0) + '%</strong></td></tr>').join('') +
+    '</tbody></table>';
 }
 
 // ── Outreach performance (email autopilot) ─────────────────
