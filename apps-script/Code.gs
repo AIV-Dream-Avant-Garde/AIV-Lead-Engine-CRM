@@ -128,6 +128,7 @@ function verifyAdminToken_(tok) {
 const CADENCE_ENABLED          = false;   // master switch (false = dry-run, sends nothing)
 const CADENCE_COMPANY          = 'AXIUS'; // {empresa} token
 const CADENCE_AGENT_NAME       = 'Andrés';// {agente} token — the sending persona name
+const CADENCE_EMAIL_SUBJECT    = PROP_('CADENCE_EMAIL_SUBJECT', 'Who runs the tech behind {business}?'); // cold-email subject; {business}/{city} tokens; same across steps so they thread
 const CADENCE_DAILY_CAP        = 200;     // max sends per day
 const CADENCE_STEP_GAP_DAYS    = 2;       // min days between proactive touches
 const CADENCE_FIRST_SPREAD_MIN = 360;     // spread first touches over N minutes (anti-burst)
@@ -546,42 +547,45 @@ function doPost(e) {
       return r.sid ? ok({sid:r.sid, status:r.status}) : err_(r.error || 'email failed');
     }
     if (a === 'previewOutreach') {
-      // QA tool: render the cadence email for REAL leads exactly as the autopilot
-      // would (AI-personalized first email when aiPersonalize is on), and send the
-      // previews to the operator's own address — never to the leads. Subjects are
-      // tagged with the business name so they can cross-reference. Cost-capped.
-      const to = String(b.to || '').trim();
-      if (!/.+@.+\..+/.test(to)) return err_('A valid email address is required.');
-      const ids = (b.leadIds || []).slice(0, 8);   // cap Gemini/Resend cost per preview
-      if (!ids.length) return err_('Select at least one lead with an email.');
+      // QA tool: render the cadence email for the SELECTED real leads exactly as the
+      // autopilot would (AI-personalized first email when aiPersonalize is on) and
+      // RETURN the rendered content for on-screen review. Optionally also email the
+      // previews to the operator's own address (never to the leads). The lead does
+      // NOT need its own email — we render against its facts; sending goes to `to`.
+      const to = String(b.to || '').trim();             // optional
+      const ids = (b.leadIds || []).slice(0, 8);         // cap Gemini/Resend cost per preview
+      if (!ids.length) return err_('Select at least one lead first.');
       const cfg = getCadenceCfg_();
-      const agent = cfg.agentName || 'Andres', company = cfg.company || 'Axius';
+      const agent = cfg.agentName || CADENCE_AGENT_NAME, company = cfg.company || CADENCE_COMPANY;
       const leads = toObjs(getSheet(SHEETS.leads, LEAD_HDR));
       const byId = {}; leads.forEach(function(l){ byId[String(l.id)] = l; });
-      let sent = 0; const chosen = [];
-      // First email per selected lead — personalized just like a real send.
+      const previews = []; let sent = 0; const chosen = [];
+      // First email per selected lead — personalized exactly like a real send.
       for (const id of ids) {
-        const lead = byId[String(id)]; if (!lead || !String(lead.email || '').trim()) continue;
+        const lead = byId[String(id)]; if (!lead) continue;
         const steps = cadenceSteps(lead); if (!steps.length) continue;
         chosen.push(lead);
         const v0 = (steps[0].variants || []);
         let body = cadenceRender(v0[pickVariant(lead.id, 0, v0.length)] || '', lead, company, agent);
-        if (cfg.aiPersonalize) { try { const p = geminiPersonalizeEmail_(lead, cfg); if (p) body = p; } catch (e) { Logger.log('preview personalize: ' + e.message); } }
-        const subj = '[Preview · email 1] ' + (lead.name || 'lead') + (lead.city ? (', ' + lead.city) : '');
-        const r = resendSend_(to, subj, body); if (r.sid) sent++;
+        let personalized = false;
+        if (cfg.aiPersonalize) { try { const p = geminiPersonalizeEmail_(lead, cfg); if (p) { body = p; personalized = true; } } catch (e) { Logger.log('preview personalize: ' + e.message); } }
+        const subject = cadenceRender(CADENCE_EMAIL_SUBJECT, lead, company, agent);
+        previews.push({ step: 1, leadName: lead.name || '', city: lead.city || '', leadEmail: lead.email || '', subject: subject, body: body, personalized: personalized });
+        if (to) { const r = resendSend_(to, '[TEST] ' + subject, body); if (r.sid) sent++; }
       }
-      // Follow-up steps (templates, not personalized) rendered for the first lead,
-      // so the operator sees the whole sequence in one go.
+      // Follow-up steps (templates) rendered for the first selected lead, so the
+      // whole sequence is visible in one go.
       if (chosen.length) {
         const lead = chosen[0], steps = cadenceSteps(lead);
         for (let s = 1; s < steps.length; s++) {
           const v = (steps[s].variants || []);
           const body = cadenceRender(v[pickVariant(lead.id, s, v.length)] || '', lead, company, agent);
-          const subj = '[Preview · follow-up ' + (s + 1) + '] template, e.g. ' + (lead.name || 'lead');
-          const r = resendSend_(to, subj, body); if (r.sid) sent++;
+          const subject = cadenceRender(CADENCE_EMAIL_SUBJECT, lead, company, agent);
+          previews.push({ step: s + 1, leadName: lead.name || '', city: lead.city || '', subject: subject, body: body, personalized: false });
+          if (to) { const r = resendSend_(to, '[TEST] ' + subject, body); if (r.sid) sent++; }
         }
       }
-      return ok({ sent, leads: chosen.length });
+      return ok({ sent, previews: previews, leads: chosen.length, agent: agent, company: company, aiOn: !!cfg.aiPersonalize });
     }
     if (a === 'runCadenceNow') {
       // On-demand cadence pass (dry-run while CADENCE_ENABLED=false). Lets the
@@ -1551,9 +1555,17 @@ function geminiPersonalizeEmail_(lead, cfg) {
     'WRITE LIKE A REAL PERSON, not AI: no em dashes at all, no "I hope this finds you well", no rule-of-three lists, no buzzwords, ' +
     'no over-polished symmetry. Use contractions. Vary sentence length. Keep it 45 to 85 words. ' +
     'End with a short, low-friction question that invites a reply. You may offer a quick look or a one page read either way, but NO ' +
-    'booking link and no hard ask. Plain text, no subject line. Sign off on two lines: ' + agent + ', then ' + company + '.';
+    'booking link and no hard ask. Plain text, no subject line. Do NOT add a sign-off, signature, or your name — end right after the ' +
+    'question. The signature is added automatically.';
   const prompt = 'Facts you may use:\n' + facts.join('\n') + '\n\nWrite the email now.';
-  return geminiGenerate_(system, prompt);
+  const draft = geminiGenerate_(system, prompt);
+  if (!draft) return '';   // generation failed → caller falls back to the template
+  // Append the sign-off deterministically — never rely on the model to add it.
+  // Strip any name/company line it may have tacked on anyway, to avoid a double sign-off.
+  let body = String(draft).trim();
+  const tail = new RegExp('\\n+\\s*(' + agent.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '|' + company.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')[\\s,.-]*$', 'i');
+  body = body.replace(tail, '').trim().replace(tail, '').trim();
+  return body + '\n\n' + agent + '\n' + company;
 }
 
 // When a business replies, draft a tailored response (addressing what they said)
@@ -1796,7 +1808,7 @@ function runCadence() {
 
       // ── LIVE send ──
       let result;
-      if (channel === 'email') { result = lead.email ? resendSend_(lead.email, 'AXIUS', body) : {error:'no email'}; }
+      if (channel === 'email') { result = lead.email ? resendSend_(lead.email, cadenceRender(CADENCE_EMAIL_SUBJECT, lead, cfg.company, cfg.agentName), body) : {error:'no email'}; }
       else { const e164 = cadenceToE164_(lead.phone, lead.country); result = e164 ? twilioSend_(e164, channel, body) : {error:'no phone'}; }
 
       appendInteraction_({ id:Utilities.getUuid(), leadId:lead.id, leadName:lead.name, phone:lead.phone || '',
