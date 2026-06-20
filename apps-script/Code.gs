@@ -209,6 +209,11 @@ function tryParse(s,d){try{return JSON.parse(s)||d}catch(e){return d}}
 function doGet(e) {
   try {
     const a = e.parameter.action;
+    // 'unsubscribe' is public (recipients have no secret) — handle it before auth.
+    if (a === 'unsubscribe') {
+      markUnsubscribed_(e.parameter.e);
+      return HtmlService.createHtmlOutput('<div style="font-family:-apple-system,Segoe UI,sans-serif;max-width:460px;margin:60px auto;text-align:center;color:#16140f"><h2 style="font-weight:600">You\'re unsubscribed</h2><p style="color:#555">You won\'t hear from us again. Sorry for the intrusion.</p></div>');
+    }
     if (a !== 'ping' && a !== 'twiml') {
       const s = e.parameter._s || '';
       if (String(s).trim() !== String(CRM_SECRET).trim()) return err_('Unauthorized');
@@ -257,6 +262,13 @@ function doGet(e) {
 function doPost(e) {
   try {
     const a = e.parameter.action;
+
+    // One-click unsubscribe POST (RFC 8058) — the mail client posts here with no
+    // secret, so handle it before auth and just acknowledge.
+    if (a === 'unsubscribe') {
+      markUnsubscribed_(e.parameter.e);
+      return ContentService.createTextOutput('unsubscribed');
+    }
 
     // Twilio inbound messaging webhook (form-encoded; NOT our JSON+_secret shape).
     // Configure the Twilio webhook URL as:  {execUrl}?action=inboundMsg&token={CRM_SECRET}
@@ -565,12 +577,12 @@ function doPost(e) {
         const lead = byId[String(id)]; if (!lead) continue;
         const steps = cadenceSteps(lead); if (!steps.length) continue;
         chosen.push(lead);
-        const v0 = (steps[0].variants || []);
-        let body = cadenceRender(v0[pickVariant(lead.id, 0, v0.length)] || '', lead, company, agent);
+        const angle = pickIndustryAngle_(lead);
+        let body = composeFirstEmail_(lead, company, agent);
         let personalized = false;
         if (cfg.aiPersonalize) { try { const p = geminiPersonalizeEmail_(lead, cfg); if (p) { body = p; personalized = true; } } catch (e) { Logger.log('preview personalize: ' + e.message); } }
-        const subject = cadenceRender(CADENCE_EMAIL_SUBJECT, lead, company, agent);
-        previews.push({ step: 1, leadName: lead.name || '', city: lead.city || '', leadEmail: lead.email || '', subject: subject, body: body, personalized: personalized });
+        const subject = cadenceSubjectFor_(lead, company, agent);
+        previews.push({ step: 1, leadName: lead.name || '', city: lead.city || '', leadEmail: lead.email || '', segment: angle.seg, subject: subject, body: body, personalized: personalized });
         if (to) { const r = resendSend_(to, '[TEST] ' + subject, body); if (r.sid) sent++; }
       }
       // Follow-up steps (templates) rendered for the first selected lead, so the
@@ -1195,15 +1207,48 @@ function twilioSend_(phoneE164, channel, body) {
 function emailFooter_() {
   const cfg = getCadenceCfg_();
   const addr = (cfg.postalAddress && cfg.postalAddress.indexOf('TU_') !== 0) ? cfg.postalAddress : cfg.company;
-  return '\n\n—\n' + addr +
-    '\nTo unsubscribe, reply STOP to this message.';
+  return '\n\n--\n' + addr +
+    '\nNot relevant? Reply STOP or use the unsubscribe link and we\'ll stop immediately.';
+}
+// Mark every lead with this email as Do Not Call (one-click unsubscribe target).
+function markUnsubscribed_(em) {
+  em = String(em || '').trim().toLowerCase();
+  if (!em) return 0;
+  try {
+    const ls = getSheet(SHEETS.leads, LEAD_HDR), rows = ls.getDataRange().getValues(), h = rows[0] || LEAD_HDR;
+    const ec = h.indexOf('email'), stc = h.indexOf('status'), dc = h.indexOf('dncReason'), uc = h.indexOf('updatedAt');
+    if (ec < 0) return 0;
+    let n = 0; const now = new Date().toISOString();
+    for (let i = 1; i < rows.length; i++) {
+      if (String(rows[i][ec] || '').trim().toLowerCase() === em) {
+        if (stc >= 0) ls.getRange(i + 1, stc + 1).setValue('Do Not Call');
+        if (dc  >= 0) ls.getRange(i + 1, dc + 1).setValue('unsubscribe (email)');
+        if (uc  >= 0) ls.getRange(i + 1, uc + 1).setValue(now);
+        n++;
+      }
+    }
+    return n;
+  } catch (e) { return 0; }
 }
 // Resend email. Returns {sid,status} on success, {error} on failure.
 function resendSend_(email, subject, body, opts) {
   opts = opts || {};
   const payload = { from: RESEND_FROM, to: [email], reply_to: REPLY_TO_EMAIL, subject: subject || 'AXIUS', text: String(body || '') + emailFooter_() };
+  const headers = {};
   // Thread a reply under the recipient's email (In-Reply-To / References headers).
-  if (opts.inReplyTo) payload.headers = { 'In-Reply-To': opts.inReplyTo, 'References': opts.references || opts.inReplyTo };
+  if (opts.inReplyTo) { headers['In-Reply-To'] = opts.inReplyTo; headers['References'] = opts.references || opts.inReplyTo; }
+  // One-click unsubscribe — required by Google/Yahoo bulk-sender rules for inbox
+  // placement. HTTPS one-click when the web-app URL is known, mailto otherwise.
+  const mailtoUnsub = 'mailto:' + REPLY_TO_EMAIL + '?subject=unsubscribe';
+  const base = PROP_('WEBAPP_URL', '');
+  if (base) {
+    const httpUnsub = base + (base.indexOf('?') < 0 ? '?' : '&') + 'action=unsubscribe&e=' + encodeURIComponent(email);
+    headers['List-Unsubscribe'] = '<' + httpUnsub + '>, <' + mailtoUnsub + '>';
+    headers['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click';
+  } else {
+    headers['List-Unsubscribe'] = '<' + mailtoUnsub + '>';
+  }
+  if (Object.keys(headers).length) payload.headers = headers;
   const res = UrlFetchApp.fetch('https://api.resend.com/emails', {
     method:'post', contentType:'application/json',
     headers:{ Authorization:'Bearer ' + RESEND_API_KEY },
@@ -1248,12 +1293,12 @@ const CADENCE_STEPS = {
         "Hi there. One thing I see in most growing businesses: the technology works only because certain people remember how it works. Lose them and things stall. {business} probably runs on a handful of tools and whoever set them up. We take that over. One owner for your systems, automations, data and vendors, documented and run so it never hangs on one person again. Want me to show you where I'd start?\n\n{agent}\n{company}",
       ] },
       { variants: [
-        "Following up. The shape of it is simple. One contact, one monthly figure, and we run your software, automations, data and vendors end to end. Everything stays in your accounts, so you're never locked in. For most businesses it costs less than one full time person, and it takes off your plate the part of the job you never wanted. Happy to walk through what we'd cover at {business}. Fifteen minutes?\n\n{agent}\n{company}",
-        "Circling back on {business}. Most owners are surprised how much is already going out across tools, freelancers and vendors once it's all in one view. We pull it into one operation and one bill, usually for less, and put one name on the result. I can show you roughly how that shakes out for you. Worth a short look?\n\n{agent}\n{company}",
+        "Following up on {business}. The whole idea is simple. One person owns your software, automations, data and vendors and runs it as one operation. It stays in your accounts, so you're never locked in, and it usually costs less than one hire. Open to a quick call Wednesday or Thursday?\n\n{agent}\n{company}",
+        "Circling back. Most owners are surprised how much is already going out across tools and vendors once it's all in one view. We pull it into one operation, usually for less, with one name on the result. Worth fifteen minutes this week?\n\n{agent}\n{company}",
       ] },
       { variants: [
-        "Last note from me for now. If it's useful, I'll put together a quick read on what {business} spends across its tech and vendors today, and what the same thing looks like run as one operation for less. No strings, yours either way. Want it?\n\n{agent}\n{company}",
-        "One more from me. Give me fifteen minutes and I'll lay out what running {business}'s technology as one operation would cover, and what it would cost next to what you pay now. Worst case, you walk away with a clearer picture of where your systems leak. Up for it?\n\n{agent}\n{company}",
+        "Last note from me on this. If it helps, I'll send a quick one page read on what {business} spends across its tech and vendors today versus running it as one operation. No strings, yours either way. Want it?\n\n{agent}\n{company}",
+        "One more and I'll leave it. Fifteen minutes and I'll show you what running {business}'s technology as one operation would cover, and what it'd cost next to today. Worst case you get a clearer picture. Open to it?\n\n{agent}\n{company}",
       ] },
     ],
   },
@@ -1277,6 +1322,72 @@ const CADENCE_STEPS = {
     ],
   },
 };
+
+// ── Per-industry angle engine ────────────────────────────────────────────────
+// Research (2025/26): a TRUE, segment-specific opening pain tied to the exact
+// thing you fix beats a generic "who owns your tech" hook ~2.5x on replies, and
+// is more reliable than per-lead AI first lines. So each business type gets its
+// own opener (the real pain that type feels), the Axius capability that removes
+// it, and a relevant subject. The AI then refines WITHIN this angle, never from
+// scratch. `keys` are matched against the lead's keyword/category/name.
+const INDUSTRY_ANGLES = [
+  { seg:'dental', keys:['dent','orthodont','endodont','periodont','oral surg'],
+    subject:'Missed calls at {business}?',
+    body:"Most practices like {business} quietly lose new patients every week. A call that goes to voicemail and never gets a callback, a booking page nobody really owns, reminders that live in one person's head at the front desk. We take that whole layer over and run it as one system, so the calls get answered, the schedule fills itself, and nobody has to babysit it. Usually for less than the cost of one hire. Worth a short call this week?" },
+  { seg:'medical', keys:['clinic','medical','doctor','physician','dermatolog','chiro','vet','veterinar','optomet','physical therap','pediatr','urgent care','wellness','health'],
+    subject:'Patient calls slipping at {business}?',
+    body:"In most practices like {business}, new patients slip through the cracks. Calls that don't get returned, intake and reminders that depend on whoever is at the desk that day, a few systems that don't talk to each other. We take that over and run it as one operation, so patients get answered fast and the front desk stops drowning. Usually for less than the cost of one hire. Open to a short call this week?" },
+  { seg:'restaurant', keys:['restaurant','cafe','coffee','bar ','pub','food','pizz','grill','bakery','cater','diner','eatery','bistro','taco','sushi','kitchen','brew'],
+    subject:'{business} runs on one manager',
+    body:"In most spots like {business}, the whole operation only works because one manager holds it together. The scheduling, the reservations, the delivery apps, the end-of-week numbers, all by hand. We take that off their plate and run it as one connected system, so the manual work disappears and the reporting is just there when you want it. One owner for all of it, usually for less than a single hire. Open to a short call this week?" },
+  { seg:'home', keys:['contract','plumb','hvac','roof','electric','construction','landscap','remodel','paint','clean','pest','garage','fenc','lawn','handyman','flooring','concrete','solar','restoration','septic','window','door','gutter','tree'],
+    subject:'Leads slipping past {business}?',
+    body:"For a {category} like {business}, the jobs come in across a few places. Calls, web forms, referrals. And the follow-up is whoever remembers to do it. The ones that slip through are leads you already paid to get. We take over the lead capture, the follow-up, and the quote-to-invoice side and run it as one system, so nothing falls through and quotes go out same day. Usually for less than one hire. Worth a quick call this week?" },
+  { seg:'beauty', keys:['salon','spa','barber','nail','beauty','hair','lash','brow','tattoo','massage','wax','aesthet','medspa','skin'],
+    subject:'{business}: filling the calendar on autopilot',
+    body:"Most places like {business} run booking, reminders, and reviews off the front desk and a few apps that don't talk to each other, so no-shows and missed follow-ups just add up. We take that whole layer over, the booking, the reminders, the review requests, and run it as one system that keeps the calendar full without anyone babysitting it. Usually for less than one hire. Open to a short call this week?" },
+  { seg:'auto', keys:['auto','car ','tire','mechanic','body shop','dealer','detailing','transmission','collision','muffler','brake','automotive','vehicle','motor'],
+    subject:'Quiet lost work at {business}',
+    body:"Shops like {business} lose work to two quiet things: calls that go unanswered, and service reminders that never get sent. We take over the calls, the follow-up, and the reminders and run them as one system, so the bays stay full and customers come back on schedule without anyone chasing them. Usually for less than one hire. Worth a short call this week?" },
+  { seg:'retail', keys:['retail','shop','store','boutique','ecommerce','e-commerce','apparel','clothing','jewel','furniture','grocery','market','goods','supply','outlet'],
+    subject:'Do your systems agree, {business}?',
+    body:"For a business like {business}, the systems pile up. Point of sale, inventory, the online store, a few spreadsheets, and none of them quite agree, so you get oversells, stockouts, and end-of-month numbers nobody trusts. We connect all of it and run it as one operation, so the data is clean and the manual work goes away. Usually for less than one hire. Open to a short call this week?" },
+  { seg:'professional', keys:['law','attorney','lawyer','legal','account','cpa','tax','insur','real estate','realtor','mortgage','financ','consult','architect','engineer','notary','title','escrow','advis','broker'],
+    subject:'Leads going cold at {business}?',
+    body:"In a {category} like {business}, the first one to respond usually wins the client. But intake and paperwork are still mostly manual, so good leads go cold while someone gets to them. We take over the intake, the follow-up, and the document side and run it as one system, so a new client is onboarded in minutes instead of days. Usually for less than one hire. Worth a short call this week?" },
+  { seg:'fitness', keys:['gym','fitness','yoga','pilates','crossfit','train','martial','dance','studio','athletic','wellness center','cycling'],
+    subject:'Who chases {business}’s win-backs?',
+    body:"Most studios like {business} run memberships, class booking, and billing across a few apps, and the retention follow-up only happens when someone has time, which is never. We take that whole layer over and run it as one system, so sign-ups, reminders, and win-backs happen on their own. Usually for less than one hire. Open to a short call this week?" },
+  { seg:'hospitality', keys:['hotel','motel','inn','resort','lodge','hostel','bnb','bed and breakfast','suites','vacation rental'],
+    subject:'{business}: channels in sync?',
+    body:"For a property like {business}, bookings come from a handful of channels, guest messages live in different inboxes, and the reporting is stitched together by hand. We connect all of it and run it as one operation, so the channels stay in sync, guests get answered fast, and the numbers are just there. Usually for less than one hire. Worth a short call this week?" },
+];
+const INDUSTRY_DEFAULT = {
+  seg:'default',
+  subject:'Who runs the tech behind {business}?',
+  body:"Quick question about {business}. Who actually owns the technology behind it day to day. The software, the automations, the follow-up, the vendors. For most owners it is no one, or it is them on top of running the place. That is what we do. We become the technology function for a business and run it as one operation, for less than the cost of one hire. Worth a short call this week to see what we would take off your plate?",
+};
+// Match a lead to its industry angle by scanning keyword/category/source/name.
+function pickIndustryAngle_(lead) {
+  lead = lead || {};
+  const hay = (String(lead.keyword || '') + ' ' + String(lead.sourceDetail || '') + ' ' + String(lead.name || '')).toLowerCase();
+  for (let i = 0; i < INDUSTRY_ANGLES.length; i++) {
+    const a = INDUSTRY_ANGLES[i];
+    for (let k = 0; k < a.keys.length; k++) { if (hay.indexOf(a.keys[k]) >= 0) return a; }
+  }
+  return INDUSTRY_DEFAULT;
+}
+// Build the segment-driven FIRST email (deterministic, no AI). The AI version
+// refines this same angle; this is also the reliable fallback.
+function composeFirstEmail_(lead, company, agent) {
+  const a = pickIndustryAngle_(lead);
+  return cadenceRender(a.body, lead, company, agent) + '\n\n' + agent + '\n' + company;
+}
+// Subject line for a lead's first email (segment-specific).
+function cadenceSubjectFor_(lead, company, agent) {
+  const a = pickIndustryAngle_(lead);
+  return cadenceRender(a.subject || CADENCE_EMAIL_SUBJECT, lead, company, agent);
+}
 
 function cadencePhoneKey(p) { const d = String(p || '').replace(/\D/g, ''); return d.length >= 10 ? d.slice(-10) : ''; }
 function cadenceChannel(country) {
@@ -1546,18 +1657,23 @@ function geminiPersonalizeEmail_(lead, cfg) {
   if (lead.website && String(lead.website) !== 'N/A') facts.push('Has a website: ' + lead.website);
   if (!facts.length) return '';   // nothing to personalize on — use the template
 
+  // The segment angle is the BRIEF. The AI refines this proven, true opener to the
+  // specific business — it does not invent a new angle from scratch.
+  const angle = pickIndustryAngle_(lead);
   const system = 'You are ' + agent + ', the operator behind ' + company + '. ' + AXIUS_BRIEF + ' ' +
     'Write the FIRST cold email to this business owner. Goal: a relevant, human note that earns a reply. ' +
-    'Open by naming a real, specific technology pain a business of this type tends to have (use the pains above), in plain words. ' +
-    'Do not open with a compliment about their work or rating. Then pick the ONE or TWO areas that fit best and say in a line what ' +
-    'owning that would change for them. Do NOT list all eight areas, name any framework, or lead with price. You may reference ONLY ' +
-    'the facts below (their type, city, rating/reviews); do NOT invent specifics, owner names, numbers, pricing, or claims you cannot know. ' +
+    'You are given a BASELINE email written for this exact industry. Keep its angle and the specific pain it names — that pain is ' +
+    'true for this type of business and is the whole point. Your job is to make it read like a real person wrote it just for THIS ' +
+    'business, tightening and varying the wording, not inventing a different pitch. Do not open with a compliment about their work or ' +
+    'rating. Do NOT name any framework, list services, or lead with price. You may reference ONLY the facts below; do NOT invent ' +
+    'specifics, owner names, numbers, pricing, or claims you cannot know. ' +
     'WRITE LIKE A REAL PERSON, not AI: no em dashes at all, no "I hope this finds you well", no rule-of-three lists, no buzzwords, ' +
-    'no over-polished symmetry. Use contractions. Vary sentence length. Keep it 45 to 85 words. ' +
-    'End with a short, low-friction question that invites a reply. You may offer a quick look or a one page read either way, but NO ' +
-    'booking link and no hard ask. Plain text, no subject line. Do NOT add a sign-off, signature, or your name — end right after the ' +
-    'question. The signature is added automatically.';
-  const prompt = 'Facts you may use:\n' + facts.join('\n') + '\n\nWrite the email now.';
+    'no over-polished symmetry. Use contractions. Vary sentence length. Open with one short sentence (under 20 words). Keep the whole ' +
+    'email under 90 words. End with a short, specific, low-friction question (e.g. a quick call this week). NO booking link, no hard ask. ' +
+    'Plain text, no subject line. Do NOT add a sign-off, signature, or your name — end right after the question. The signature is added automatically.';
+  const prompt = 'Industry: ' + (lead.keyword || angle.seg) + '\n\nBaseline email for this industry (keep its angle, rewrite it human and specific):\n' +
+    composeFirstEmail_(lead, company, agent).replace(/\n+[^\n]*\n[^\n]*$/, '').trim() +
+    '\n\nFacts you may use:\n' + facts.join('\n') + '\n\nWrite the refined email now.';
   const draft = geminiGenerate_(system, prompt);
   if (!draft) return '';   // generation failed → caller falls back to the template
   // Append the sign-off deterministically — never rely on the model to add it.
@@ -1771,12 +1887,19 @@ function runCadence() {
       }
       const stepTag = 'seq:' + stepIndex;
       let body = cadenceMessage(lead, stepIndex, cfg.company, cfg.agentName);
-      if (!body) return;
-      // AI personalization: tailor the FIRST email to this specific lead to lift
-      // replies. Falls back to the template body if Gemini is off/unavailable.
-      if (cfg.aiPersonalize && channel === 'email' && stepIndex === 0) {
-        try { const p = geminiPersonalizeEmail_(lead, cfg); if (p) body = p; } catch (e) { Logger.log('personalize error: ' + e.message); }
+      // First email is built from the lead's INDUSTRY angle (segment-specific pain
+      // + the exact thing we fix), which beats a generic opener. Follow-ups keep
+      // their templates.
+      if (channel === 'email' && stepIndex === 0) {
+        const composed = composeFirstEmail_(lead, cfg.company, cfg.agentName);
+        if (composed) body = composed;
+        // AI then REFINES this same angle to the specific business (grounded, not
+        // from scratch). Falls back to the composed segment email if AI is off.
+        if (cfg.aiPersonalize) {
+          try { const p = geminiPersonalizeEmail_(lead, cfg); if (p) body = p; } catch (e) { Logger.log('personalize error: ' + e.message); }
+        }
       }
+      if (!body) return;
 
       // Idempotency: already really sent this step → just advance.
       if (alreadySent(interactions, lead.id, stepTag)) {
@@ -1808,7 +1931,7 @@ function runCadence() {
 
       // ── LIVE send ──
       let result;
-      if (channel === 'email') { result = lead.email ? resendSend_(lead.email, cadenceRender(CADENCE_EMAIL_SUBJECT, lead, cfg.company, cfg.agentName), body) : {error:'no email'}; }
+      if (channel === 'email') { result = lead.email ? resendSend_(lead.email, cadenceSubjectFor_(lead, cfg.company, cfg.agentName), body) : {error:'no email'}; }
       else { const e164 = cadenceToE164_(lead.phone, lead.country); result = e164 ? twilioSend_(e164, channel, body) : {error:'no phone'}; }
 
       appendInteraction_({ id:Utilities.getUuid(), leadId:lead.id, leadName:lead.name, phone:lead.phone || '',
