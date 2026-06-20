@@ -253,6 +253,18 @@ function seqStateLabel(st) {
 function getSequence(leadId) { return (S.sequences || []).find(s => s.leadId === leadId) || null; }
 function _seqLeadName(leadId) { const l = S.leads.find(x => x.id === leadId); return l ? l.name : leadId; }
 
+// Render the whole Outreach section (its own top-level area, promoted out of
+// Admin): cadence engine + launch readiness + active sequences, SMS templates,
+// and call scripts. Called on navigate('outreach'). NB: named *Section to avoid
+// colliding with analytics.js's renderOutreach (the Analytics outreach funnel).
+function renderOutreachSection() {
+  if (S.session && S.session.role !== 'admin') return;
+  renderSequences();                       // cadence engine + readiness + sequence list
+  if (typeof renderSmsTemplates === 'function') renderSmsTemplates();
+  if (typeof renderScripts === 'function') renderScripts();
+  if (typeof checkTriggerStatus === 'function') checkTriggerStatus(); // refresh cadence trigger state
+}
+
 function renderSequences() {
   if (typeof renderCadenceEngine === 'function') renderCadenceEngine();
   const wrap = document.getElementById('admin-seq-list'); if (!wrap) return;

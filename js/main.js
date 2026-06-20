@@ -113,6 +113,10 @@ function navigate(id) {
     if (S.session?.role !== 'admin') { toast('Access restricted.', 'error'); navigate('leads'); return; }
     renderAdmin();
   }
+  if (id === 'outreach') {
+    if (S.session?.role !== 'admin') { toast('Access restricted.', 'error'); navigate('leads'); return; }
+    renderOutreachSection();
+  }
   if (id === 'scraper') {
     fillCountries('sc-country'); onCountryChange(); fillSources('sc-source');
     renderScrapeHistory();

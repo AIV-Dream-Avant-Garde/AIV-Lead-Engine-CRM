@@ -87,7 +87,7 @@ const STATUS_COLOR = {
 };
 
 const ROLE_VISIBLE = {
-  admin:    ['dashboard','setup','scraper','import','responder','leads','pipeline','llamadas','perfil','export','admin','analytics'],
+  admin:    ['dashboard','setup','scraper','import','responder','leads','pipeline','llamadas','perfil','export','admin','analytics','outreach'],
   closer:   ['dashboard','responder','leads','pipeline','llamadas','perfil'],
   solo:     ['dashboard','responder','leads','pipeline','llamadas','perfil','analytics'],
 };
