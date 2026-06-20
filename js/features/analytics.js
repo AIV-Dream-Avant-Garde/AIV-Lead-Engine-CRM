@@ -18,9 +18,9 @@ function renderAnalytics() {
 // see which line actually earns replies. Labels mirror Code.gs SUBJECT_LINES (for
 // display only; keep this list + order in sync when you change the subjects).
 const SUBJECT_LABELS = [
-  "A note for {business}",
-  "Reaching out about {business}",
-  "Quick question about {business}",
+  "Not sure who to ask",
+  "Who handles this at {business}?",
+  "Who's responsible for this?",
 ];
 function cadencePickVariant_(leadId, stepIndex, n) {
   if (!n || n <= 1) return 0;
@@ -40,7 +40,7 @@ function renderSubjectPerformance() {
   const n = SUBJECT_LABELS.length;
   const stat = Array.from({ length: n }, () => ({ sent: 0, replied: 0 }));
   Object.keys(firstEmailed).forEach(leadId => {
-    const idx = cadencePickVariant_(leadId, 7, n);
+    const idx = cadencePickVariant_(leadId, 0, n);
     stat[idx].sent++;
     if (replied.has(leadId)) stat[idx].replied++;
   });
