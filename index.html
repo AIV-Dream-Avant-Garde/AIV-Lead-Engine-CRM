@@ -10,11 +10,11 @@
 <script src="https://cdn.jsdelivr.net/npm/@twilio/voice-sdk@2.9.0/dist/twilio.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-<link rel="stylesheet" href="css/base.css?v=20260620g">
-<link rel="stylesheet" href="css/layout.css?v=20260620g">
-<link rel="stylesheet" href="css/components.css?v=20260620g">
-<link rel="stylesheet" href="css/widgets.css?v=20260620g">
-<link rel="stylesheet" href="css/responsive.css?v=20260620g">
+<link rel="stylesheet" href="css/base.css?v=20260620i">
+<link rel="stylesheet" href="css/layout.css?v=20260620i">
+<link rel="stylesheet" href="css/components.css?v=20260620i">
+<link rel="stylesheet" href="css/widgets.css?v=20260620i">
+<link rel="stylesheet" href="css/responsive.css?v=20260620i">
 </head>
 <body>
 
@@ -104,11 +104,19 @@
       Import CSV
     </div>
 
-    <div class="sb-sec-label" data-secs="analytics,admin">Insights</div>
+    <div class="sb-sec-label" data-secs="outreach">Outreach</div>
+    <div class="nav-item role-hidden" data-sec="outreach" id="nav-outreach-item">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1"/><path d="M2.5 4L8 8.5 13.5 4"/></svg>
+      Outreach
+    </div>
+
+    <div class="sb-sec-label" data-secs="analytics">Insights</div>
     <div class="nav-item role-hidden" data-sec="analytics" id="nav-analytics-item">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12l3-4 3 2 3-5 3 3"/><path d="M2 14h12"/></svg>
       Analytics
     </div>
+
+    <div class="sb-sec-label" data-secs="admin">Admin</div>
     <div class="nav-item role-hidden" data-sec="admin" id="nav-admin-item">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1l1.5 3h3l-2.5 2 1 3L8 7.5 5 9l1-3L3.5 4h3z"/></svg>
       Admin
@@ -637,89 +645,16 @@ Content-Type: application/json
 </div>
 
 <!-- ADMIN SECTION -->
-<div class="section" id="sec-admin">
-  <div class="eyebrow">Administration</div>
-  <h1 class="section-title">Admin Panel</h1>
-  <p class="section-sub">Team, commission, and audit management. Accessible to administrators only.</p>
+<!-- OUTREACH SECTION (the autopilot — promoted out of Admin) -->
+<div class="section" id="sec-outreach">
+  <div class="eyebrow">Outreach</div>
+  <h1 class="section-title">Outreach autopilot</h1>
+  <p class="section-sub">Your email engine: who it's reaching, what it's sending, and the templates behind it.</p>
 
-  <!-- Team management -->
+  <!-- Cadence engine + launch readiness + active sequences -->
   <div class="admin-section">
     <div class="admin-section-title">
-      <span>Team</span>
-      <button class="btn btn-primary btn-sm" onclick="openTeamModal(null)">+ Add member</button>
-    </div>
-    <div id="admin-team-list"><div class="notes-empty">No team members yet.</div></div>
-  </div>
-
-  <!-- Team performance -->
-  <div class="admin-section">
-    <div class="admin-section-title">
-      <span>Team performance</span>
-      <select class="filter-sel" id="perf-period" onchange="renderAdmin()" style="font-size:11px">
-        <option value="today">Today</option>
-        <option value="week" selected>This week</option>
-        <option value="month">This month</option>
-        <option value="all">All time</option>
-      </select>
-    </div>
-    <div id="admin-perf-list"><div class="notes-empty">Loading...</div></div>
-  </div>
-
-  <!-- Commission ledger -->
-  <div class="admin-section">
-    <div class="admin-section-title">
-      <span>Commissions <span id="admin-comm-pending-label" style="font-size:11px;color:var(--amber);font-weight:400"></span></span>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn btn-ghost btn-sm" id="gen-residuals-btn" onclick="generateResiduals()" title="Create this month's residual commission rows now for active recurring deals">↻ Generate residuals</button>
-        <button class="btn btn-ghost btn-sm" id="auto-residuals-btn" onclick="setTrigger('runMonthlyResiduals', !(S.triggerStatus&&S.triggerStatus.residual))" title="Auto-generate residual rows on the 1st of each month">Auto: off</button>
-        <select class="filter-sel" id="admin-comm-person" onchange="renderAdmin()" style="max-width:140px"><option value="">All members</option></select>
-        <select class="filter-sel" id="admin-comm-filter" onchange="renderAdmin()">
-          <option value="">All</option>
-          <option value="pending">Pending</option>
-          <option value="paid">Paid</option>
-          <option value="cancelled">Cancelled</option>
-          <option value="clawback">Refunds</option>
-        </select>
-      </div>
-    </div>
-    <div id="admin-comm-list"><div class="notes-empty">No commissions recorded.</div></div>
-    <div id="admin-comm-bulk-wrap" style="display:none;margin-top:10px"><button class="btn btn-success" onclick="bulkMarkPaid()" style="font-size:12px">Mark all filtered pending as paid</button></div>
-  </div>
-
-  <!-- Audit log -->
-  <div class="admin-section">
-    <div class="admin-section-title">
-      <span>Audit log</span>
-      <div style="display:flex;align-items:center;gap:10px">
-        <span style="font-size:11px;color:var(--body);font-weight:400">Last 100 actions</span>
-        <button class="btn btn-ghost btn-xs" onclick="exportAuditLog()">Export CSV</button>
-      </div>
-    </div>
-    <div id="admin-audit-list"><div class="notes-empty">No audit entries.</div></div>
-  </div>
-
-  <!-- Locked leads -->
-  <div class="admin-section">
-    <div class="admin-section-title">
-      <span>Locked leads (active claims)</span>
-      <span id="admin-locked-count" style="font-size:11px;color:var(--body);font-weight:400"></span>
-    </div>
-    <div id="admin-locked-list"><div class="notes-empty">No leads currently claimed.</div></div>
-  </div>
-
-  <!-- DNC registry -->
-  <div class="admin-section">
-    <div class="admin-section-title">
-      <span>Do Not Call registry (DNC)</span>
-      <span id="admin-dnc-count" style="font-size:11px;color:var(--body);font-weight:400"></span>
-    </div>
-    <div id="admin-dnc-list"><div class="notes-empty">No leads marked as Do Not Call.</div></div>
-  </div>
-
-  <!-- Outreach cadence (Secuencias) — deterministic engine runs in the CRM backend (Apps Script) -->
-  <div class="admin-section">
-    <div class="admin-section-title">
-      <span>Outreach sequences</span>
+      <span>Sequences</span>
       <span id="admin-seq-counts" style="font-size:11px;color:var(--body);font-weight:400"></span>
     </div>
     <div style="font-size:11px;color:var(--body);margin-bottom:10px">The cadence engine runs automatically in the CRM backend. It enrolls new leads and sends the sequence while respecting opt-out, schedule, and daily cap. Here you control the engine and can pause, resume, or remove a lead.</div>
@@ -741,15 +676,6 @@ Content-Type: application/json
     <div id="admin-sms-list"><div class="notes-empty">No SMS templates.</div></div>
   </div>
 
-  <!-- Weekly report trigger -->
-  <div class="admin-section">
-    <div class="admin-section-title">
-      <span>Weekly report</span>
-    </div>
-    <div style="font-size:11px;color:var(--body);margin-bottom:12px">Enable automatic weekly report delivery every Monday at 8am. Set the recipient email on the Settings page.</div>
-    <div id="admin-report-trigger"></div>
-  </div>
-
   <!-- Script manager -->
   <div class="admin-section">
     <div class="admin-section-title">
@@ -758,6 +684,105 @@ Content-Type: application/json
     </div>
     <div style="font-size:11px;color:var(--body);margin-bottom:12px">Scripts appear in the call widget. Organize by stage: Opening, Pitch, Objections, Close, Quick responses.</div>
     <div id="admin-scripts-list"><div class="notes-empty">No scripts configured.</div></div>
+  </div>
+</div>
+
+<!-- ADMIN SECTION (people, money, operations — tabbed) -->
+<div class="section" id="sec-admin">
+  <div class="eyebrow">Administration</div>
+  <h1 class="section-title">Admin</h1>
+  <p class="section-sub">Team, commissions, and operations. Administrators only.</p>
+
+  <div style="display:flex;gap:4px;margin-bottom:18px;border-bottom:1px solid var(--border)">
+    <button class="admin-tab active" id="admin-tab-money" onclick="adminTab('money')">Team &amp; Money</button>
+    <button class="admin-tab" id="admin-tab-ops" onclick="adminTab('ops')">Operations</button>
+  </div>
+
+  <div id="admin-pane-money">
+    <!-- Team management -->
+    <div class="admin-section">
+      <div class="admin-section-title">
+        <span>Team</span>
+        <button class="btn btn-primary btn-sm" onclick="openTeamModal(null)">+ Add member</button>
+      </div>
+      <div id="admin-team-list"><div class="notes-empty">No team members yet.</div></div>
+    </div>
+
+    <!-- Team performance -->
+    <div class="admin-section">
+      <div class="admin-section-title">
+        <span>Team performance</span>
+        <select class="filter-sel" id="perf-period" onchange="renderAdmin()" style="font-size:11px">
+          <option value="today">Today</option>
+          <option value="week" selected>This week</option>
+          <option value="month">This month</option>
+          <option value="all">All time</option>
+        </select>
+      </div>
+      <div id="admin-perf-list"><div class="notes-empty">Loading...</div></div>
+    </div>
+
+    <!-- Commission ledger -->
+    <div class="admin-section">
+      <div class="admin-section-title">
+        <span>Commissions <span id="admin-comm-pending-label" style="font-size:11px;color:var(--amber);font-weight:400"></span></span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" id="gen-residuals-btn" onclick="generateResiduals()" title="Create this month's residual commission rows now for active recurring deals">↻ Generate residuals</button>
+          <button class="btn btn-ghost btn-sm" id="auto-residuals-btn" onclick="setTrigger('runMonthlyResiduals', !(S.triggerStatus&&S.triggerStatus.residual))" title="Auto-generate residual rows on the 1st of each month">Auto: off</button>
+          <select class="filter-sel" id="admin-comm-person" onchange="renderAdmin()" style="max-width:140px"><option value="">All members</option></select>
+          <select class="filter-sel" id="admin-comm-filter" onchange="renderAdmin()">
+            <option value="">All</option>
+            <option value="pending">Pending</option>
+            <option value="paid">Paid</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="clawback">Refunds</option>
+          </select>
+        </div>
+      </div>
+      <div id="admin-comm-list"><div class="notes-empty">No commissions recorded.</div></div>
+      <div id="admin-comm-bulk-wrap" style="display:none;margin-top:10px"><button class="btn btn-success" onclick="bulkMarkPaid()" style="font-size:12px">Mark all filtered pending as paid</button></div>
+    </div>
+
+    <!-- Audit log -->
+    <div class="admin-section">
+      <div class="admin-section-title">
+        <span>Audit log</span>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:11px;color:var(--body);font-weight:400">Last 100 actions</span>
+          <button class="btn btn-ghost btn-xs" onclick="exportAuditLog()">Export CSV</button>
+        </div>
+      </div>
+      <div id="admin-audit-list"><div class="notes-empty">No audit entries.</div></div>
+    </div>
+  </div>
+
+  <div id="admin-pane-ops" style="display:none">
+    <!-- Locked leads -->
+    <div class="admin-section">
+      <div class="admin-section-title">
+        <span>Locked leads (active claims)</span>
+        <span id="admin-locked-count" style="font-size:11px;color:var(--body);font-weight:400"></span>
+      </div>
+      <div id="admin-locked-list"><div class="notes-empty">No leads currently claimed.</div></div>
+    </div>
+
+    <!-- DNC registry -->
+    <div class="admin-section">
+      <div class="admin-section-title">
+        <span>Do Not Call registry (DNC)</span>
+        <span id="admin-dnc-count" style="font-size:11px;color:var(--body);font-weight:400"></span>
+      </div>
+      <div id="admin-dnc-list"><div class="notes-empty">No leads marked as Do Not Call.</div></div>
+    </div>
+
+    <!-- Weekly report trigger -->
+    <div class="admin-section">
+      <div class="admin-section-title">
+        <span>Weekly report</span>
+      </div>
+      <div style="font-size:11px;color:var(--body);margin-bottom:12px">Enable automatic weekly report delivery every Monday at 8am. Set the recipient email on the Settings page.</div>
+      <div id="admin-report-trigger"></div>
+    </div>
   </div>
 </div>
 
@@ -1136,33 +1161,33 @@ Content-Type: application/json
 </div>
 
 <!-- JS: load order matters — data → core → auth → locks → commission → features → main -->
-<script src="js/data/keywords.js?v=20260620g"></script>
-<script src="js/data/locations.js?v=20260620g"></script>
-<script src="js/data/states.js?v=20260620g"></script>
-<script src="js/data/constants.js?v=20260620g"></script>
-<script src="js/data/demo-data.js?v=20260620g"></script>
-<script src="js/data/outreach-templates.js?v=20260620g"></script>
-<script src="js/core/state.js?v=20260620g"></script>
-<script src="js/core/theme.js?v=20260620g"></script>
-<script src="js/core/utils.js?v=20260620g"></script>
-<script src="js/core/storage.js?v=20260620g"></script>
-<script src="js/core/api.js?v=20260620g"></script>
-<script src="js/auth/auth.js?v=20260620g"></script>
-<script src="js/locks.js?v=20260620g"></script>
-<script src="js/commission.js?v=20260620g"></script>
-<script src="js/features/scraper.js?v=20260620g"></script>
-<script src="js/features/dashboard.js?v=20260620g"></script>
-<script src="js/features/campaigns.js?v=20260620g"></script>
-<script src="js/features/outreach.js?v=20260620g"></script>
-<script src="js/features/inbox.js?v=20260620g"></script>
-<script src="js/features/import.js?v=20260620g"></script>
-<script src="js/features/leads.js?v=20260620g"></script>
-<script src="js/features/pipeline.js?v=20260620g"></script>
-<script src="js/features/calls.js?v=20260620g"></script>
-<script src="js/features/profile.js?v=20260620g"></script>
-<script src="js/features/admin.js?v=20260620g"></script>
-<script src="js/features/analytics.js?v=20260620g"></script>
-<script src="js/features/export.js?v=20260620g"></script>
-<script src="js/main.js?v=20260620g"></script>
+<script src="js/data/keywords.js?v=20260620i"></script>
+<script src="js/data/locations.js?v=20260620i"></script>
+<script src="js/data/states.js?v=20260620i"></script>
+<script src="js/data/constants.js?v=20260620i"></script>
+<script src="js/data/demo-data.js?v=20260620i"></script>
+<script src="js/data/outreach-templates.js?v=20260620i"></script>
+<script src="js/core/state.js?v=20260620i"></script>
+<script src="js/core/theme.js?v=20260620i"></script>
+<script src="js/core/utils.js?v=20260620i"></script>
+<script src="js/core/storage.js?v=20260620i"></script>
+<script src="js/core/api.js?v=20260620i"></script>
+<script src="js/auth/auth.js?v=20260620i"></script>
+<script src="js/locks.js?v=20260620i"></script>
+<script src="js/commission.js?v=20260620i"></script>
+<script src="js/features/scraper.js?v=20260620i"></script>
+<script src="js/features/dashboard.js?v=20260620i"></script>
+<script src="js/features/campaigns.js?v=20260620i"></script>
+<script src="js/features/outreach.js?v=20260620i"></script>
+<script src="js/features/inbox.js?v=20260620i"></script>
+<script src="js/features/import.js?v=20260620i"></script>
+<script src="js/features/leads.js?v=20260620i"></script>
+<script src="js/features/pipeline.js?v=20260620i"></script>
+<script src="js/features/calls.js?v=20260620i"></script>
+<script src="js/features/profile.js?v=20260620i"></script>
+<script src="js/features/admin.js?v=20260620i"></script>
+<script src="js/features/analytics.js?v=20260620i"></script>
+<script src="js/features/export.js?v=20260620i"></script>
+<script src="js/main.js?v=20260620i"></script>
 </body>
 </html>

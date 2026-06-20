@@ -804,13 +804,21 @@ function renderAdmin() {
   }
 
   updateAdminBadge();
-  renderScripts();
-  if (typeof renderSequences === 'function') renderSequences();
-  renderScheduledJobs();
-  renderReportTrigger();
-  renderSmsTemplates();
-  initAdminJobsForm();
+  renderReportTrigger();              // Operations tab (weekly report)
   checkTriggerStatus(); // async — re-renders trigger rows when response arrives
+  // Outreach renders (sequences/SMS templates/scripts) now live in renderOutreach();
+  // scheduled-scrape renders live with the Scraper section.
+}
+
+// Admin sub-tabs: 'money' (team, performance, commissions, audit) | 'ops'
+// (locked leads, DNC, weekly report). Toggles the two panes + active tab.
+function adminTab(tab) {
+  ['money', 'ops'].forEach(t => {
+    const pane = document.getElementById('admin-pane-' + t);
+    const btn  = document.getElementById('admin-tab-' + t);
+    if (pane) pane.style.display = (t === tab) ? '' : 'none';
+    if (btn)  btn.classList.toggle('active', t === tab);
+  });
 }
 
 function exportAuditLog() {
