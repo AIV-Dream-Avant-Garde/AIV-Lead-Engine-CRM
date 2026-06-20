@@ -347,9 +347,9 @@ function renderCadenceEngine() {
 
       <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
         <div style="font-size:12px;font-weight:600;color:var(--hl);margin-bottom:3px">Preview on real leads</div>
-        <div style="font-size:11px;color:var(--sub);margin-bottom:8px">Renders the exact outreach for the leads you <strong>select in the Leads tab</strong> (the AI-personalized first email + the follow-up templates) and shows it right here, just as that business would receive it. If you don't select any, it uses your first few leads. The lead doesn't need its own email — to also receive copies in your inbox, type your address below.</div>
+        <div style="font-size:11px;color:var(--sub);margin-bottom:8px">Renders the exact outreach for the leads you <strong>select in the Leads tab</strong> (the AI-personalized first email + the follow-up templates) and shows it right here, just as that business would receive it. If you don't select any, it uses your first few leads. <strong>This never sends anything to the leads.</strong> The email box below is optional and only sends copies to <em>your own</em> inbox so you can read them in a real mail client.</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <input type="email" id="cad-test-email" placeholder="optional — also email copies to me" style="flex:1;min-width:200px;font-size:16px">
+          <input type="email" id="cad-test-email" placeholder="optional — email copies to my own inbox" style="flex:1;min-width:200px;font-size:16px">
           <button class="btn btn-primary btn-xs" id="cad-test-btn" onclick="sendCadenceTest()">Generate preview</button>
         </div>
         <div id="cad-preview-output" style="margin-top:10px"></div>
@@ -378,7 +378,7 @@ async function sendCadenceTest() {
     const res = await sheetsCall({ action:'previewOutreach', to, leadIds: ids });
     if (res && res.success && res.previews) {
       renderCadencePreviews(res, out, to);
-      if (to && res.sent) toast('Also emailed ' + res.sent + ' copies to ' + to + '.', 'success', 6000);
+      if (to && res.sent) toast(res.sent + ' preview copies sent to your inbox (' + to + '). Nothing was sent to any lead.', 'success', 7000);
     } else {
       if (out) out.innerHTML = '';
       toast('Preview failed: ' + ((res && res.error) || 'check the Apps Script connection and that you are signed in as admin.'), 'error', 7000);
@@ -393,7 +393,7 @@ function renderCadencePreviews(res, out, to) {
   if (!out) return;
   const previews = res.previews || [];
   if (!previews.length) { out.innerHTML = '<div class="notes-empty">Nothing to preview for those leads.</div>'; return; }
-  const head = '<div style="font-size:11px;color:var(--sub);margin:4px 0 8px">Signed by <strong>' + esc(res.agent || '') + '</strong> · ' + esc(res.company || '') + ' · AI personalization ' + (res.aiOn ? 'ON' : 'OFF') + (to ? ' · copies emailed to ' + esc(to) : '') + '</div>';
+  const head = '<div style="font-size:11px;color:var(--sub);margin:4px 0 8px">Signed by <strong>' + esc(res.agent || '') + '</strong> · ' + esc(res.company || '') + ' · AI personalization ' + (res.aiOn ? 'ON' : 'OFF') + (to ? ' · copies sent to your inbox (' + esc(to) + ')' : '') + '</div>';
   const cards = previews.map(p => {
     const tag = p.step === 1
       ? ('First email · ' + esc(p.leadName || 'lead') + (p.city ? (', ' + esc(p.city)) : '') + ' · ' + (p.personalized ? 'AI-personalized' : 'template'))
