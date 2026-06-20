@@ -347,43 +347,64 @@ function renderCadenceEngine() {
 
       <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
         <div style="font-size:12px;font-weight:600;color:var(--hl);margin-bottom:3px">Preview on real leads</div>
-        <div style="font-size:11px;color:var(--sub);margin-bottom:8px">Renders the actual outreach for a few of your real scraped leads — the AI-personalized first email plus the follow-up templates — and emails it to you, exactly as a lead would receive it (real domain + footer). Select leads in the Leads tab to choose specific ones; otherwise it uses your first few New leads. Never sends to a lead.</div>
+        <div style="font-size:11px;color:var(--sub);margin-bottom:8px">Renders the exact outreach for the leads you <strong>select in the Leads tab</strong> (the AI-personalized first email + the follow-up templates) and shows it right here, just as that business would receive it. If you don't select any, it uses your first few leads. The lead doesn't need its own email — to also receive copies in your inbox, type your address below.</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <input type="email" id="cad-test-email" placeholder="you@example.com" style="flex:1;min-width:180px;font-size:16px">
-          <button class="btn btn-ghost btn-xs" id="cad-test-btn" onclick="sendCadenceTest()">Send preview to me</button>
+          <input type="email" id="cad-test-email" placeholder="optional — also email copies to me" style="flex:1;min-width:200px;font-size:16px">
+          <button class="btn btn-primary btn-xs" id="cad-test-btn" onclick="sendCadenceTest()">Generate preview</button>
         </div>
+        <div id="cad-preview-output" style="margin-top:10px"></div>
       </div>
     </div>`;
 }
 
-// QA preview: render the real outreach for a few real leads (AI-personalized
-// first email + follow-up templates) and email it to the operator. The server
-// does the rendering (it owns the AI personalization), so this needs the
-// previewOutreach backend action. Uses selected leads, else first few New ones.
+// QA preview: ask the server to render the real outreach for the SELECTED leads
+// (it owns the AI personalization) and show it on screen. Optionally also emails
+// copies. Uses S.selected as-is so it always reflects exactly what you picked.
 async function sendCadenceTest() {
   if (!S.config.scriptUrl) { toast('Connect Apps Script first.', 'error'); return; }
   const g = id => document.getElementById(id);
   const to = (g('cad-test-email')?.value || '').trim();
-  if (!/.+@.+\..+/.test(to)) { toast('Enter a valid email address first.', 'error'); return; }
-  const hasEmail = l => l && l.email && l.email !== 'N/A';
-  let ids = [...(S.selected || [])].filter(id => hasEmail(S.leads.find(x => x.id === id)));
-  if (!ids.length) ids = S.leads.filter(l => (l.status || 'New') === 'New' && hasEmail(l)).slice(0, 5).map(l => l.id);
-  if (!ids.length) { toast('No leads with an email yet. Scrape or import some first, or select leads in the Leads tab.', 'error', 6000); return; }
+  if (to && !/.+@.+\..+/.test(to)) { toast('That email address looks off. Leave it blank to just preview on screen.', 'error'); return; }
+  let ids = [...(S.selected || [])];
+  let usingSelection = ids.length > 0;
+  if (!ids.length) ids = (S.leads || []).slice(0, 3).map(l => l.id);
+  if (!ids.length) { toast('No leads yet. Scrape or import some first.', 'error', 6000); return; }
   ids = ids.slice(0, 8);
-  const btn = g('cad-test-btn');
+  const btn = g('cad-test-btn'), out = g('cad-preview-output');
   if (btn && btn.disabled) return;
-  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Rendering…'; }
+  if (out) out.innerHTML = '<div style="font-size:11px;color:var(--sub)">Rendering ' + ids.length + (usingSelection ? ' selected' : '') + ' lead' + (ids.length !== 1 ? 's' : '') + '…' + (g('cad-aipersonalize')?.checked ? ' (AI personalization can take a few seconds)' : '') + '</div>';
   try {
     const res = await sheetsCall({ action:'previewOutreach', to, leadIds: ids });
-    if (res && res.success) {
-      const n = res.leads || ids.length;
-      toast('Sent ' + (res.sent || 0) + ' preview emails to ' + to + ', based on ' + n + ' real lead' + (n !== 1 ? 's' : '') + '. Check your inbox.', 'success', 9000);
+    if (res && res.success && res.previews) {
+      renderCadencePreviews(res, out, to);
+      if (to && res.sent) toast('Also emailed ' + res.sent + ' copies to ' + to + '.', 'success', 6000);
     } else {
-      toast('Preview failed: ' + ((res && res.error) || 'check the Apps Script connection.'), 'error', 7000);
+      if (out) out.innerHTML = '';
+      toast('Preview failed: ' + ((res && res.error) || 'check the Apps Script connection and that you are signed in as admin.'), 'error', 7000);
     }
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Send preview to me'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Generate preview'; }
   }
+}
+
+// Render the returned previews inline so you can read the exact email per lead.
+function renderCadencePreviews(res, out, to) {
+  if (!out) return;
+  const previews = res.previews || [];
+  if (!previews.length) { out.innerHTML = '<div class="notes-empty">Nothing to preview for those leads.</div>'; return; }
+  const head = '<div style="font-size:11px;color:var(--sub);margin:4px 0 8px">Signed by <strong>' + esc(res.agent || '') + '</strong> · ' + esc(res.company || '') + ' · AI personalization ' + (res.aiOn ? 'ON' : 'OFF') + (to ? ' · copies emailed to ' + esc(to) : '') + '</div>';
+  const cards = previews.map(p => {
+    const tag = p.step === 1
+      ? ('First email · ' + esc(p.leadName || 'lead') + (p.city ? (', ' + esc(p.city)) : '') + ' · ' + (p.personalized ? 'AI-personalized' : 'template'))
+      : ('Follow-up ' + p.step + ' · template');
+    return '<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--surface)">'
+      + '<div style="font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--accent)">' + tag + '</div>'
+      + '<div style="font-size:12px;color:var(--hl);font-weight:600;margin-top:5px">Subject: ' + esc(p.subject || '') + '</div>'
+      + '<div style="font-size:12.5px;color:var(--body);white-space:pre-wrap;margin-top:6px;line-height:1.55">' + esc(p.body || '') + '</div>'
+      + '</div>';
+  }).join('');
+  out.innerHTML = head + cards;
 }
 
 // Persist the operator-tunable cadence config. Confirms before flipping to live.
