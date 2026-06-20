@@ -1,17 +1,14 @@
-/* ── FEATURE: Cadence engine — pure decision core ──────────────────────────
-   Deterministic helpers for the CRM-native outreach engine ("Sequence
-   Engine"). EVERYTHING here is PURE: no DOM, no Apps Script, no Date.now()
-   / Math.random() (callers pass `now` and derive variety from stable hashes).
+/* ── TEST FIXTURE: cadence pure-helper unit tests ──────────────────────────
+   NOTE: this file is NOT loaded in the app (it's absent from index.html). It is
+   loaded ONLY by tests/harness.js to unit-test the PURE cadence helpers
+   (cadenceChannel, cadenceResolveChannel, cadenceGuard, pickVariant,
+   advanceSequence, etc.) in isolation. The LIVE outreach engine and ALL sent
+   copy — the industry first-email engine, the follow-ups, the AI prompts — live
+   in apps-script/Code.gs and run server-side. This is a behavior fixture, not a
+   mirror of the production copy; do not treat its CADENCE_STEPS as what ships.
 
-   This file is the unit-tested source of truth (tests/cases.js) and is MIRRORED
-   into apps-script/Code.gs's runCadence(). Keep the two copies in sync — the
-   same way isOptOut (js) ↔ isOptOutGs (Code.gs) are kept in sync.
-
-   VOICE (non-negotiable): confident, capable, genuinely in the lead's interest;
-   sincere but never weak or subservient; no emojis, no pleading, no false
-   availability. 2–3 variants per step keep a deterministic engine from reading
-   like a bot. Tokens: {business} {city} {neighborhood} {category} {name}
-   {company} {agent}.                                                          */
+   EVERYTHING here is PURE: no DOM, no Apps Script, no Date.now()/Math.random()
+   (callers pass `now` and derive variety from stable hashes).                  */
 
 // ── Multi-step cadence content, by country × channel ──────────────────────
 // Each step has 2–3 on-voice variants; the engine picks one per lead by stable
