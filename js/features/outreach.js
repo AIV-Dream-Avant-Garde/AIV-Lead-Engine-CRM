@@ -344,7 +344,46 @@ function renderCadenceEngine() {
       </label>
       <div style="font-size:11px;color:var(--amber);margin-top:6px">Turn on "live" only with a legal basis for consent. The engine always respects opt-outs, quiet hours, and the cap. AI replies are reply-gated and capped per lead.</div>
       <button class="btn btn-primary btn-xs" style="margin-top:10px" onclick="saveCadenceConfig()">Save configuration</button>
+
+      <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
+        <div style="font-size:12px;font-weight:600;color:var(--hl);margin-bottom:3px">Preview on real leads</div>
+        <div style="font-size:11px;color:var(--sub);margin-bottom:8px">Renders the actual outreach for a few of your real scraped leads — the AI-personalized first email plus the follow-up templates — and emails it to you, exactly as a lead would receive it (real domain + footer). Select leads in the Leads tab to choose specific ones; otherwise it uses your first few New leads. Never sends to a lead.</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <input type="email" id="cad-test-email" placeholder="you@example.com" style="flex:1;min-width:180px;font-size:16px">
+          <button class="btn btn-ghost btn-xs" id="cad-test-btn" onclick="sendCadenceTest()">Send preview to me</button>
+        </div>
+      </div>
     </div>`;
+}
+
+// QA preview: render the real outreach for a few real leads (AI-personalized
+// first email + follow-up templates) and email it to the operator. The server
+// does the rendering (it owns the AI personalization), so this needs the
+// previewOutreach backend action. Uses selected leads, else first few New ones.
+async function sendCadenceTest() {
+  if (!S.config.scriptUrl) { toast('Connect Apps Script first.', 'error'); return; }
+  const g = id => document.getElementById(id);
+  const to = (g('cad-test-email')?.value || '').trim();
+  if (!/.+@.+\..+/.test(to)) { toast('Enter a valid email address first.', 'error'); return; }
+  const hasEmail = l => l && l.email && l.email !== 'N/A';
+  let ids = [...(S.selected || [])].filter(id => hasEmail(S.leads.find(x => x.id === id)));
+  if (!ids.length) ids = S.leads.filter(l => (l.status || 'New') === 'New' && hasEmail(l)).slice(0, 5).map(l => l.id);
+  if (!ids.length) { toast('No leads with an email yet. Scrape or import some first, or select leads in the Leads tab.', 'error', 6000); return; }
+  ids = ids.slice(0, 8);
+  const btn = g('cad-test-btn');
+  if (btn && btn.disabled) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  try {
+    const res = await sheetsCall({ action:'previewOutreach', to, leadIds: ids });
+    if (res && res.success) {
+      const n = res.leads || ids.length;
+      toast('Sent ' + (res.sent || 0) + ' preview emails to ' + to + ', based on ' + n + ' real lead' + (n !== 1 ? 's' : '') + '. Check your inbox.', 'success', 9000);
+    } else {
+      toast('Preview failed: ' + ((res && res.error) || 'check the Apps Script connection.'), 'error', 7000);
+    }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Send preview to me'; }
+  }
 }
 
 // Persist the operator-tunable cadence config. Confirms before flipping to live.
