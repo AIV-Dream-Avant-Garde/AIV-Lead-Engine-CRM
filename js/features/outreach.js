@@ -342,7 +342,11 @@ function renderCadenceEngine() {
         <input type="checkbox" id="cad-aireplies" ${c.aiReplies?'checked':''} style="margin-top:2px">
         <span>AI auto-replies. When a business replies, draft a tailored response (with your booking link) and send it automatically — looping until they book.</span>
       </label>
-      <div style="font-size:11px;color:var(--amber);margin-top:6px">Turn on "live" only with a legal basis for consent. The engine always respects opt-outs, quiet hours, and the cap. AI replies are reply-gated and capped per lead.</div>
+      <label style="display:flex;align-items:flex-start;gap:8px;margin-top:8px;font-size:12px;color:var(--hl);cursor:pointer">
+        <input type="checkbox" id="cad-sendtime" ${c.sendTimeOptimized?'checked':''} style="margin-top:2px">
+        <span>Send Tuesday–Thursday mornings only. Concentrate sends into peak open windows, in each lead's local time. Off = send any weekday within quiet hours (faster, higher volume).</span>
+      </label>
+      <div style="font-size:11px;color:var(--amber);margin-top:6px">Turn on "live" only with a legal basis for consent. Quiet hours + send timing now use each lead's local time zone. The engine always respects opt-outs and the cap. AI replies are reply-gated and capped per lead.</div>
       <button class="btn btn-primary btn-xs" style="margin-top:10px" onclick="saveCadenceConfig()">Save configuration</button>
 
       <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
@@ -425,6 +429,7 @@ async function saveCadenceConfig() {
     postalAddress: g('cad-address')?.value?.trim() || '',
     aiReplies:     !!(g('cad-aireplies') && g('cad-aireplies').checked),
     aiPersonalize: !!(g('cad-aipersonalize') && g('cad-aipersonalize').checked),
+    sendTimeOptimized: !!(g('cad-sendtime') && g('cad-sendtime').checked),
   };
   const res = await sheetsCall({ action:'saveCadenceConfig', config });
   if (res?.success) {
