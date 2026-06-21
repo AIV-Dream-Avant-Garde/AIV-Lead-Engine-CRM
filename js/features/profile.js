@@ -23,14 +23,14 @@ function renderPerfil() {
       </div>
     </div>`;
 
-  // Lead stats
-  const isAdmin  = role === 'admin';
-  const myLeads  = isAdmin ? S.leads : S.leads.filter(l => l.closerId === uid_ || l.lockedBy === uid_ || l.providerId === uid_);
+  // Lead stats — always PERSONAL scope: leads where you're the closer, the
+  // sourcer (provider), or you've claimed (locked) them. Company-wide totals live
+  // in Admin → Team & Money; this is "My Profile".
+  const myLeads  = S.leads.filter(l => l.closerId === uid_ || l.lockedBy === uid_ || l.providerId === uid_);
   const myClosed = myLeads.filter(l => l.status === 'Closed Won');
-  const myComm   = isAdmin ? S.commissions : S.commissions.filter(c => c.closerId === uid_ || c.providerId === uid_);
+  const myComm   = S.commissions.filter(c => c.closerId === uid_ || c.providerId === uid_);
   // This user's share of a commission record: closer cut if they closed it, provider cut if they sourced it
-  const myShare  = c => (isAdmin ? parseFloat(c.closerAmount||0) + parseFloat(c.providerAmount||0)
-    : (c.closerId === uid_ ? parseFloat(c.closerAmount||0) : 0) + (c.providerId === uid_ ? parseFloat(c.providerAmount||0) : 0));
+  const myShare  = c => (c.closerId === uid_ ? parseFloat(c.closerAmount||0) : 0) + (c.providerId === uid_ ? parseFloat(c.providerAmount||0) : 0);
   // Include clawbacks (negative amounts) to accurately reduce totalPaid on refunds
   const totalPaid = myComm.filter(c => c.status === 'paid' || c.status === 'clawback').reduce((s,c) =>
     s + myShare(c), 0);
@@ -44,8 +44,19 @@ function renderPerfil() {
   setEl('pst-rate',    (myLeads.length ? Math.round(myClosed.length / myLeads.length * 100) : 0) + '%');
   setEl('pst-total',   fmtUSD(totalPaid + totalPending));
 
-  // Call stats
-  const myCalls  = isAdmin ? S.calls : S.calls.filter(c => {
+  // My leads by status — a quick breakdown (New / Contacted / …) of the leads above.
+  const sb = document.getElementById('perfil-status-breakdown');
+  if (sb) {
+    const order = ['New','Contacted','Interested','Closed Won','Closed Lost','Not Interested','Do Not Call'];
+    const counts = {};
+    myLeads.forEach(l => { const st = l.status || 'New'; counts[st] = (counts[st] || 0) + 1; });
+    const chips = order.filter(st => counts[st]).map(st =>
+      `<span class="pf-status-chip"><span class="pf-status-dot" style="background:${(typeof STATUS_COLOR!=='undefined'&&STATUS_COLOR[st])||'#999'}"></span>${esc(st)} <strong>${counts[st]}</strong></span>`).join('');
+    sb.innerHTML = chips || '<div class="notes-empty" style="padding:4px 0">No leads assigned to you yet.</div>';
+  }
+
+  // Call stats — your calls only (or calls on leads you own).
+  const myCalls  = S.calls.filter(c => {
     if (c.calledBy) return c.calledBy === uid_;
     const lead = S.leads.find(l => l.id === c.leadId);
     return lead && lead.closerId === uid_;
