@@ -118,6 +118,32 @@ function verifyAdminToken_(tok) {
   return diff === 0;
 }
 
+// Stateless per-rep session token: "uid64.role.exp.sig", sig = HMAC(uid64.role.exp).
+// Binds the rep's id + role so the server can trust them without re-reading the
+// Team sheet. userId is base64url-encoded so it can't collide with the '.' delimiter.
+function issueRepToken_(userId, role, hours) {
+  const exp = Date.now() + (hours || 12) * 3600 * 1000;
+  const uid64 = Utilities.base64EncodeWebSafe(String(userId)).replace(/=+$/, '');
+  const body = uid64 + '.' + role + '.' + exp;
+  return body + '.' + hmacHex_('rep:' + body);
+}
+// Returns {userId, role} if the token is valid and unexpired, else null.
+function verifyRepToken_(tok) {
+  const p = String(tok || '').split('.');
+  if (p.length !== 4) return null;
+  const exp = parseInt(p[2], 10);
+  if (!exp || Date.now() > exp) return null;
+  const body = p[0] + '.' + p[1] + '.' + p[2];
+  const expect = hmacHex_('rep:' + body);
+  if (p[3].length !== expect.length) return null;
+  let diff = 0;
+  for (let i = 0; i < expect.length; i++) diff |= p[3].charCodeAt(i) ^ expect.charCodeAt(i);
+  if (diff !== 0) return null;
+  let userId = '';
+  try { userId = Utilities.newBlob(Utilities.base64DecodeWebSafe(p[0])).getDataAsString(); } catch (e) { return null; }
+  return { userId: userId, role: p[1] };
+}
+
 // ── CADENCE ENGINE config (Cadence Engine) ────────────────────────────
 // Autonomous templated outreach (deterministic; no LLM). SAFETY: inert until
 // CADENCE_ENABLED = true. While false the engine DRY-RUNS — it logs what it
@@ -224,7 +250,10 @@ function doGet(e) {
       let leads = toObjs(getSheet(SHEETS.leads,LEAD_HDR)).map(l=>({...l,notes:tryParse(l.notes,[])}));
       if(since){const sd=new Date(since);leads=leads.filter(l=>!l.updatedAt||new Date(l.updatedAt)>=sd);}
       const calls   = toObjs(getSheet(SHEETS.calls,CALL_HDR));
-      const team    = toObjs(getSheet(SHEETS.team,TEAM_HDR));
+      // Strip pinHash — reps now sign in via the server (repLogin), so the client
+      // never needs the hashes, and broadcasting SHA-256(4-digit PIN) is trivially
+      // reversible. (Pre-redeploy clients still get hashes from the OLD backend.)
+      const team    = toObjs(getSheet(SHEETS.team,TEAM_HDR)).map(function(m){ const c=Object.assign({},m); delete c.pinHash; return c; });
       const comms   = toObjs(getSheet(SHEETS.commissions,COMM_HDR));
       const scripts = toObjs(getSheet(SHEETS.scripts,SCRIPT_HDR));
       let scheduledJobs=[]; try { const raw=cfgGet('scheduledJobs'); if(raw) scheduledJobs=JSON.parse(raw); } catch(e){}
@@ -337,6 +366,37 @@ function doPost(e) {
         if (fails >= 5) { next.lockUntil = now + 15*60*1000; next.fails = 0; }
         PROPS.setProperty('adminAuthState', JSON.stringify(next));
         return ok({ ok:false, remaining: Math.max(0, 5 - fails), locked: !!next.lockUntil, lockedUntil: next.lockUntil || 0 });
+      } finally { lock.releaseLock(); }
+    }
+
+    // Server-validated REP login (PIN-only). Hashes the PIN server-side and matches
+    // it against the Team sheet's pinHash, with a 5-try / 15-min global lockout, and
+    // returns a per-rep token. `serverAuth:true` always — it tells the client this
+    // backend validates reps, so the client trusts the verdict instead of falling
+    // back to its (now hash-free) local list. Pre-auth: only needs the CRM secret.
+    if (a === 'repLogin') {
+      const lock = LockService.getScriptLock();
+      try { lock.waitLock(5000); } catch (e) { return ok({ serverAuth:true, ok:false, error:'busy' }); }
+      try {
+        let st = {}; try { st = JSON.parse(PROP_('repAuthState') || '{}'); } catch (e) {}
+        const now = Date.now();
+        if (st.lockUntil && now < st.lockUntil) {
+          return ok({ serverAuth:true, ok:false, locked:true, lockedUntil:st.lockUntil });
+        }
+        const ph = sha256Hex_(String(b.pin || ''));
+        const team = toObjs(getSheet(SHEETS.team, TEAM_HDR));
+        const m = team.find(function(x){ return String(x.pinHash) === ph && String(x.active) !== 'false'; });
+        if (m) {
+          PROPS.deleteProperty('repAuthState');
+          return ok({ serverAuth:true, ok:true, userId:m.id, name:m.name, role:m.role || 'closer',
+            closerRate:parseFloat(m.closerRate || 0), providerRate:parseFloat(m.providerRate || 0),
+            token:issueRepToken_(m.id, m.role || 'closer', 12) });
+        }
+        const fails = (st.fails || 0) + 1;
+        const next = { fails:fails };
+        if (fails >= 5) { next.lockUntil = now + 15*60*1000; next.fails = 0; }
+        PROPS.setProperty('repAuthState', JSON.stringify(next));
+        return ok({ serverAuth:true, ok:false, remaining: Math.max(0, 5 - fails), locked: !!next.lockUntil, lockedUntil: next.lockUntil || 0 });
       } finally { lock.releaseLock(); }
     }
 

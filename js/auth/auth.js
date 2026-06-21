@@ -110,7 +110,32 @@ async function tryLogin() {
     return;
   }
 
-  // Team member PIN check
+  // Server-validated rep login (preferred). The backend hashes the PIN and matches
+  // it against the Team sheet, returning a per-rep token. We trust the server's
+  // verdict whenever it answers with `serverAuth`; otherwise (a pre-redeploy backend
+  // or no connection) we fall back to the local list below.
+  if (S.config.scriptUrl && !S.demoMode) {
+    let res = null;
+    try { res = await sheetsCall({ action: 'repLogin', pin: entered }); } catch (e) { res = null; }
+    if (res && res.serverAuth) {
+      if (res.ok) {
+        startSession({
+          userId:       res.userId,
+          userName:     res.name,
+          role:         res.role || 'closer',
+          closerRate:   parseFloat(res.closerRate || 0),
+          providerRate: parseFloat(res.providerRate || 0),
+          repToken:     res.token,
+        });
+        return;
+      }
+      failLogin_(res.locked, res.locked ? 'Too many attempts. Locked out for 15 minutes.' : null);
+      return;
+    }
+    // No `serverAuth` marker → old backend or unreachable → fall through to local.
+  }
+
+  // Local fallback: demo, offline, or a pre-redeploy backend that still ships pinHash.
   const member = S.team.find(m => m.pinHash === hash && String(m.active) !== 'false');
   if (member) {
     startSession({
@@ -123,13 +148,18 @@ async function tryLogin() {
     return;
   }
 
-  // Failed attempt
+  failLogin_();
+}
+
+// Register a failed login attempt: error state, the lockout after MAX_FAIL_ATTEMPTS
+// (or immediately if the server reports a lockout), else the "N attempts left" hint.
+function failLogin_(forceLock, lockMsg) {
   failedAttempts++;
   updatePinDots('error');
-  if (failedAttempts >= MAX_FAIL_ATTEMPTS) {
+  if (forceLock || failedAttempts >= MAX_FAIL_ATTEMPTS) {
     pinLockedUntil = Date.now() + LOCKOUT_MS;
     const el = document.getElementById('login-lockout');
-    if (el) { el.style.display = 'block'; el.textContent = 'Too many attempts. Locked out for 15 minutes.'; }
+    if (el) { el.style.display = 'block'; el.textContent = lockMsg || 'Too many attempts. Locked out for 15 minutes.'; }
     const np = document.querySelector('.numpad');
     if (np) np.style.opacity = '0.35';
     setTimeout(() => {
