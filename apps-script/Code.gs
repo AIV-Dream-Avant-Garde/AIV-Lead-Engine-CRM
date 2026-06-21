@@ -167,7 +167,7 @@ const CADENCE_GAP_MS           = CADENCE_STEP_GAP_DAYS * 24 * 3600 * 1000;
 const SHEETS = { leads:'Leads', calls:'Llamadas', team:'Team', commissions:'Commissions', scripts:'Scripts', interactions:'Interactions', sequences:'Sequences' };
 
 const LEAD_HDR = ['id','name','phone','address','website','rating','reviews','city','barrio','keyword','source','sourceDetail','status','providerId','providerRate','closerId','closerRate','dealValue','collectedAmount','providerCommission','closerCommission','commissionStatus','lockedBy','lockedUntil','assignedAt','workHistory','dncReason','followUpDate','notes','importedAt','updatedAt','calendarEventId','refundAmount','refundReason','refundedAt','country','email','externalId','lastTouchAt','lastReplyAt','consentSms','consentWhatsapp','consentEmail','lat','lng','residualActive','residualRate','residualMRR'];
-const CALL_HDR = ['id','leadId','leadName','phone','callSid','outcome','duration','notes','recordingUrl','driveUrl','consentConfirmed','calledAt'];
+const CALL_HDR = ['id','leadId','leadName','phone','callSid','outcome','duration','notes','recordingUrl','driveUrl','consentConfirmed','calledAt','calledBy','calledByName'];
 const TEAM_HDR = ['id','name','role','pinHash','providerRate','closerRate','contact','active','createdAt','commissionType'];
 const COMM_HDR   = ['id','leadId','leadName','dealValue','collectedAmount','providerId','providerRate','providerAmount','closerId','closerRate','closerAmount','status','createdAt','paidAt','paidBy','paymentRef','refundReason','adjustedBy','adjustedAt','providerName','closerName','recurring','period'];
 const SCRIPT_HDR = ['id','name','stage','body','createdAt','updatedAt'];
@@ -501,7 +501,14 @@ function doPost(e) {
       // If the recording callback already fired for this call (race), attach it now.
       if (b.callSid) {
         const pend = cfgGet('pendingRec_' + b.callSid);
-        if (pend) { try { const p = JSON.parse(pend); patchCallRec(b.callSid, p.recordingUrl, p.driveUrl); cfgSet('pendingRec_' + b.callSid, ''); } catch (e) {} }
+        if (pend) { try {
+          const p = JSON.parse(pend);
+          patchCallRec(b.callSid, p.recordingUrl, p.driveUrl);
+          // The file was saved generically (no call row existed yet) — rename it now
+          // that we know the lead/rep/date.
+          try { const fid=(String(p.driveUrl).match(/id=([^&]+)/)||[])[1]; if(fid) DriveApp.getFileById(fid).setName(recordingName_(b.callSid,{leadName:b.leadName,calledAt:b.calledAt,phone:b.phone,calledByName:b.calledByName})); } catch(e){}
+          cfgSet('pendingRec_' + b.callSid, '');
+        } catch (e) {} }
       }
       return ok({saved:true});
     }
@@ -891,16 +898,16 @@ function saveToDrive(recUrl,fileName){
 // or null. Used to give the recording a human-readable filename.
 function findCallMeta_(key){
   const s=getSheet(SHEETS.calls,CALL_HDR),rows=s.getDataRange().getValues(),h=rows[0]||CALL_HDR;
-  const sc=h.indexOf('callSid'),lnc=h.indexOf('leadName'),cac=h.indexOf('calledAt'),pc=h.indexOf('phone');
-  for(let i=1;i<rows.length;i++){ if(String(rows[i][sc])===String(key)) return {leadName:rows[i][lnc],calledAt:rows[i][cac],phone:rows[i][pc]}; }
+  const sc=h.indexOf('callSid'),lnc=h.indexOf('leadName'),cac=h.indexOf('calledAt'),pc=h.indexOf('phone'),rnc=h.indexOf('calledByName');
+  for(let i=1;i<rows.length;i++){ if(String(rows[i][sc])===String(key)) return {leadName:rows[i][lnc],calledAt:rows[i][cac],phone:rows[i][pc],calledByName:rnc>=0?rows[i][rnc]:''}; }
   return null;
 }
-// Build a readable .mp3 filename: "<lead or phone> <date time> [key].mp3".
+// Build a readable .mp3 filename: "<date time> · <lead/company> · <rep>.mp3".
 function recordingName_(key,meta){
-  let base=(meta&&(meta.leadName||meta.phone))||'Call', when='';
-  try{ if(meta&&meta.calledAt) when=Utilities.formatDate(new Date(meta.calledAt),Session.getScriptTimeZone(),'yyyy-MM-dd HH-mm'); }catch(e){}
-  const name=(String(base)+(when?' '+when:'')).replace(/[\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim();
-  return (name||'Call')+' ['+key+'].mp3';
+  let when='', lead=(meta&&(meta.leadName||meta.phone))||'Call', rep=(meta&&meta.calledByName)||'';
+  try{ if(meta&&meta.calledAt) when=Utilities.formatDate(new Date(meta.calledAt),Session.getScriptTimeZone(),'yyyy-MM-dd HH-mm-ss'); }catch(e){}
+  const name=[when,lead,rep].filter(function(x){return x;}).join(' · ').replace(/[\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim();
+  return (name||'Call')+'.mp3';
 }
 
 // Returns true if a call row matched the key and was patched, else false.
