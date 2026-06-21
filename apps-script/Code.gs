@@ -280,7 +280,7 @@ function doGet(e) {
     }
     if (a === 'twiml') {
       const xml = ContentService.createTextOutput(
-        '<?xml version="1.0"?><Response><Dial callerId="'+TWILIO_FROM_NUMBER+'" record="record-from-answer" recordingStatusCallback="'+ScriptApp.getService().getUrl()+'?action=rec_hook&amp;token='+encodeURIComponent(CRM_SECRET)+'"><Number>'+(e.parameter.To||'')+'</Number></Dial></Response>'
+        '<?xml version="1.0"?><Response><Dial callerId="'+TWILIO_FROM_NUMBER+'" record="record-from-answer" recordingStatusCallback="'+ScriptApp.getService().getUrl()+'?action=rec_hook&amp;token='+encodeURIComponent(CRM_SECRET)+'&amp;cid='+encodeURIComponent(e.parameter.cid||'')+'"><Number>'+(e.parameter.To||'')+'</Number></Dial></Response>'
       ).setMimeType(ContentService.MimeType.XML);
       return xml;
     }
@@ -342,9 +342,12 @@ function doPost(e) {
     // Secured by a token param the twiml handler appends to the callback URL.
     if (a === 'rec_hook') {
       if (String(e.parameter.token || '').trim() !== String(CRM_SECRET).trim()) return err_('Unauthorized');
-      const callSid = e.parameter.CallSid, recUrl = e.parameter.RecordingUrl;
-      if (callSid && recUrl) {
-        try { const du = saveToDrive(recUrl, callSid); patchCallRec(callSid, recUrl, du); }
+      // Match on our own `cid` (set by the browser, stored as the call's callSid) so
+      // the recording links to THIS call deterministically; fall back to Twilio's
+      // CallSid for older calls placed before the cid tagging.
+      const key = e.parameter.cid || e.parameter.CallSid, recUrl = e.parameter.RecordingUrl;
+      if (key && recUrl) {
+        try { const du = saveToDrive(recUrl, key); patchCallRec(key, recUrl, du); }
         catch (ex) { Logger.log('rec_hook: ' + ex.message); }
       }
       return ContentService.createTextOutput('ok');
@@ -861,7 +864,12 @@ function createToken(identity){
 function saveToDrive(recUrl,callSid){
   const auth=Utilities.base64Encode(TWILIO_ACCOUNT_SID+':'+TWILIO_AUTH_TOKEN);
   const res=UrlFetchApp.fetch(recUrl+'.mp3',{headers:{Authorization:'Basic '+auth},muteHttpExceptions:true});
-  const f=DriveApp.getFolderById(DRIVE_FOLDER_ID).createFile(callSid+'.mp3',res.getBlob().setName(callSid+'.mp3'));
+  if(res.getResponseCode()!==200) throw new Error('Twilio recording fetch '+res.getResponseCode());
+  // createFile(blob) — pass the BLOB ALONE. createFile(name, blob) hits the
+  // (name, stringContent) overload, which coerces the blob to the literal string
+  // "Blob" and writes a 4-byte text file instead of the audio. (That was the bug.)
+  const blob=res.getBlob().setName(callSid+'.mp3').setContentType('audio/mpeg');
+  const f=DriveApp.getFolderById(DRIVE_FOLDER_ID).createFile(blob);
   // Call recordings are consent/PII audio — do NOT make them world-readable.
   // They stay private to the script owner; to let reps listen, share the Drive
   // folder (DRIVE_FOLDER_ID) with their Google accounts instead.

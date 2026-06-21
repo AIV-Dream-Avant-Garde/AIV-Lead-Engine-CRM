@@ -145,9 +145,13 @@ async function dialNow() {
   const l = S.leads.find(x => x.id === CALL.curLeadId);
   if (!l) return;
   try {
-    CALL.activeCall = await CALL.device.connect({params:{To: normalizePhone(l.phone)}});
+    // Tag the call with our own id and pass it through to the recording callback,
+    // so the saved .mp3 links back to THIS call deterministically. (Twilio's
+    // outbound CallSid via call.parameters is unreliable in the browser SDK.)
+    const cid = 'rec_' + uid();
+    CALL.callSid = cid;
+    CALL.activeCall = await CALL.device.connect({params:{To: normalizePhone(l.phone), cid: cid}});
     CALL.activeCall.on('accept', call => {
-      CALL.callSid = call.parameters.CallSid;
       setCWStatus('connected','Connected');
       CALL.timer = setInterval(() => {
         CALL.seconds++;
