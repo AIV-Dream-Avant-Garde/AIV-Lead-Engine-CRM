@@ -347,8 +347,13 @@ function doPost(e) {
       // CallSid for older calls placed before the cid tagging.
       const key = e.parameter.cid || e.parameter.CallSid, recUrl = e.parameter.RecordingUrl;
       if (key && recUrl) {
-        try { const du = saveToDrive(recUrl, key); patchCallRec(key, recUrl, du); }
-        catch (ex) { Logger.log('rec_hook: ' + ex.message); }
+        try {
+          const meta = findCallMeta_(key);                       // for a readable filename
+          const du = saveToDrive(recUrl, recordingName_(key, meta));
+          // If the call row isn't written yet (callback beat the call-log save),
+          // stash the recording so saveCall attaches it when the row arrives.
+          if (!patchCallRec(key, recUrl, du)) cfgSet('pendingRec_' + key, JSON.stringify({ recordingUrl: recUrl, driveUrl: du }));
+        } catch (ex) { Logger.log('rec_hook: ' + ex.message); }
       }
       return ContentService.createTextOutput('ok');
     }
@@ -493,6 +498,11 @@ function doPost(e) {
     }
     if (a === 'saveCall') {
       getSheet(SHEETS.calls,CALL_HDR).appendRow(CALL_HDR.map(h=>b[h]??''));
+      // If the recording callback already fired for this call (race), attach it now.
+      if (b.callSid) {
+        const pend = cfgGet('pendingRec_' + b.callSid);
+        if (pend) { try { const p = JSON.parse(pend); patchCallRec(b.callSid, p.recordingUrl, p.driveUrl); cfgSet('pendingRec_' + b.callSid, ''); } catch (e) {} }
+      }
       return ok({saved:true});
     }
     if (a === 'saveTeamMember') {
@@ -861,14 +871,14 @@ function createToken(identity){
   return h+'.'+p+'.'+sig;
 }
 
-function saveToDrive(recUrl,callSid){
+function saveToDrive(recUrl,fileName){
   const auth=Utilities.base64Encode(TWILIO_ACCOUNT_SID+':'+TWILIO_AUTH_TOKEN);
   const res=UrlFetchApp.fetch(recUrl+'.mp3',{headers:{Authorization:'Basic '+auth},muteHttpExceptions:true});
   if(res.getResponseCode()!==200) throw new Error('Twilio recording fetch '+res.getResponseCode());
   // createFile(blob) — pass the BLOB ALONE. createFile(name, blob) hits the
   // (name, stringContent) overload, which coerces the blob to the literal string
   // "Blob" and writes a 4-byte text file instead of the audio. (That was the bug.)
-  const blob=res.getBlob().setName(callSid+'.mp3').setContentType('audio/mpeg');
+  const blob=res.getBlob().setName(fileName).setContentType('audio/mpeg');
   const f=DriveApp.getFolderById(DRIVE_FOLDER_ID).createFile(blob);
   // Call recordings are consent/PII audio — do NOT make them world-readable.
   // They stay private to the script owner; to let reps listen, share the Drive
@@ -877,10 +887,28 @@ function saveToDrive(recUrl,callSid){
   return 'https://drive.google.com/uc?export=preview&id='+f.getId();
 }
 
+// Look up a saved call by its key (callSid column) → {leadName, calledAt, phone}
+// or null. Used to give the recording a human-readable filename.
+function findCallMeta_(key){
+  const s=getSheet(SHEETS.calls,CALL_HDR),rows=s.getDataRange().getValues(),h=rows[0]||CALL_HDR;
+  const sc=h.indexOf('callSid'),lnc=h.indexOf('leadName'),cac=h.indexOf('calledAt'),pc=h.indexOf('phone');
+  for(let i=1;i<rows.length;i++){ if(String(rows[i][sc])===String(key)) return {leadName:rows[i][lnc],calledAt:rows[i][cac],phone:rows[i][pc]}; }
+  return null;
+}
+// Build a readable .mp3 filename: "<lead or phone> <date time> [key].mp3".
+function recordingName_(key,meta){
+  let base=(meta&&(meta.leadName||meta.phone))||'Call', when='';
+  try{ if(meta&&meta.calledAt) when=Utilities.formatDate(new Date(meta.calledAt),Session.getScriptTimeZone(),'yyyy-MM-dd HH-mm'); }catch(e){}
+  const name=(String(base)+(when?' '+when:'')).replace(/[\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim();
+  return (name||'Call')+' ['+key+'].mp3';
+}
+
+// Returns true if a call row matched the key and was patched, else false.
 function patchCallRec(callSid,recUrl,driveUrl){
   const s=getSheet(SHEETS.calls,CALL_HDR),rows=s.getDataRange().getValues(),h=rows[0];
   const sc=h.indexOf('callSid'),rc=h.indexOf('recordingUrl'),dc=h.indexOf('driveUrl');
-  for(let i=1;i<rows.length;i++){if(rows[i][sc]===callSid){s.getRange(i+1,rc+1).setValue(recUrl);s.getRange(i+1,dc+1).setValue(driveUrl);break;}}
+  for(let i=1;i<rows.length;i++){if(rows[i][sc]===callSid){s.getRange(i+1,rc+1).setValue(recUrl);s.getRange(i+1,dc+1).setValue(driveUrl);return true;}}
+  return false;
 }
 
 // ── Weekly report (time-triggered) ─────────────────────────
