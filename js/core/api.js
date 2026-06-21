@@ -12,7 +12,7 @@ async function sheetsCall(params) {
     const r = await fetch(url + '?action=' + params.action, {
       method:'POST', redirect:'follow',
       headers:{'Content-Type':'text/plain'},
-      body: JSON.stringify({...params, _secret: S.config.crmSecret, adminToken: (S.session && S.session.adminToken) || ''}),
+      body: JSON.stringify({...params, _secret: S.config.crmSecret, adminToken: (S.session && S.session.adminToken) || '', repToken: (S.session && S.session.repToken) || ''}),
     });
     const data = await r.json();
     // The server rejected our admin token (expired/missing) on an admin-only
