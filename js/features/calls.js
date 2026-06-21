@@ -264,6 +264,34 @@ async function saveCallLog(goNext) {
   if (goNext || S.dialerMode) setTimeout(() => goNextLead(), 250);
 }
 
+// Normalize any stored Drive URL to the file-viewer link, which reliably opens
+// Google Drive's media player. The old `uc?export=preview` form often hangs.
+function driveViewUrl_(u) {
+  u = String(u || '');
+  const m = u.match(/[?&]id=([-\w]+)/) || u.match(/\/file\/d\/([-\w]+)/);
+  return m ? 'https://drive.google.com/file/d/' + m[1] + '/view' : u;
+}
+// A call is "recording pending" if it was answered (record-from-answer) and we
+// don't have the link yet, within a window where it's plausibly still uploading.
+function recordingPending_(c) {
+  if (!c || c.outcome !== 'answered' || c.driveUrl || c.recordingUrl) return false;
+  const t = c.calledAt ? new Date(c.calledAt).getTime() : 0;
+  if (!t) return false;
+  const age = Date.now() - t;
+  return age >= 0 && age < 20 * 60 * 1000;   // ~20 min grace
+}
+// Recording cell for a call: a play link, a "processing" hint, or nothing.
+function recordingHtml_(c) {
+  if (c.driveUrl) {
+    return `<a class="call-rec-link" href="${esc(driveViewUrl_(c.driveUrl))}" target="_blank" rel="noopener" title="Opens in Google Drive">▶ Listen to recording</a>`;
+  }
+  if (c.recordingUrl) return `<audio class="call-audio" controls src="${esc(c.recordingUrl)}"></audio>`;
+  if (recordingPending_(c)) {
+    return `<span class="call-rec-pending"><span class="call-rec-spin"></span>Recording processing… <a class="call-rec-refresh" onclick="syncNow()">refresh</a></span>`;
+  }
+  return '';
+}
+
 function renderCallsSection() {
   const q  = (document.getElementById('calls-q')?.value      || '').toLowerCase();
   const oc = document.getElementById('calls-outcome')?.value || '';
@@ -295,13 +323,7 @@ function renderCallsSection() {
     const oc2  = c.outcome || 'answered';
     const dur  = c.duration ? fmtSec(parseInt(c.duration)) : '--';
     const lead = S.leads.find(l => l.id === c.leadId);
-    // Recordings are private PII in Drive (not world-readable), so they can't be
-    // streamed inline — link to Drive's player instead. A raw public recordingUrl,
-    // if ever present, still plays inline.
-    const audio   = c.driveUrl
-      ? `<a class="call-rec-link" href="${esc(c.driveUrl)}" target="_blank" rel="noopener" title="Opens in Google Drive">▶ Listen to recording</a>`
-      : c.recordingUrl
-        ? `<audio class="call-audio" controls src="${esc(c.recordingUrl)}"></audio>` : '';
+    const audio = recordingHtml_(c);
     const consent = c.consentConfirmed ? '<span class="consent-tag">✓ Consent</span>' : '';
     return `<div class="call-entry">
       <div class="call-entry-top">
@@ -323,10 +345,7 @@ function renderLeadCallHistory(leadId) {
     .slice(0, 5);
   el.innerHTML = calls.length ? calls.map(c => {
     const oc2   = c.outcome || 'answered';
-    const audio = c.driveUrl
-      ? `<audio class="call-audio" controls src="${esc(c.driveUrl)}"></audio>`
-      : c.recordingUrl
-        ? `<audio class="call-audio" controls src="${esc(c.recordingUrl)}"></audio>` : '';
+    const audio = recordingHtml_(c);
     return `<div class="call-entry" style="margin-bottom:5px">
       <div class="call-entry-top">
         <span class="call-outcome-badge ${oc2}">${OUTCOME_LABELS[oc2]||oc2}</span>

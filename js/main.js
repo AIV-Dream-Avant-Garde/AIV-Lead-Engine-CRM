@@ -72,6 +72,9 @@ function renderAll() {
   if (document.getElementById('sec-analytics')?.classList.contains('active')) renderAnalytics();
   if (document.getElementById('sec-perfil')?.classList.contains('active')) renderPerfil();
   if (document.getElementById('sec-responder')?.classList.contains('active')) renderResponder();
+  // Re-render Calls on sync so recording links (added server-side after the call)
+  // surface without a manual page reload.
+  if (document.getElementById('sec-llamadas')?.classList.contains('active') && typeof renderCallsSection === 'function') renderCallsSection();
 }
 
 // ── Mobile off-canvas sidebar ──────────────────────────────
