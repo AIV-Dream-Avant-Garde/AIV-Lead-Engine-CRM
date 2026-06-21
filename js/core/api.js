@@ -143,11 +143,21 @@ async function syncNow() {
         });
       }
     });
-    // Merge pulled calls by id (append unseen) instead of replacing the array —
-    // a wholesale replace would clobber locally-saved calls not yet pushed.
+    // Merge pulled calls by id: append unseen, AND fill in server-added recording
+    // links on calls we already have. recordingUrl/driveUrl are stamped on the row
+    // AFTER the call is saved (by the async recording callback), so an already-local
+    // call must pick them up on a later pull — without clobbering other local fields.
     if (Array.isArray(res.calls)) {
-      const haveCalls = new Set(S.calls.map(c => c.id));
-      res.calls.forEach(c => { if (c && c.id && !haveCalls.has(c.id)) { S.calls.push({...c, _synced:true}); haveCalls.add(c.id); } });
+      const callById = new Map((S.calls || []).map(c => [c.id, c]));
+      res.calls.forEach(c => {
+        if (!c || !c.id) return;
+        const local = callById.get(c.id);
+        if (!local) { const nc = {...c, _synced:true}; S.calls.push(nc); callById.set(c.id, nc); }
+        else {
+          if (c.recordingUrl && !local.recordingUrl) local.recordingUrl = c.recordingUrl;
+          if (c.driveUrl     && !local.driveUrl)     local.driveUrl     = c.driveUrl;
+        }
+      });
     }
     if (res.team) {
       // Preserve pinPlain (local-only) when merging server team data
