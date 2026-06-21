@@ -280,7 +280,7 @@ function doGet(e) {
     }
     if (a === 'twiml') {
       const xml = ContentService.createTextOutput(
-        '<?xml version="1.0"?><Response><Dial callerId="'+TWILIO_FROM_NUMBER+'" record="record-from-answer" recordingStatusCallback="'+ScriptApp.getService().getUrl()+'?action=rec_hook"><Number>'+(e.parameter.To||'')+'</Number></Dial></Response>'
+        '<?xml version="1.0"?><Response><Dial callerId="'+TWILIO_FROM_NUMBER+'" record="record-from-answer" recordingStatusCallback="'+ScriptApp.getService().getUrl()+'?action=rec_hook&amp;token='+encodeURIComponent(CRM_SECRET)+'"><Number>'+(e.parameter.To||'')+'</Number></Dial></Response>'
       ).setMimeType(ContentService.MimeType.XML);
       return xml;
     }
@@ -334,6 +334,20 @@ function doPost(e) {
       if (isOptOutGs(text)) notifyTelegram('Opt-out — ' + who + ' (' + channel + ') asked to stop receiving messages.');
       else notifyTelegram('Reply from ' + who + ' (' + channel + '): ' + text);
       return ContentService.createTextOutput('<?xml version="1.0"?><Response></Response>').setMimeType(ContentService.MimeType.XML);
+    }
+
+    // Twilio recording-status callback: a form-encoded POST with NO _secret, so it
+    // must be handled BEFORE the JSON.parse/_secret gate below (like inboundMsg) —
+    // otherwise JSON.parse throws on the form body and the recording is never saved.
+    // Secured by a token param the twiml handler appends to the callback URL.
+    if (a === 'rec_hook') {
+      if (String(e.parameter.token || '').trim() !== String(CRM_SECRET).trim()) return err_('Unauthorized');
+      const callSid = e.parameter.CallSid, recUrl = e.parameter.RecordingUrl;
+      if (callSid && recUrl) {
+        try { const du = saveToDrive(recUrl, callSid); patchCallRec(callSid, recUrl, du); }
+        catch (ex) { Logger.log('rec_hook: ' + ex.message); }
+      }
+      return ContentService.createTextOutput('ok');
     }
 
     const b = JSON.parse((e.postData && e.postData.contents) || '{}');
@@ -745,11 +759,6 @@ function doPost(e) {
       const s=getSheet(SHEETS.scripts,SCRIPT_HDR),rows=s.getDataRange().getValues(),h=rows[0],ic=h.indexOf('id');
       for(let i=rows.length-1;i>=1;i--){if(String(rows[i][ic])===String(b.id)){s.deleteRow(i+1);break;}}
       return ok({deleted:true});
-    }
-    if (a === 'rec_hook') {
-      const callSid=b.CallSid||e.parameter.CallSid, recUrl=b.RecordingUrl||e.parameter.RecordingUrl;
-      if(callSid&&recUrl){ try{const du=saveToDrive(recUrl,callSid);patchCallRec(callSid,recUrl,du);}catch(ex){Logger.log(ex.message);} }
-      return ok({ok:true});
     }
     if (a === 'scrape') {
       const {keyword,lat,lng,radius,maxResults,region} = b;
