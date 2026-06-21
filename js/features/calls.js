@@ -291,8 +291,11 @@ function renderCallsSection() {
     const oc2  = c.outcome || 'answered';
     const dur  = c.duration ? fmtSec(parseInt(c.duration)) : '--';
     const lead = S.leads.find(l => l.id === c.leadId);
+    // Recordings are private PII in Drive (not world-readable), so they can't be
+    // streamed inline — link to Drive's player instead. A raw public recordingUrl,
+    // if ever present, still plays inline.
     const audio   = c.driveUrl
-      ? `<audio class="call-audio" controls src="${esc(c.driveUrl)}"></audio>`
+      ? `<a class="call-rec-link" href="${esc(c.driveUrl)}" target="_blank" rel="noopener" title="Opens in Google Drive">▶ Listen to recording</a>`
       : c.recordingUrl
         ? `<audio class="call-audio" controls src="${esc(c.recordingUrl)}"></audio>` : '';
     const consent = c.consentConfirmed ? '<span class="consent-tag">✓ Consent</span>' : '';
