@@ -1004,8 +1004,21 @@ function sendWeeklyReport() {
 }
 
 // ── Scheduled scraper (time-triggered) ─────────────────────
-// Admin adds time trigger: Triggers → runScheduledScrapes → Time-based → Every day 6am
+// Admin adds time trigger: Triggers → runScheduledScrapes → Time-based → Every day 6am.
+// Runs BOTH state campaigns and scheduled keyword/city jobs. Campaigns run FIRST so
+// they always advance even when there are NO scheduled jobs — the jobs path below
+// short-circuits when none exist, which previously skipped campaigns entirely.
 function runScheduledScrapes() {
+  let campAdded = 0;
+  try { campAdded = (runStateCampaigns() || {}).added || 0; } catch (e) { Logger.log('runStateCampaigns error: ' + e.message); }
+  let jobsRes = {};
+  try { jobsRes = runScheduledJobs_() || {}; } catch (e) { Logger.log('runScheduledJobs_ error: ' + e.message); }
+  return { added: (jobsRes.added || 0) + campAdded, campaignsAdded: campAdded,
+           ranAt: jobsRes.ranAt || new Date().toISOString(), jobsRun: jobsRes.jobsRun || 0, ofJobs: jobsRes.ofJobs || 0 };
+}
+
+// Scheduled keyword/city jobs (state campaigns are handled by the caller above).
+function runScheduledJobs_() {
   const ss   = SpreadsheetApp.openById(SHEET_ID);
   const cfg  = ss.getSheetByName('Config');
   if (!cfg) return;
@@ -1119,9 +1132,7 @@ function runScheduledScrapes() {
   cfgSet('scrapeEmpty', JSON.stringify(emptyMap));
   const ranAt = new Date().toISOString();
   cfgSet('lastScrapeRun', JSON.stringify({ranAt, added: totalAdded, jobsRun, ofJobs: active.length, skipped}));
-  Logger.log('Scheduled scrape: +' + totalAdded + ' leads, ' + jobsRun + '/' + eligible.length + ' eligible (' + skipped + ' exhausted-skipped of ' + active.length + '), ' + apiCalls + ' calls.');
-  // The same daily trigger also advances any state campaigns.
-  try { runStateCampaigns(); } catch (e) { Logger.log('runStateCampaigns error: ' + e.message); }
+  Logger.log('Scheduled jobs: +' + totalAdded + ' leads, ' + jobsRun + '/' + eligible.length + ' eligible (' + skipped + ' exhausted-skipped of ' + active.length + '), ' + apiCalls + ' calls.');
   return {added: totalAdded, ranAt, jobsRun, ofJobs: active.length, skipped};
 }
 

@@ -378,15 +378,18 @@ function renderResidualTrigger() {
 // Run all active saved scrape jobs immediately (on-demand), then pull the new leads.
 async function runScrapesNow() {
   if (!S.config.scriptUrl) { toast('Set up the Apps Script URL first.', 'error'); return; }
-  const btn = document.getElementById('run-scrapes-now-btn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Running...'; }
-  const res = await sheetsCall({action:'runScrapesNow'});
-  if (btn) { btn.disabled = false; btn.textContent = 'Run now'; }
+  // Both the scheduled-jobs panel and the state-campaign card share this trigger.
+  const btns = [...document.querySelectorAll('.run-scrapes-btn')];
+  btns.forEach(b => { b.dataset.lbl = b.textContent; b.disabled = true; b.textContent = 'Scraping… (up to a few min)'; });
+  let res; try { res = await sheetsCall({action:'runScrapesNow'}); } catch(e) { res = null; }
+  btns.forEach(b => { b.disabled = false; b.textContent = b.dataset.lbl || 'Run now'; });
   if (res?.success) {
     if (S.triggerStatus) S.triggerStatus.lastScrapeRun = {ranAt: res.ranAt, added: res.added};
-    toast('Scrape ran: +' + (res.added || 0) + ' new leads.', 'success', 5000);
+    const camp = res.campaignsAdded || 0;
+    toast('Scrape ran: +' + (res.added || 0) + ' new leads' + (camp ? ' (' + camp + ' from state campaigns)' : '') + '.', 'success', 5000);
     await syncNow();          // bring the newly-appended leads into the pool now
     renderScheduledJobs();
+    if (typeof renderCampaigns === 'function') renderCampaigns();
   } else {
     toast('Error running the scrape. Check the Apps Script and the API key.', 'error', 5000);
   }
@@ -447,7 +450,7 @@ function renderScheduledJobs() {
           onclick="setTrigger('runScheduledScrapes',${!active})">
           ${active ? 'Deactivate' : 'Activate'}
         </button>
-        <button id="run-scrapes-now-btn" class="btn btn-primary" style="font-size:11px;padding:4px 10px" onclick="runScrapesNow()">
+        <button id="run-scrapes-now-btn" class="btn btn-primary run-scrapes-btn" style="font-size:11px;padding:4px 10px" onclick="runScrapesNow()">
           Run now
         </button>
       </div>
