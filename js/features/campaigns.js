@@ -116,7 +116,14 @@ function renderCampaigns() {
     el.innerHTML = '<div class="notes-empty">No state campaigns yet. Launch one above to auto-scrape an entire state.</div>';
     return;
   }
-  el.innerHTML = S.stateCampaigns.map(c => {
+  const anyActive = S.stateCampaigns.some(c => c.active && !c.exhausted);
+  const runHdr = anyActive
+    ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;font-size:11px;color:var(--sub)">
+        <span>Campaigns scrape automatically each morning (6am ET). Want results now?</span>
+        <button class="btn btn-primary btn-sm run-scrapes-btn" onclick="runScrapesNow()">▶ Run now</button>
+      </div>`
+    : '';
+  el.innerHTML = runHdr + S.stateCampaigns.map(c => {
     const total   = (c.tileCount || 0) * (c.keywords?.length || 1);
     const pct      = total ? Math.min(100, Math.round((c.cursor || 0) / total * 100)) : 0;
     const status   = c.exhausted ? '<span style="color:var(--pos)">Complete</span>'
