@@ -62,12 +62,12 @@ const DEMO_DATA = (() => {
     {id:'dc-04',leadId:'dl-05',leadName:'Riverside Family Pharmacy',phone:'+19045551005',callSid:'CA-demo-004',outcome:'answered',duration:312,notes:'Manager Laura Caine available Tue/Thu. Sending brochure.',recordingUrl:DEMO_REC,driveUrl:'',consentConfirmed:true,calledAt:ts(5)},
     {id:'dc-05',leadId:'dl-06',leadName:'Stylo Express Hair Salon',phone:'+14075551006',callSid:'CA-demo-005',outcome:'answered',duration:198,notes:'Diana Shaw wants a formal meeting. Great fit.',recordingUrl:DEMO_REC,driveUrl:'',consentConfirmed:true,calledAt:ts(11)},
     {id:'dc-06',leadId:'dl-06',leadName:'Stylo Express Hair Salon',phone:'+14075551006',callSid:'CA-demo-006',outcome:'answered',duration:441,notes:'Second call. Confirmed interest. Virtual meeting scheduled.',recordingUrl:DEMO_REC,driveUrl:'',consentConfirmed:true,calledAt:ts(4)},
-    {id:'dc-07',leadId:'dl-07',leadName:'Bright Smile Dental',phone:'+13055551007',callSid:'CA-demo-007',outcome:'answered',duration:523,notes:'Dr. Vance reviewing the 6-month proposal. Very positive.',recordingUrl:DEMO_REC,driveUrl:'',consentConfirmed:true,calledAt:ts(15)},
+    {id:'dc-07',leadId:'dl-07',leadName:'Bright Smile Dental',phone:'+13055551007',callSid:'CA-demo-007',outcome:'answered',duration:523,notes:'Dr. Vance reviewing the 6-month proposal. Very positive.',recordingUrl:DEMO_REC,driveUrl:'',consentConfirmed:true,calledAt:ts(15),calledBy:'demo-clsr-1',calledByName:'Sarah Mitchell',callSummary:'Walked Dr. Vance through the 6-month package and how Axius would own patient follow-up and scheduling. His main concern was the cost of switching, so reassured him everything stays in their own accounts. Next step: send the one-page proposal and follow up Thursday.',transcript:'Rep: Hi Dr. Vance, thanks for taking the call. Did you get a chance to look at the overview?\nProspect: I did, it looks interesting. My worry is the disruption of switching everything over.\nRep: Totally fair. Nothing moves out of your accounts, we run it in place, so there is no downtime.\nProspect: Okay. Send me the details and we can talk Thursday.\nRep: Will do, I will get that over today.'},
     {id:'dc-08',leadId:'dl-08',leadName:'Bay & Tide Seafood',phone:'+18135551008',callSid:'CA-demo-008',outcome:'answered',duration:677,notes:'Hector Ramsey signed the contract on the call. CLOSED.',recordingUrl:DEMO_REC,driveUrl:'',consentConfirmed:true,calledAt:ts(28)},
-    {id:'dc-09',leadId:'dl-09',leadName:'Protect Insurance Agency',phone:'+13055551009',callSid:'CA-demo-009',outcome:'answered',duration:891,notes:'Lucy Hayes signed the annual package. CLOSED. $8,200.',recordingUrl:DEMO_REC,driveUrl:'',consentConfirmed:true,calledAt:ts(16)},
+    {id:'dc-09',leadId:'dl-09',leadName:'Protect Insurance Agency',phone:'+13055551009',callSid:'CA-demo-009',outcome:'answered',duration:891,notes:'Lucy Hayes signed the annual package. CLOSED. $8,200.',recordingUrl:DEMO_REC,driveUrl:'',consentConfirmed:true,calledAt:ts(16),calledBy:'demo-clsr-1',calledByName:'Sarah Mitchell',callSummary:'Lucy Hayes confirmed the annual package and signed on the call. Covered the two-week onboarding and the single monthly invoice. No objections raised. Next step: send the agreement and the kickoff schedule.',transcript:'Rep: So that covers your systems, your reporting, and the vendor side, all under one roof.\nProspect: That is exactly what we have been missing. Let us do the annual.\nRep: Perfect. I will send the agreement now and we can kick off in two weeks.\nProspect: Sounds good.'},
     {id:'dc-10',leadId:'dl-11',leadName:'The Bolt Hardware Store',phone:'+13055551011',callSid:'CA-demo-010',outcome:'answered',duration:156,notes:'No budget this quarter. Closed Lost.',recordingUrl:DEMO_REC,driveUrl:'',consentConfirmed:true,calledAt:ts(8)},
     // New calls for extended scenarios
-    {id:'dc-11',leadId:'dl-16',leadName:'St. Peter Health Clinic',phone:'+18135551016',callSid:'CA-demo-011',outcome:'answered',duration:389,notes:'Medical director Clara Owens very interested. Presentation scheduled.',recordingUrl:DEMO_REC,driveUrl:'',consentConfirmed:true,calledAt:ts(3)},
+    {id:'dc-11',leadId:'dl-16',leadName:'St. Peter Health Clinic',phone:'+18135551016',callSid:'CA-demo-011',outcome:'answered',duration:389,notes:'Medical director Clara Owens very interested. Presentation scheduled.',recordingUrl:DEMO_REC,driveUrl:'',consentConfirmed:true,calledAt:ts(3),calledBy:'demo-clsr-1',calledByName:'Sarah Mitchell',callSummary:'Medical director Clara Owens is interested in offloading patient follow-up and reporting. She wants a live walkthrough before committing. Next step: a 30-minute presentation booked for next week.',transcript:'Rep: Who is handling your patient follow-up and the reporting side right now?\nProspect: Honestly it is spread across the front desk and me. It is a lot.\nRep: That is the exact area we take over. Could I show you a quick walkthrough next week?\nProspect: Yes, let us set that up.'},
     {id:'dc-12',leadId:'dl-17',leadName:'Oxford English Academy',phone:'+19045551017',callSid:'CA-demo-012',outcome:'answered',duration:742,notes:'Closed Won. 50% partial payment received. Balance due in 60 days.',recordingUrl:DEMO_REC,driveUrl:'',consentConfirmed:true,calledAt:ts(20)},
     {id:'dc-13',leadId:'dl-02',leadName:'Bella Vista Med Spa',phone:'+13055551002',callSid:'CA-demo-013',outcome:'voicemail',duration:0,notes:'Left a voicemail. Awaiting a callback.',recordingUrl:'',driveUrl:'',consentConfirmed:false,calledAt:ts(6)},
   ];
@@ -98,5 +98,18 @@ const DEMO_DATA = (() => {
     {id:'di-06', leadId:'dl-05', leadName:'Riverside Family Pharmacy', phone:'+19045551005', channel:'email', direction:'in',  stepTag:'', body:"Who is this for — the owner? Laura handles marketing, you can reach her here.", status:'received', sid:'demo', createdAt:hrs(26), createdBy:'inbound', _synced:true},
   ];
 
-  return {leads, team, calls, commissions, interactions};
+  // State-scrape campaigns — one running, one paused — so the demo shows the
+  // "Scrape an entire state" grid sweep with progress bars.
+  const campaigns = [
+    {id:'dcmp-01', name:'Florida · Dentists', state:'FL', industry:'Dental', businessType:'', region:'us',
+     bounds:{minLat:24.5,maxLat:31.0,minLng:-87.6,maxLng:-80.0}, radius:25000, rows:8, cols:6, tileCount:48,
+     keywords:['dentist','orthodontist','dental clinic'], dailyCap:100,
+     cursor:53, active:true, exhausted:false, leadsFound:212, lastRunAt:hrs(8), createdAt:ts(6)},
+    {id:'dcmp-02', name:'Florida · Med Spas', state:'FL', industry:'Med Spa', businessType:'', region:'us',
+     bounds:{minLat:24.5,maxLat:31.0,minLng:-87.6,maxLng:-80.0}, radius:25000, rows:8, cols:6, tileCount:48,
+     keywords:['med spa','medical spa'], dailyCap:80,
+     cursor:60, active:false, exhausted:false, leadsFound:147, lastRunAt:hrs(30), createdAt:ts(12)},
+  ];
+
+  return {leads, team, calls, commissions, interactions, campaigns};
 })();
