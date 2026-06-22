@@ -292,6 +292,40 @@ function recordingHtml_(c) {
   return '';
 }
 
+// Transcript/summary cell: shows the AI summary + a transcript expander once present,
+// a "Transcribe" button while a recording exists but hasn't been transcribed, or a
+// spinner while transcribing. Demo mode hides the button (no backend).
+function transcriptHtml_(c) {
+  if (c.callSummary || c.transcript) {
+    let h = '';
+    if (c.callSummary) h += `<div class="call-summary"><span class="call-summary-label">AI summary</span> ${esc(c.callSummary)}</div>`;
+    if (c.transcript)  h += `<details class="call-transcript"><summary>View transcript</summary><div class="call-transcript-body">${esc(c.transcript)}</div></details>`;
+    return h;
+  }
+  if (c._transcribing) return `<span class="call-rec-pending"><span class="call-rec-spin"></span>Transcribing…</span>`;
+  if (c.driveUrl && !S.demoMode) {
+    return `<button class="call-tx-btn" onclick="transcribeCall_('${esc(c.id)}')">🎙 Transcribe &amp; summarize</button>`;
+  }
+  return '';
+}
+
+// On-demand: ask the backend to transcribe + summarize this call's recording.
+async function transcribeCall_(id) {
+  const c = (S.calls || []).find(x => x.id === id);
+  if (!c || !c.driveUrl || c._transcribing) return;
+  c._transcribing = true; renderCallsSection();
+  try {
+    const r = await sheetsCall({ action: 'transcribeCall', callSid: c.callSid, driveUrl: c.driveUrl });
+    if (r && (r.transcript || r.summary)) {
+      c.transcript = r.transcript || ''; c.callSummary = r.summary || '';
+      toast('Transcript ready.', 'success');
+    } else {
+      toast((r && r.error) ? r.error : 'Could not transcribe this recording.', 'error', 6000);
+    }
+  } catch (e) { toast('Transcription failed: ' + e.message, 'error'); }
+  c._transcribing = false; saveLocal(); renderCallsSection();
+}
+
 function renderCallsSection() {
   const q  = (document.getElementById('calls-q')?.value      || '').toLowerCase();
   const oc = document.getElementById('calls-outcome')?.value || '';
@@ -333,6 +367,7 @@ function renderCallsSection() {
       </div>
       ${c.notes ? `<div class="call-notes-text">${esc(c.notes)}</div>` : ''}
       ${audio}
+      ${transcriptHtml_(c)}
     </div>`;
   }).join('') : '<div style="text-align:center;padding:40px;color:var(--body);font-size:13px">No calls yet — open a lead and hit <strong>Call</strong> to start dialing.</div>';
 }
