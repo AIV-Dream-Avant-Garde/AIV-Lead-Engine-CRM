@@ -374,6 +374,10 @@ function renderCadenceEngine() {
         <div class="field"><label>Start hour (0–23)</label><input type="number" id="cad-qstart" value="${esc(String(v(c.quietStart,8)))}" min="0" max="23"></div>
         <div class="field"><label>End hour (1–24)</label><input type="number" id="cad-qend" value="${esc(String(v(c.quietEnd,20)))}" min="1" max="24"></div>
       </div>
+      <div style="display:flex;gap:9px;margin-top:10px;padding:10px 12px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;font-size:11px;line-height:1.6;color:var(--body)">
+        <span style="flex-shrink:0;font-size:13px">🌱</span>
+        <div><strong style="color:var(--hl)">Warming up a new sending domain?</strong> A brand-new domain that blasts cold email gets filtered to spam. Keep the <strong>daily cap low to start</strong> — roughly 20–30/day for the first few days — then raise it about 50% every couple of days as replies come in. Authentication (SPF/DKIM/DMARC) gets you allowed to send; a slow ramp is what keeps you in the inbox.</div>
+      </div>
       <div class="field" style="margin-top:8px"><label>Mailing address (CAN-SPAM · email footer)</label><input type="text" id="cad-address" value="${esc(v(c.postalAddress,''))}" placeholder="AXIUS, 123 Main St, Austin, TX 78701"></div>
       <label style="display:flex;align-items:flex-start;gap:8px;margin-top:10px;font-size:12px;color:var(--hl);cursor:pointer">
         <input type="checkbox" id="cad-enabled" ${live?'checked':''} style="margin-top:2px">
