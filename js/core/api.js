@@ -156,6 +156,8 @@ async function syncNow() {
         else {
           if (c.recordingUrl && !local.recordingUrl) local.recordingUrl = c.recordingUrl;
           if (c.driveUrl     && !local.driveUrl)     local.driveUrl     = c.driveUrl;
+          if (c.transcript   && !local.transcript)   local.transcript   = c.transcript;
+          if (c.callSummary  && !local.callSummary)  local.callSummary  = c.callSummary;
         }
       });
     }

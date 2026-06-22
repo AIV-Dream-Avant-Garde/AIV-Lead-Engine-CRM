@@ -167,7 +167,7 @@ const CADENCE_GAP_MS           = CADENCE_STEP_GAP_DAYS * 24 * 3600 * 1000;
 const SHEETS = { leads:'Leads', calls:'Llamadas', team:'Team', commissions:'Commissions', scripts:'Scripts', interactions:'Interactions', sequences:'Sequences' };
 
 const LEAD_HDR = ['id','name','phone','address','website','rating','reviews','city','barrio','keyword','source','sourceDetail','status','providerId','providerRate','closerId','closerRate','dealValue','collectedAmount','providerCommission','closerCommission','commissionStatus','lockedBy','lockedUntil','assignedAt','workHistory','dncReason','followUpDate','notes','importedAt','updatedAt','calendarEventId','refundAmount','refundReason','refundedAt','country','email','externalId','lastTouchAt','lastReplyAt','consentSms','consentWhatsapp','consentEmail','lat','lng','residualActive','residualRate','residualMRR'];
-const CALL_HDR = ['id','leadId','leadName','phone','callSid','outcome','duration','notes','recordingUrl','driveUrl','consentConfirmed','calledAt','calledBy','calledByName'];
+const CALL_HDR = ['id','leadId','leadName','phone','callSid','outcome','duration','notes','recordingUrl','driveUrl','consentConfirmed','calledAt','calledBy','calledByName','transcript','callSummary'];
 const TEAM_HDR = ['id','name','role','pinHash','providerRate','closerRate','contact','active','createdAt','commissionType'];
 const COMM_HDR   = ['id','leadId','leadName','dealValue','collectedAmount','providerId','providerRate','providerAmount','closerId','closerRate','closerAmount','status','createdAt','paidAt','paidBy','paymentRef','refundReason','adjustedBy','adjustedAt','providerName','closerName','recurring','period'];
 const SCRIPT_HDR = ['id','name','stage','body','createdAt','updatedAt'];
@@ -511,6 +511,22 @@ function doPost(e) {
         } catch (e) {} }
       }
       return ok({saved:true});
+    }
+    // On-demand: transcribe + summarize a call's recording (Gemini). Pulls the .mp3
+    // from the Drive folder (where rec_hook archived it), runs Gemini, and stores
+    // the result on the call row. A rep action — gated by the shared secret above.
+    if (a === 'transcribeCall') {
+      const callSid = String(b.callSid || ''), driveUrl = String(b.driveUrl || '');
+      if (!callSid) return err_('Missing call id.');
+      const m = driveUrl.match(/[?&]id=([-\w]+)/) || driveUrl.match(/\/file\/d\/([-\w]+)/);
+      if (!m) return err_('No recording to transcribe.');
+      let blob;
+      try { blob = DriveApp.getFileById(m[1]).getBlob().setContentType('audio/mpeg'); }
+      catch (e) { return err_('Recording not found in Drive.'); }
+      const tr = geminiTranscribe_(blob, findCallMeta_(callSid));
+      if (!tr.transcript && !tr.summary) return err_('Could not transcribe (silent, too long, or AI unavailable).');
+      patchCallTranscript_(callSid, tr.transcript, tr.summary);
+      return ok({ transcript: tr.transcript, summary: tr.summary });
     }
     if (a === 'saveTeamMember') {
       const s=getSheet(SHEETS.team,TEAM_HDR),rows=s.getDataRange().getValues(),h=rows[0]||TEAM_HDR,ic=h.indexOf('id');
@@ -1787,6 +1803,50 @@ function geminiGenerate_(system, prompt) {
       ? d.candidates[0].content.parts.map(function(p){ return p.text || ''; }).join('').trim() : '';
     return text;
   } catch (e) { Logger.log('geminiGenerate_ error: ' + e.message); return ''; }
+}
+
+// Transcribe + summarize a call recording with Gemini (audio in, JSON out).
+// Returns {transcript, summary}; both empty on failure / silent / too-long audio.
+function geminiTranscribe_(blob, meta) {
+  if (!GEMINI_API_KEY || GEMINI_API_KEY.indexOf('TU_') === 0) return { transcript:'', summary:'' };
+  try {
+    const bytes = blob.getBytes();
+    if (!bytes.length || bytes.length > 18 * 1024 * 1024) return { transcript:'', summary:'' };  // inline-data cap
+    const who = (meta && meta.leadName) ? (' with ' + meta.leadName) : '';
+    const sys = 'You transcribe and summarize recorded sales phone calls. Output ONLY a JSON object, no markdown fences.';
+    const prompt = 'This is a recorded sales call' + who + '. Return a JSON object with exactly two string fields:\n' +
+      '"summary": 2 to 4 sentences — what was discussed, any objections or concerns raised, and the agreed next step (say "No next step agreed" if none).\n' +
+      '"transcript": the full transcript, each line labelled "Rep:" or "Prospect:".\n' +
+      'If the audio is silent or unintelligible, return both fields as empty strings.';
+    const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent?key=' + encodeURIComponent(GEMINI_API_KEY);
+    const payload = {
+      systemInstruction: { parts: [{ text: sys }] },
+      contents: [{ role:'user', parts: [ { inlineData: { mimeType:'audio/mpeg', data: Utilities.base64Encode(bytes) } }, { text: prompt } ] }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 8192, responseMimeType: 'application/json' },
+    };
+    const res = UrlFetchApp.fetch(url, { method:'post', contentType:'application/json', payload:JSON.stringify(payload), muteHttpExceptions:true });
+    if (res.getResponseCode() !== 200) { Logger.log('geminiTranscribe_ http ' + res.getResponseCode() + ': ' + res.getContentText().slice(0,200)); return { transcript:'', summary:'' }; }
+    const d = JSON.parse(res.getContentText() || '{}');
+    let text = (d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts)
+      ? d.candidates[0].content.parts.map(function(p){ return p.text || ''; }).join('').trim() : '';
+    text = text.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+    let obj = {}; try { obj = JSON.parse(text); } catch (e) { obj = { transcript: text, summary: '' }; }
+    return { transcript: String(obj.transcript || ''), summary: String(obj.summary || '') };
+  } catch (e) { Logger.log('geminiTranscribe_ error: ' + e.message); return { transcript:'', summary:'' }; }
+}
+
+// Write transcript + summary onto a call row (matched by callSid). true if matched.
+function patchCallTranscript_(callSid, transcript, summary) {
+  const s = getSheet(SHEETS.calls, CALL_HDR), rows = s.getDataRange().getValues(), h = rows[0];
+  const sc = h.indexOf('callSid'), tc = h.indexOf('transcript'), smc = h.indexOf('callSummary');
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][sc]) === String(callSid)) {
+      if (tc >= 0)  s.getRange(i + 1, tc + 1).setValue(transcript);
+      if (smc >= 0) s.getRange(i + 1, smc + 1).setValue(summary);
+      return true;
+    }
+  }
+  return false;
 }
 
 // AI-personalized FIRST email: analyzes the lead (type, city, rating/reviews) and
