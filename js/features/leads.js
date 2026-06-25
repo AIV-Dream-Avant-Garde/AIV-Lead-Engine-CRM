@@ -447,6 +447,9 @@ function openLead(id) {
       : 'Not set'},
     {lb:'Imported',  v: fmtD(l.importedAt)},
     {lb:'Updated',v: fmtD(l.updatedAt)},
+    // The lead id IS the immutable Engagement ID — the join key every Axius system
+    // (Stripe, Registry, Mongo, the bot) stores. Surfaced here, click to copy.
+    {lb:'Engagement ID', v:`<span title="Immutable join key across all Axius systems" style="font-family:'Geist Mono',monospace;font-size:11px;color:var(--sub);user-select:all;cursor:text">${esc(l.id)}</span>`},
   ];
   // Partial collection indicator
   if (l.collectedAmount && parseFloat(l.collectedAmount) !== parseFloat(l.dealValue || 0)) {
