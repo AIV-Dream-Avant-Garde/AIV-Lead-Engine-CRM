@@ -36,6 +36,7 @@ const S = {
   scheduledJobs:   [],     // Scheduled scrape jobs (synced to GAS Config sheet)
   stateCampaigns:  [],     // Whole-state grid-tiling scrape campaigns (synced to GAS Config)
   smsTemplates:    [],     // SMS/WhatsApp message templates (stored in localStorage)
+  engagements:     [],     // Active Client / spine engagement records (synced to GAS Engagements sheet)
   triggerStatus:   { scrape: false, report: false, cadence: false, residual: false }, // GAS time-trigger state
   isSyncing:       false,  // Sync race guard — true while syncNow() is in flight
   demoMode:        false,  // Demo mode — no GAS calls, preloaded sample data

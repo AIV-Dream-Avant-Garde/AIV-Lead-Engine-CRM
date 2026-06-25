@@ -164,7 +164,18 @@ const CADENCE_GAP_MS           = CADENCE_STEP_GAP_DAYS * 24 * 3600 * 1000;
 // Set it before sending real email. (Bounce/complaint suppression via a Resend
 // webhook is still a separate follow-up — see GO-LIVE §1.)
 
-const SHEETS = { leads:'Leads', calls:'Llamadas', team:'Team', commissions:'Commissions', scripts:'Scripts', interactions:'Interactions', sequences:'Sequences' };
+const SHEETS = { leads:'Leads', calls:'Llamadas', team:'Team', commissions:'Commissions', scripts:'Scripts', interactions:'Interactions', sequences:'Sequences', engagements:'Engagements' };
+
+// ── ENGAGEMENT (Active Client) record — the CRM-side spine record, one per won
+// lead, keyed by engagementId (= the lead id). Tracks the Gate-A signals
+// (paid + roadmap approved + MSA signed; "won" is implied) and the Registry links
+// (Stripe, Mongo, Discord, Drive) returned by provisioning. CRM is source of record
+// for shared fields pre-Gate-A; Mongo owns operational detail post-Gate-A.
+const ENGAGEMENT_HDR = ['engagementId','company','status','dealValue',
+  'paid','paidAt','msaSigned','msaSignedAt','msaSignerName','msaSignerIp',
+  'roadmap','roadmapApprovedAt',
+  'stripeCustomerId','mongoSlug','discordGuildId','discordCategoryId','discordRoleId','driveFolderId',
+  'gateAReadyAt','provisionedAt','createdAt','updatedAt'];
 
 const LEAD_HDR = ['id','name','phone','address','website','rating','reviews','city','barrio','keyword','source','sourceDetail','status','providerId','providerRate','closerId','closerRate','dealValue','collectedAmount','providerCommission','closerCommission','commissionStatus','lockedBy','lockedUntil','assignedAt','workHistory','dncReason','followUpDate','notes','importedAt','updatedAt','calendarEventId','refundAmount','refundReason','refundedAt','country','email','externalId','lastTouchAt','lastReplyAt','consentSms','consentWhatsapp','consentEmail','lat','lng','residualActive','residualRate','residualMRR'];
 const CALL_HDR = ['id','leadId','leadName','phone','callSid','outcome','duration','notes','recordingUrl','driveUrl','consentConfirmed','calledAt','calledBy','calledByName','transcript','callSummary'];
@@ -261,7 +272,8 @@ function doGet(e) {
       let interactions = toObjs(getSheet(SHEETS.interactions,INTERACTION_HDR));
       if(since){const sd=new Date(since);interactions=interactions.filter(i=>!i.createdAt||new Date(i.createdAt)>=sd);}
       const sequences = toObjs(getSheet(SHEETS.sequences,SEQUENCE_HDR));
-      return ok({leads,calls,team,commissions:comms,scripts,scheduledJobs,stateCampaigns,interactions,sequences,adminGateEnabled:!!PROP_('ADMIN_GATE_HASH'),serverTime:new Date().toISOString()});
+      const engagements = toObjs(getSheet(SHEETS.engagements,ENGAGEMENT_HDR));
+      return ok({leads,calls,team,commissions:comms,scripts,scheduledJobs,stateCampaigns,interactions,sequences,engagements,adminGateEnabled:!!PROP_('ADMIN_GATE_HASH'),serverTime:new Date().toISOString()});
     }
     if (a === 'getToken') return ok({token:createToken(e.parameter.identity||'agent')});
     if (a === 'checkTriggers') {
@@ -428,7 +440,8 @@ function doPost(e) {
     // commissions) are intentionally NOT in this set. code 401 → client re-login.
     var ADMIN_ONLY = { saveTeamMember:1, cancelCommission:1, adjustCollected:1, markCommissionPaid:1,
       saveCadenceConfig:1, saveScheduledJobs:1, saveStateCampaigns:1, saveReportEmail:1,
-      setTrigger:1, runCadenceNow:1, runScrapesNow:1, saveScript:1, deleteScript:1, previewOutreach:1 };
+      setTrigger:1, runCadenceNow:1, runScrapesNow:1, saveScript:1, deleteScript:1, previewOutreach:1,
+      saveEngagement:1 };
     if (ADMIN_ONLY[a] && !verifyAdminToken_(b.adminToken)) {
       return err_('Admin sign-in required for this action.', 401);
     }
@@ -527,6 +540,30 @@ function doPost(e) {
       if (!tr.transcript && !tr.summary) return err_('Could not transcribe (silent, too long, or AI unavailable).');
       patchCallTranscript_(callSid, tr.transcript, tr.summary);
       return ok({ transcript: tr.transcript, summary: tr.summary });
+    }
+    // Upsert an engagement (Active Client) record by engagementId (= lead id).
+    // Recomputes gateAReadyAt = first moment paid + roadmap-approved + MSA-signed.
+    if (a === 'saveEngagement') {
+      const eid = String(b.engagementId || '').trim();
+      if (!eid) return err_('Missing engagementId.');
+      const s = getSheet(SHEETS.engagements, ENGAGEMENT_HDR);
+      const rows = s.getDataRange().getValues(), h = rows[0] || ENGAGEMENT_HDR, ec = h.indexOf('engagementId');
+      const now = new Date().toISOString();
+      let rowIdx = -1, existing = {};
+      for (let i = 1; i < rows.length; i++) { if (String(rows[i][ec]) === eid) { rowIdx = i; h.forEach(function(k,j){ existing[k] = rows[i][j]; }); break; } }
+      const rec = {};
+      h.forEach(function(k){ rec[k] = (b[k] != null && b[k] !== '') ? b[k] : (existing[k] != null ? existing[k] : ''); });
+      rec.engagementId = eid;
+      rec.createdAt = existing.createdAt || now;
+      rec.updatedAt = now;
+      // Gate A: paid + roadmap approved + MSA signed (won is implied by the record existing).
+      const gateA = String(rec.paid) === 'yes' && rec.roadmapApprovedAt && String(rec.msaSigned) === 'yes';
+      if (gateA && !rec.gateAReadyAt) rec.gateAReadyAt = now;
+      if (gateA && (rec.status === 'won' || rec.status === 'roadmap_draft' || rec.status === 'roadmap_sent' || rec.status === 'approved' || !rec.status)) rec.status = 'gate_a_ready';
+      const vals = h.map(function(k){ return rec[k] != null ? rec[k] : ''; });
+      if (rowIdx >= 0) s.getRange(rowIdx + 1, 1, 1, h.length).setValues([vals]);
+      else s.appendRow(vals);
+      return ok({ saved:true, engagement: rec });
     }
     if (a === 'saveTeamMember') {
       const s=getSheet(SHEETS.team,TEAM_HDR),rows=s.getDataRange().getValues(),h=rows[0]||TEAM_HDR,ic=h.indexOf('id');
