@@ -163,6 +163,13 @@
 .admin-tab{background:none;border:none;padding:9px 6px;font-size:13px;font-weight:500;color:var(--sub);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit}
 .admin-tab:hover{color:var(--hl)}
 .admin-tab.active{color:var(--hl);border-bottom-color:var(--accent)}
+.eng-checks{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.eng-check{font-size:11px;color:var(--sub);background:var(--surface-hi);border:1px solid var(--border);border-radius:14px;padding:2px 9px}
+.eng-check.on{color:var(--pos);border-color:rgba(45,212,191,.35)}
+.eng-status{font-size:10px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;padding:2px 7px;border-radius:10px;margin-left:6px;background:var(--surface-hi);color:var(--sub);border:1px solid var(--border)}
+.eng-gate_a_ready{color:var(--accent);border-color:var(--accent)}
+.eng-active{color:var(--pos);border-color:rgba(45,212,191,.4)}
+.eng-churned{color:#c0392b}
 .admin-section-title{font-size:13px;font-weight:600;color:var(--hl);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .team-row{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 14px;margin-bottom:7px;display:flex;align-items:center;gap:12px;transition:border-color var(--t-fast)}
 .team-row:hover{border-color:var(--border-hi)}

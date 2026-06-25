@@ -334,6 +334,7 @@ function startDemo() {
   S.commissions  = DEMO_DATA.commissions.map(c => ({...c}));
   S.interactions = (DEMO_DATA.interactions || []).map(i => ({...i}));
   S.stateCampaigns = (DEMO_DATA.campaigns || []).map(c => ({...c}));
+  S.engagements    = (DEMO_DATA.engagements || []).map(e => ({...e}));
   const user    = {userId:'demo-admin', userName:'Demo User', role:'admin', closerRate:12};
   S.session     = user;
   // Demo is in-memory only — don't persist a session token (a refresh returns

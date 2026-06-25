@@ -28,11 +28,11 @@
 <script src="https://cdn.jsdelivr.net/npm/@twilio/voice-sdk@2.9.0/dist/twilio.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-<link rel="stylesheet" href="css/base.css?v=20260624a">
-<link rel="stylesheet" href="css/layout.css?v=20260624a">
-<link rel="stylesheet" href="css/components.css?v=20260624a">
-<link rel="stylesheet" href="css/widgets.css?v=20260624a">
-<link rel="stylesheet" href="css/responsive.css?v=20260624a">
+<link rel="stylesheet" href="css/base.css?v=20260624b">
+<link rel="stylesheet" href="css/layout.css?v=20260624b">
+<link rel="stylesheet" href="css/components.css?v=20260624b">
+<link rel="stylesheet" href="css/widgets.css?v=20260624b">
+<link rel="stylesheet" href="css/responsive.css?v=20260624b">
 </head>
 <body>
 
@@ -724,6 +724,7 @@ Content-Type: application/json
   <div style="display:flex;gap:4px;margin-bottom:18px;border-bottom:1px solid var(--border)">
     <button class="admin-tab active" id="admin-tab-money" onclick="adminTab('money')">Team &amp; Money</button>
     <button class="admin-tab" id="admin-tab-ops" onclick="adminTab('ops')">Operations</button>
+    <button class="admin-tab" id="admin-tab-clients" onclick="adminTab('clients')">Active Clients</button>
   </div>
 
   <div id="admin-pane-money">
@@ -810,6 +811,16 @@ Content-Type: application/json
       </div>
       <div style="font-size:11px;color:var(--body);margin-bottom:12px">Enable automatic weekly report delivery every Monday at 8am. Set the recipient email on the Settings page.</div>
       <div id="admin-report-trigger"></div>
+    </div>
+  </div>
+
+  <div id="admin-pane-clients" style="display:none">
+    <div class="admin-section">
+      <div class="admin-section-title">
+        <span>Active Clients <span id="engagements-count" style="font-size:11px;color:var(--body);font-weight:400"></span></span>
+      </div>
+      <div style="font-size:11px;color:var(--body);margin-bottom:12px">Engagements past the sale, moving through Gate&nbsp;A — won → roadmap approved → MSA signed → paid → provisioned. Each carries its Engagement&nbsp;ID and the Registry links (Stripe, Mongo, Discord, Drive). Start one from a Closed&nbsp;Won lead.</div>
+      <div id="engagements-list"><div class="notes-empty">No engagements yet. Open a Closed Won lead and click “Start engagement”.</div></div>
     </div>
   </div>
 </div>
@@ -922,6 +933,7 @@ Content-Type: application/json
     </div>
     <div class="modal-body">
       <div id="m-lock-wrap" style="margin-bottom:8px"></div>
+      <div id="m-engagement" style="margin-bottom:8px"></div>
       <div class="detail-grid" id="m-details"></div>
       <div id="m-action-btns" style="margin-bottom:4px"></div>
       <div class="divider"></div>
@@ -1189,33 +1201,34 @@ Content-Type: application/json
 </div>
 
 <!-- JS: load order matters — data → core → auth → locks → commission → features → main -->
-<script src="js/data/keywords.js?v=20260624a"></script>
-<script src="js/data/locations.js?v=20260624a"></script>
-<script src="js/data/states.js?v=20260624a"></script>
-<script src="js/data/constants.js?v=20260624a"></script>
-<script src="js/data/demo-data.js?v=20260624a"></script>
-<script src="js/data/outreach-templates.js?v=20260624a"></script>
-<script src="js/core/state.js?v=20260624a"></script>
-<script src="js/core/theme.js?v=20260624a"></script>
-<script src="js/core/utils.js?v=20260624a"></script>
-<script src="js/core/storage.js?v=20260624a"></script>
-<script src="js/core/api.js?v=20260624a"></script>
-<script src="js/auth/auth.js?v=20260624a"></script>
-<script src="js/locks.js?v=20260624a"></script>
-<script src="js/commission.js?v=20260624a"></script>
-<script src="js/features/scraper.js?v=20260624a"></script>
-<script src="js/features/dashboard.js?v=20260624a"></script>
-<script src="js/features/campaigns.js?v=20260624a"></script>
-<script src="js/features/outreach.js?v=20260624a"></script>
-<script src="js/features/inbox.js?v=20260624a"></script>
-<script src="js/features/import.js?v=20260624a"></script>
-<script src="js/features/leads.js?v=20260624a"></script>
-<script src="js/features/pipeline.js?v=20260624a"></script>
-<script src="js/features/calls.js?v=20260624a"></script>
-<script src="js/features/profile.js?v=20260624a"></script>
-<script src="js/features/admin.js?v=20260624a"></script>
-<script src="js/features/analytics.js?v=20260624a"></script>
-<script src="js/features/export.js?v=20260624a"></script>
-<script src="js/main.js?v=20260624a"></script>
+<script src="js/data/keywords.js?v=20260624b"></script>
+<script src="js/data/locations.js?v=20260624b"></script>
+<script src="js/data/states.js?v=20260624b"></script>
+<script src="js/data/constants.js?v=20260624b"></script>
+<script src="js/data/demo-data.js?v=20260624b"></script>
+<script src="js/data/outreach-templates.js?v=20260624b"></script>
+<script src="js/core/state.js?v=20260624b"></script>
+<script src="js/core/theme.js?v=20260624b"></script>
+<script src="js/core/utils.js?v=20260624b"></script>
+<script src="js/core/storage.js?v=20260624b"></script>
+<script src="js/core/api.js?v=20260624b"></script>
+<script src="js/auth/auth.js?v=20260624b"></script>
+<script src="js/locks.js?v=20260624b"></script>
+<script src="js/commission.js?v=20260624b"></script>
+<script src="js/features/scraper.js?v=20260624b"></script>
+<script src="js/features/dashboard.js?v=20260624b"></script>
+<script src="js/features/campaigns.js?v=20260624b"></script>
+<script src="js/features/outreach.js?v=20260624b"></script>
+<script src="js/features/inbox.js?v=20260624b"></script>
+<script src="js/features/import.js?v=20260624b"></script>
+<script src="js/features/leads.js?v=20260624b"></script>
+<script src="js/features/pipeline.js?v=20260624b"></script>
+<script src="js/features/calls.js?v=20260624b"></script>
+<script src="js/features/profile.js?v=20260624b"></script>
+<script src="js/features/admin.js?v=20260624b"></script>
+<script src="js/features/engagements.js?v=20260624b"></script>
+<script src="js/features/analytics.js?v=20260624b"></script>
+<script src="js/features/export.js?v=20260624b"></script>
+<script src="js/main.js?v=20260624b"></script>
 </body>
 </html>

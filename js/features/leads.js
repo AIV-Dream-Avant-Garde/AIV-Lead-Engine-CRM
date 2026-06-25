@@ -474,6 +474,23 @@ function openLead(id) {
       lockWrap.innerHTML = `<button class="claim-btn" onclick="claimLead('${l.id}')">Claim this lead</button>`;
   }
 
+  // Engagement (spine) affordance — once a deal is Closed Won it can become an
+  // engagement (the post-sale Active Client record), admin-only.
+  const engWrap = document.getElementById('m-engagement');
+  if (engWrap) {
+    const isWon = String(l.status) === 'Closed Won';
+    const eng = (typeof engFor === 'function') ? engFor(l.id) : null;
+    if (S.session && S.session.role === 'admin' && isWon && !eng) {
+      engWrap.innerHTML = `<button class="btn btn-primary" style="font-size:11px;padding:5px 11px" onclick="startEngagement('${l.id}')">Start engagement</button>
+        <span style="font-size:11px;color:var(--sub);margin-left:8px">Begin the post-sale onboarding (roadmap → MSA → pay → provision).</span>`;
+    } else if (eng) {
+      engWrap.innerHTML = `<span class="lock-badge lock-mine">Engagement active</span>
+        <button class="btn btn-ghost" style="font-size:11px;padding:4px 9px;margin-left:8px" onclick="closeModal();navigate('admin');adminTab('clients')">View in Active Clients</button>`;
+    } else {
+      engWrap.innerHTML = '';
+    }
+  }
+
   // Work history
   const whWrap = document.getElementById('m-work-history');
   if (whWrap) {

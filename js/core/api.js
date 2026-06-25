@@ -171,6 +171,7 @@ async function syncNow() {
     }
     if (res.commissions) { S.commissions = res.commissions; localStorage.setItem('aiv-comm', JSON.stringify(S.commissions)); }
     if (res.scripts)     { S.scripts     = res.scripts;     localStorage.setItem('aiv-scripts', JSON.stringify(S.scripts)); }
+    if (Array.isArray(res.engagements)) { S.engagements = res.engagements; localStorage.setItem('aiv-engagements', JSON.stringify(S.engagements)); }
     if (Array.isArray(res.scheduledJobs)) { S.scheduledJobs = res.scheduledJobs; localStorage.setItem('aiv-sched-jobs', JSON.stringify(S.scheduledJobs)); }
     // State campaigns: the server is authoritative (it advances cursor/leadsFound
     // as it scrapes), so take its copy on pull.
