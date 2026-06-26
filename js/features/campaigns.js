@@ -90,7 +90,7 @@ function launchStateCampaign() {
 
 function saveCampaigns() {
   saveLocal();
-  if (S.config.scriptUrl) sheetsCall({ action: 'saveStateCampaigns', data: S.stateCampaigns });
+  durableSave({ action: 'saveStateCampaigns', data: S.stateCampaigns }, 'Campaign', 'stateCampaigns');
 }
 
 function toggleCampaign(id) {

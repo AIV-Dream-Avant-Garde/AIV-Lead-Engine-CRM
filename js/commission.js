@@ -172,7 +172,7 @@ function confirmCerradoWithValue(leadId, dealValue) {
   };
   S.commissions.push(commRec);
   saveLocal();
-  bgSave({action:'saveCommission', ...commRec}, 'Commission');
+  bgSave({action:'saveCommission', ...commRec}, 'Commission', 'commissions');
   toast(isResidual ? 'Deal closed — first month’s residual recorded' : 'Deal closed — commission recorded', 'success');
   closeModal();
   renderAll();
@@ -210,7 +210,7 @@ function generateResiduals(period) {
       recurring: true, period,
     };
     S.commissions.push(rec);
-    if (S.config.scriptUrl) sheetsCall({action:'saveCommission', ...rec});
+    durableSave({action:'saveCommission', ...rec}, 'Residual', 'commissions');
     created++;
   });
   if (created) { saveLocal(); renderAll(); }
@@ -250,7 +250,7 @@ function adjustCollectedAmount(leadId, collectedRaw, reason) {
       if (reason) c.refundReason = reason;
     });
   pushLead(lead);
-  if (S.config.scriptUrl) sheetsCall({action:'adjustCollected', leadId, collected, reason: reason || '', adjustedBy: S.session?.userName || 'Admin'});
+  durableSave({action:'adjustCollected', leadId, collected, reason: reason || '', adjustedBy: S.session?.userName || 'Admin'}, 'Adjustment', 'commissions');
   saveLocal();
   auditLog('adjustCollected', leadId, `${lead.name} → ${fmtUSD(collected)}`);
   toast('Collected amount updated', 'success');
@@ -276,7 +276,7 @@ function cancelCommission(commId, reason) {
   c.adjustedAt   = now;
   const lead = S.leads.find(l => l.id === c.leadId);
   if (lead) { lead.commissionStatus = 'cancelled'; lead.updatedAt = now; pushLead(lead); }
-  if (S.config.scriptUrl) sheetsCall({action:'cancelCommission', id: commId, reason: reason || '', adjustedBy: c.adjustedBy});
+  durableSave({action:'cancelCommission', id: commId, reason: reason || '', adjustedBy: c.adjustedBy}, 'Cancellation', 'commissions');
   saveLocal();
   auditLog('cancelCommission', commId, reason || '');
   toast('Commission cancelled', 'warning');
@@ -301,7 +301,7 @@ function issueRefund(leadId, reason) {
         c.refundReason = reason;
         c.adjustedBy   = S.session?.userName || 'Admin';
         c.adjustedAt   = now;
-        if (S.config.scriptUrl) sheetsCall({action:'cancelCommission', id: c.id, reason, adjustedBy: c.adjustedBy});
+        durableSave({action:'cancelCommission', id: c.id, reason, adjustedBy: c.adjustedBy}, 'Cancellation', 'commissions');
       } else if (c.status === 'paid') {
         // Reverse BOTH the closer and provider payouts (negative amounts).
         const clawback = {
@@ -326,7 +326,7 @@ function issueRefund(leadId, reason) {
           createdAt:      now,
         };
         S.commissions.push(clawback);
-        if (S.config.scriptUrl) sheetsCall({action:'saveCommission', ...clawback, isClawback: true});
+        durableSave({action:'saveCommission', ...clawback, isClawback: true}, 'Clawback', 'commissions');
       }
     });
 

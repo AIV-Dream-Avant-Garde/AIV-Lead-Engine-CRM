@@ -34,15 +34,57 @@ function handleAdminAuthExpired() {
   setTimeout(() => { _adminAuthExpiring = false; if (typeof logout === 'function') logout(); }, 1200);
 }
 
-// Fire a backend save the user expects to persist, and surface a failure. These
-// writes used to be silent — a rejected save would quietly vanish on the next
-// pull (which overwrites local team/commissions/etc. from the server). The local
-// copy is already saved, so this just tells the user to retry.
-function bgSave(params, label) {
-  if (!S.config.scriptUrl) return;            // local-only mode — nothing to sync to
-  Promise.resolve(sheetsCall(params)).then(res => {
-    if (!res || !res.success) toast((label || 'Change') + " didn't save to the server. Check your connection and try again.", 'error', 6000);
-  }).catch(() => toast((label || 'Change') + " didn't save to the server. Check your connection and try again.", 'error', 6000));
+/* ── Durable outbound writes (mutation queue) ──────────────────────────────────
+   team / commissions / engagements / scripts / scheduledJobs / stateCampaigns are
+   wholesale-replaced from the server on every pull. A fire-and-forget write that
+   failed used to vanish on the next pull. Now every such write goes through the
+   queue: it's tried immediately, and on failure it's PERSISTED and retried on each
+   sync — and the pull won't overwrite an array that still has unsent writes. */
+
+function mutKey_(params, arrayKey) {
+  // Coalesce repeated writes to the same record/array (latest wins) so the queue
+  // can't grow unbounded. Whole-array saves (no id) key on the action alone.
+  const id = params.engagementId || params.id || params.leadId || '';
+  return (arrayKey || '') + '|' + params.action + '|' + id;
+}
+function enqueueMutation(params, label, arrayKey) {
+  S.mutationQueue = S.mutationQueue || [];
+  const k = mutKey_(params, arrayKey);
+  S.mutationQueue = S.mutationQueue.filter(m => m._key !== k);
+  S.mutationQueue.push({ _key:k, params, label: label || 'Change', arrayKey: arrayKey || '', ts: Date.now() });
+  saveLocal();
+}
+// Try a write now; on failure, persist it for retry. arrayKey = which pulled array
+// this write owns (so the next pull won't clobber the optimistic local copy).
+// opts.onResult(res) runs on success for writes that need the server's response.
+async function durableSave(params, label, arrayKey, onResult) {
+  if (S.demoMode || !S.config.scriptUrl) return null;
+  let res = null;
+  try { res = await sheetsCall(params); } catch (e) { res = null; }
+  if (res && res.success) { if (onResult) onResult(res); return res; }
+  enqueueMutation(params, label, arrayKey);
+  toast((label || 'Change') + ' saved locally — couldn’t reach the server. It’ll retry on the next sync.', 'error', 5500);
+  return res;
+}
+// Back-compat shim: existing callers pass (params, label); add arrayKey when known.
+function bgSave(params, label, arrayKey) {
+  if (!S.config.scriptUrl) return;
+  durableSave(params, label, arrayKey);
+}
+// Drain the queue (called at the start of each sync). Returns the set of arrayKeys
+// that STILL have unsent writes, so the pull merge can skip overwriting them.
+async function drainMutationQueue() {
+  const pending = new Set();
+  if (!S.mutationQueue || !S.mutationQueue.length || !S.config.scriptUrl || S.demoMode) return pending;
+  const remaining = [];
+  for (const m of S.mutationQueue) {
+    let okx = false;
+    try { const r = await sheetsCall(m.params); okx = !!(r && r.success); } catch (e) { okx = false; }
+    if (!okx) { remaining.push(m); if (m.arrayKey) pending.add(m.arrayKey); }
+  }
+  S.mutationQueue = remaining;
+  saveLocal();
+  return pending;
 }
 
 function setSyncUI(state, text) {
@@ -109,6 +151,10 @@ async function syncNow() {
     const r = await sheetsCall({action:'saveCall', ...c});
     if (r && r.success) c._synced = true;
   }
+  // Drain the durable mutation queue (retry any failed team/commission/engagement/
+  // script/job/campaign writes). Arrays still holding unsent writes are protected
+  // from the pull overwrite below.
+  const pendingArrays = await drainMutationQueue();
   setProgress(40);
 
   // Pull from server
@@ -161,7 +207,7 @@ async function syncNow() {
         }
       });
     }
-    if (res.team) {
+    if (res.team && !pendingArrays.has('team')) {
       // Preserve pinPlain (local-only) when merging server team data
       S.team = res.team.map(m => {
         const local = S.team.find(x => x.id === m.id);
@@ -169,13 +215,13 @@ async function syncNow() {
       });
       localStorage.setItem('aiv-team', JSON.stringify(S.team));
     }
-    if (res.commissions) { S.commissions = res.commissions; localStorage.setItem('aiv-comm', JSON.stringify(S.commissions)); }
-    if (res.scripts)     { S.scripts     = res.scripts;     localStorage.setItem('aiv-scripts', JSON.stringify(S.scripts)); }
-    if (Array.isArray(res.engagements)) { S.engagements = res.engagements; localStorage.setItem('aiv-engagements', JSON.stringify(S.engagements)); }
-    if (Array.isArray(res.scheduledJobs)) { S.scheduledJobs = res.scheduledJobs; localStorage.setItem('aiv-sched-jobs', JSON.stringify(S.scheduledJobs)); }
+    if (res.commissions && !pendingArrays.has('commissions')) { S.commissions = res.commissions; localStorage.setItem('aiv-comm', JSON.stringify(S.commissions)); }
+    if (res.scripts && !pendingArrays.has('scripts'))     { S.scripts     = res.scripts;     localStorage.setItem('aiv-scripts', JSON.stringify(S.scripts)); }
+    if (Array.isArray(res.engagements) && !pendingArrays.has('engagements')) { S.engagements = res.engagements; localStorage.setItem('aiv-engagements', JSON.stringify(S.engagements)); }
+    if (Array.isArray(res.scheduledJobs) && !pendingArrays.has('scheduledJobs')) { S.scheduledJobs = res.scheduledJobs; localStorage.setItem('aiv-sched-jobs', JSON.stringify(S.scheduledJobs)); }
     // State campaigns: the server is authoritative (it advances cursor/leadsFound
-    // as it scrapes), so take its copy on pull.
-    if (Array.isArray(res.stateCampaigns)) { S.stateCampaigns = res.stateCampaigns; localStorage.setItem('aiv-campaigns', JSON.stringify(S.stateCampaigns)); }
+    // as it scrapes), so take its copy on pull — unless we have unsent campaign writes.
+    if (Array.isArray(res.stateCampaigns) && !pendingArrays.has('stateCampaigns')) { S.stateCampaigns = res.stateCampaigns; localStorage.setItem('aiv-campaigns', JSON.stringify(S.stateCampaigns)); }
     // Merge incoming interactions append-only, by id (never clobber; preserves local optimistic rows)
     const freshInbound = [];
     if (Array.isArray(res.interactions)) {

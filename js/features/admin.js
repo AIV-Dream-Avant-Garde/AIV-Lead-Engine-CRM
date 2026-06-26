@@ -204,7 +204,7 @@ async function saveTeamMember() {
   else           S.team.push(member);
 
   saveLocal();
-  bgSave({action:'saveTeamMember', ...member}, 'Team member');
+  bgSave({action:'saveTeamMember', ...member}, 'Team member', 'team');
   auditLog(isNew ? 'createTeamMember' : 'updateTeamMember', id, name + ' role=' + role);
   closeTeamModal();
   renderAdmin();
@@ -217,7 +217,7 @@ function toggleTeamActive(memberId) {
   const newActive = !(String(m.active) !== 'false');
   m.active = newActive;
   saveLocal();
-  bgSave({action:'saveTeamMember', ...m}, 'Team member');
+  bgSave({action:'saveTeamMember', ...m}, 'Team member', 'team');
   auditLog(newActive ? 'activateTeamMember' : 'deactivateTeamMember', memberId, m.name);
   renderAdmin();
 }
@@ -256,7 +256,7 @@ async function markCommissionPaid(commId) {
   comm.paidBy     = S.session?.userName || '';
   comm.paymentRef = ref;
   saveLocal();
-  bgSave({action:'markCommissionPaid', id:commId, paidBy:comm.paidBy, paymentRef:ref}, 'Payment');
+  bgSave({action:'markCommissionPaid', id:commId, paidBy:comm.paidBy, paymentRef:ref}, 'Payment', 'commissions');
   auditLog('markCommissionPaid', commId, ref);
   toast('Commission marked as paid', 'success');
   renderAdmin();
@@ -273,7 +273,7 @@ async function bulkMarkPaid() {
   pending.forEach(comm => {
     comm.status = 'paid'; comm.paidAt = new Date().toISOString();
     comm.paidBy = S.session?.userName || ''; comm.paymentRef = ref;
-    if (S.config.scriptUrl) sheetsCall({action:'markCommissionPaid', id:comm.id, paidBy:comm.paidBy, paymentRef:ref});
+    durableSave({action:'markCommissionPaid', id:comm.id, paidBy:comm.paidBy, paymentRef:ref}, 'Payment', 'commissions');
   });
   saveLocal();
   auditLog('bulkMarkPaid', '', 'count=' + pending.length + ' ref=' + ref);
@@ -495,7 +495,7 @@ function addScheduledJob() {
   if (!Array.isArray(S.scheduledJobs)) S.scheduledJobs = [];
   S.scheduledJobs.push({keyword, country, city, barrio, lat, lng, radius, maxResults:max, region:COUNTRY_REGION[country]||'', source:'Scraper (auto)', active:true});
   saveLocal();
-  if (S.config.scriptUrl) sheetsCall({action:'saveScheduledJobs', jobs:S.scheduledJobs});
+  durableSave({action:'saveScheduledJobs', jobs:S.scheduledJobs}, 'Scheduled jobs', 'scheduledJobs');
   renderScheduledJobs();
 }
 
@@ -524,7 +524,7 @@ function addCategoryJobs() {
     added++;
   });
   saveLocal();
-  if (S.config.scriptUrl) sheetsCall({action:'saveScheduledJobs', jobs:S.scheduledJobs});
+  durableSave({action:'saveScheduledJobs', jobs:S.scheduledJobs}, 'Scheduled jobs', 'scheduledJobs');
   renderScheduledJobs();
   toast(added ? `Added ${added} job${added!==1?'s':''} — ${cat} in ${city}.` : 'Those jobs already exist.', added ? 'success' : 'info');
 }
@@ -533,7 +533,7 @@ function toggleScheduledJob(idx) {
   if (!S.scheduledJobs?.[idx]) return;
   S.scheduledJobs[idx].active = !S.scheduledJobs[idx].active;
   saveLocal();
-  if (S.config.scriptUrl) sheetsCall({action:'saveScheduledJobs', jobs:S.scheduledJobs});
+  durableSave({action:'saveScheduledJobs', jobs:S.scheduledJobs}, 'Scheduled jobs', 'scheduledJobs');
   renderScheduledJobs();
 }
 
@@ -541,7 +541,7 @@ function deleteScheduledJob(idx) {
   if (!confirm('Delete this scheduled job?')) return;
   S.scheduledJobs.splice(idx, 1);
   saveLocal();
-  if (S.config.scriptUrl) sheetsCall({action:'saveScheduledJobs', jobs:S.scheduledJobs});
+  durableSave({action:'saveScheduledJobs', jobs:S.scheduledJobs}, 'Scheduled jobs', 'scheduledJobs');
   renderScheduledJobs();
 }
 
@@ -579,7 +579,7 @@ function saveScript() {
   if (idx >= 0) S.scripts[idx] = sc;
   else          { if (!Array.isArray(S.scripts)) S.scripts = []; S.scripts.push(sc); }
   saveLocal();
-  bgSave({action:'saveScript', ...sc}, 'Script');
+  bgSave({action:'saveScript', ...sc}, 'Script', 'scripts');
   closeScriptModal();
   renderScripts();
 }
@@ -588,7 +588,7 @@ function deleteScript(scriptId) {
   if (!confirm('Delete this script?')) return;
   S.scripts = (S.scripts||[]).filter(x => x.id !== scriptId);
   saveLocal();
-  if (S.config.scriptUrl) sheetsCall({action:'deleteScript', id:scriptId});
+  durableSave({action:'deleteScript', id:scriptId}, 'Script', 'scripts');
   renderScripts();
 }
 
