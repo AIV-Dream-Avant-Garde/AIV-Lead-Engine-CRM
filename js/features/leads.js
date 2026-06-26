@@ -251,7 +251,7 @@ function renderTable() {
       if (isLockedByMe(l))    lockCell = `<span class="lock-badge lock-mine">Mine · ${lockCountdown(l)}</span>`;
       else if (isLockedByOther(l)) lockCell = `<span class="lock-badge lock-other">${esc(getLockerName(l))} · ${lockCountdown(l)}</span>`;
       else                    lockCell = `<button class="claim-btn" onclick="event.stopPropagation();claimLead('${l.id}')">Claim</button>`;
-      return `<tr class="${sel} ${dnc}" onclick="rowClick(event,'${l.id}')">
+      return `<tr class="${sel} ${dnc}" role="button" tabindex="0" aria-label="Open ${esc(l.name||'lead')}" onclick="rowClick(event,'${l.id}')">
         <td onclick="event.stopPropagation()"><input type="checkbox" ${S.selected.has(l.id)?'checked':''} onchange="toggleSel('${l.id}',this.checked)"></td>
         <td style="text-align:center;width:36px">${scoreDotHTML(l)}</td>
         <td class="name-cell">${highlight(l.name, q)}${l.lastReplyAt && (!l.lastTouchAt || new Date(l.lastReplyAt) > new Date(l.lastTouchAt)) ? ' <span class="sbadge" style="background:var(--pos);color:#04140d;font-size:9px;padding:1px 5px">Replied</span>' : ''}</td>
