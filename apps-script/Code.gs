@@ -473,7 +473,7 @@ function doPost(e) {
     var ADMIN_ONLY = { saveTeamMember:1, cancelCommission:1, adjustCollected:1, markCommissionPaid:1,
       saveCadenceConfig:1, saveScheduledJobs:1, saveStateCampaigns:1, saveReportEmail:1,
       setTrigger:1, runCadenceNow:1, runScrapesNow:1, saveScript:1, deleteScript:1, previewOutreach:1,
-      saveEngagement:1, draftRoadmap:1, generateAudit:1, sendAudit:1, provisionEngagement:1 };
+      saveEngagement:1, draftRoadmap:1, generateAudit:1, sendAudit:1, provisionEngagement:1, syncDeliveryNow:1 };
     if (ADMIN_ONLY[a] && !verifyAdminToken_(b.adminToken)) {
       return err_('Admin sign-in required for this action.', 401);
     }
@@ -659,6 +659,10 @@ function doPost(e) {
         notifyTelegram('Provisioned — ' + (e.company || eid) + ' is live (Discord + Drive + Registry).');
         return ok({ provisioned: true, engagement: rec, runtime: { slug: prov.slug, guild: (prov.cc || {}).guildId, role: prov.clientRoleId, driveFolderId: folderId } });
       } catch (err) { Logger.log('provisionEngagement: ' + err.message); return err_('Provisioning failed: ' + err.message); }
+    }
+    if (a === 'syncDeliveryNow') {
+      const r = syncDelivery();
+      return ok({ pulled: (r && r.pulled) || 0, wrote: (r && r.wrote) || 0 });
     }
     if (a === 'saveTeamMember') {
       const s=getSheet(SHEETS.team,TEAM_HDR),rows=s.getDataRange().getValues(),h=rows[0]||TEAM_HDR,ic=h.indexOf('id');
@@ -1143,6 +1147,8 @@ function sendWeeklyReport() {
 function runScheduledScrapes() {
   let campAdded = 0;
   try { campAdded = (runStateCampaigns() || {}).added || 0; } catch (e) { Logger.log('runStateCampaigns error: ' + e.message); }
+  // Drain the bot's Drive-sync queue into each client's ACWA folders (task 8b).
+  try { syncDelivery(); } catch (e) { Logger.log('syncDelivery error: ' + e.message); }
   let jobsRes = {};
   try { jobsRes = runScheduledJobs_() || {}; } catch (e) { Logger.log('runScheduledJobs_ error: ' + e.message); }
   return { added: (jobsRes.added || 0) + campAdded, campaignsAdded: campAdded,
@@ -2193,6 +2199,59 @@ function writeRegistryRow_(e, prov, folderId) {
   const rows = sh.getDataRange().getValues();
   for (let i = 1; i < rows.length; i++) { if (String(rows[i][0]) === String(e.engagementId)) { sh.getRange(i + 1, 1, 1, row.length).setValues([row]); return; } }
   sh.appendRow(row);
+}
+
+/* ── Delivery-sync loop (task 8b): drain the bot's staged queue into Drive ──── */
+
+// Pull the bot's pending Drive items, write each into its ACWA section (or
+// Testimonials), ack the ids written. Runs on the schedule + on demand.
+function syncDelivery() {
+  if (!PROVISION_SECRET) { Logger.log('syncDelivery: no PROVISION_SECRET'); return { pulled: 0, wrote: 0 }; }
+  let pulled = 0, wrote = 0;
+  try {
+    const res = UrlFetchApp.fetch(PROVISION_URL + '/sync/pending?limit=200', {
+      method: 'get', headers: { Authorization: 'Bearer ' + PROVISION_SECRET }, muteHttpExceptions: true });
+    if (res.getResponseCode() !== 200) { Logger.log('syncDelivery pending ' + res.getResponseCode()); return { pulled: 0, wrote: 0 }; }
+    const items = (JSON.parse(res.getContentText() || '{}').items) || [];
+    pulled = items.length;
+    if (!pulled) return { pulled: 0, wrote: 0 };
+    const folderFor = {};
+    toObjs(getSheet(SHEETS.engagements, ENGAGEMENT_HDR)).forEach(function(e){ folderFor[String(e.engagementId)] = e.driveFolderId || ''; });
+    const acked = [];
+    items.forEach(function(it){
+      try { if (writeDriveItem_(it, folderFor)) { acked.push(it.id); wrote++; } }
+      catch (e) { Logger.log('syncDelivery item ' + it.id + ': ' + e.message); }
+    });
+    if (acked.length) {
+      UrlFetchApp.fetch(PROVISION_URL + '/sync/ack', {
+        method: 'post', contentType: 'application/json',
+        headers: { Authorization: 'Bearer ' + PROVISION_SECRET },
+        payload: JSON.stringify({ ids: acked }), muteHttpExceptions: true });
+    }
+    Logger.log('syncDelivery: pulled ' + pulled + ', wrote ' + wrote);
+  } catch (e) { Logger.log('syncDelivery error: ' + e.message); }
+  return { pulled: pulled, wrote: wrote };
+}
+
+// Write one staged item into its target folder. Returns true if written, null if
+// it can't be placed yet (engagement not provisioned) so it stays staged.
+function writeDriveItem_(it, folderFor) {
+  const section = String(it.section || '');
+  let folder = null;
+  if (section === 'ASSETS') {
+    folder = DriveApp.getFolderById(TESTIMONIALS_FOLDER_ID);
+  } else {
+    const root = folderFor[String(it.engagementId || it.projectSlug || '')];
+    if (!root) return null;                                  // not provisioned yet → leave staged
+    folder = acwaSection_(DriveApp.getFolderById(root), section);
+    if (!folder) return null;
+  }
+  const dt = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const base = String(it.title || it.kind || 'item').replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80) || 'item';
+  const body = it.content ? String(it.content)
+    : ('Source: ' + (it.url || '') + '\n\nKind: ' + (it.kind || '') + (it.title ? '\nTitle: ' + it.title : ''));
+  folder.createFile(base + ' — ' + dt + '.txt', body, 'text/plain');
+  return true;
 }
 
 // Gather everything we know about an engagement's lead — the lead row, its call

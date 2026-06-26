@@ -100,6 +100,19 @@ function copyCloseLink_(eid) {
   else prompt('Copy the close link:', url);
 }
 
+// Manually drain the bot's staged delivery queue into Drive (also runs on schedule).
+async function syncDeliveryNow_() {
+  if (!S.config.scriptUrl || S.demoMode) { toast('Connect Apps Script to sync delivery.', 'error'); return; }
+  const btn = document.getElementById('sync-delivery-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '↻ Syncing…'; }
+  try {
+    const r = await sheetsCall({ action:'syncDeliveryNow' });
+    if (r && r.success) toast(r.pulled ? ('Synced ' + r.wrote + ' of ' + r.pulled + ' item' + (r.pulled === 1 ? '' : 's') + ' to Drive.') : 'Nothing pending to sync.', 'success');
+    else toast((r && r.error) ? r.error : 'Sync failed.', 'error', 6000);
+  } catch (e) { toast('Sync failed: ' + e.message, 'error'); }
+  if (btn) { btn.disabled = false; btn.textContent = '↻ Sync delivery'; }
+}
+
 // Provisioning (Gate-A handoff): a button once all four signals are met and the
 // engagement isn't provisioned yet; a spinner while it runs. Hidden in demo.
 function provisionHtml_(e) {
