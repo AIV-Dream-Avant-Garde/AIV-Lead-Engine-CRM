@@ -33,6 +33,16 @@ const TELEGRAM_ALERT_CHAT_ID   = PROP_('TELEGRAM_ALERT_CHAT_ID');
 const GEMINI_API_KEY     = PROP_('GEMINI_API_KEY');
 const CRM_SECRET         = PROP_('CRM_SECRET');
 
+// Stripe — task 6/7 close page. SECRET key server-side only (never sent to the client).
+// Reuses the live Axius Products/Prices + setup-waiver promotion codes (see Stripe infra).
+const STRIPE_SECRET_KEY  = PROP_('STRIPE_SECRET_KEY');
+const CLOSE_PAGE_URL     = PROP_('CLOSE_PAGE_URL') || 'https://crm.axius.tech/close.html';
+const STRIPE_TIERS = {
+  team:       { label:'Team',       monthly:2500, setup:500,  priceMonthly:'price_1TcEFHD7QdyAY19ByJPyX5dT', priceSetup:'price_1Tm17PD7QdyAY19BUXzYLS8U', waiveCode:'BYETEAMFEE' },
+  department: { label:'Department', monthly:5000, setup:1000, priceMonthly:'price_1TcEFID7QdyAY19BLkTBaFGD', priceSetup:'price_1Tm17QD7QdyAY19BY0IKFi96', waiveCode:'BYEDEPTFEE' },
+};
+function stripeTier_(t) { return STRIPE_TIERS[String(t || 'team').toLowerCase()] || STRIPE_TIERS.team; }
+
 // Deployment config — overridable via Script properties, with safe defaults.
 const RESEND_FROM        = PROP_('RESEND_FROM', 'Andres Toro <hola@axius.tech>');   // a PERSON, not the brand — cold mail from a name gets opened more (override via Script property)
 const REPLY_TO_EMAIL     = PROP_('REPLY_TO_EMAIL', 'andres@axius.tech');      // inbox runInboundEmailScan polls
@@ -73,6 +83,7 @@ function seedProperties() {
     TWILIO_AUTH_TOKEN: '', TWILIO_TWIML_APP: '',
     TWILIO_FROM_NUMBER: '', TWILIO_FROM_SMS_US: '', TWILIO_FROM_WA: '',
     RECORDINGS_FOLDER_ID: '', AUDIT_FOLDER_ID: '', EXECUTED_AGREEMENTS_FOLDER_ID: '', RESEND_API_KEY: '',
+    STRIPE_SECRET_KEY: '', CLOSE_PAGE_URL: '',
     TELEGRAM_ALERT_BOT_TOKEN: '', TELEGRAM_ALERT_CHAT_ID: '',
     GEMINI_API_KEY: '', CRM_SECRET: '',
     // Optional overrides (defaults already fine):
@@ -176,8 +187,8 @@ const SHEETS = { leads:'Leads', calls:'Llamadas', team:'Team', commissions:'Comm
 // (paid + roadmap approved + MSA signed; "won" is implied) and the Registry links
 // (Stripe, Mongo, Discord, Drive) returned by provisioning. CRM is source of record
 // for shared fields pre-Gate-A; Mongo owns operational detail post-Gate-A.
-const ENGAGEMENT_HDR = ['engagementId','company','status','dealValue',
-  'paid','paidAt','msaSigned','msaSignedAt','msaSignerName','msaSignerIp',
+const ENGAGEMENT_HDR = ['engagementId','company','status','dealValue','tier',
+  'paid','paidAt','msaSigned','msaSignedAt','msaSignerName','msaSignerIp','msaUrl',
   'roadmap','roadmapApprovedAt',
   'stripeCustomerId','mongoSlug','discordGuildId','discordCategoryId','discordRoleId','driveFolderId',
   'gateAReadyAt','provisionedAt','createdAt','updatedAt'];
@@ -376,6 +387,14 @@ function doPost(e) {
     }
 
     const b = JSON.parse((e.postData && e.postData.contents) || '{}');
+
+    // Public close-page endpoints (prospect-facing, NO CRM secret): the engagement
+    // id is the unguessable key and all amounts are server-determined, so these are
+    // safe to expose. Handled before the secret gate (like the webhooks above).
+    if (a === 'engagementPublic' || a === 'signMsa' || a === 'createCheckout' || a === 'confirmCheckout') {
+      return handleClose_(a, b);
+    }
+
     if (String(b._secret).trim() !== String(CRM_SECRET).trim()) {
       return err_('Unauthorized — set the CRM_SECRET Script property to the value shown in Settings.');
     }
@@ -1967,6 +1986,109 @@ function upsertEngagement_(b) {
   if (rowIdx >= 0) s.getRange(rowIdx + 1, 1, 1, h.length).setValues([vals]);
   else s.appendRow(vals);
   return rec;
+}
+
+/* ── Close page (task 6/7): public e-sign + Stripe pay, keyed by engagement id ── */
+
+function engById_(eid) {
+  return toObjs(getSheet(SHEETS.engagements, ENGAGEMENT_HDR)).find(function(x){ return String(x.engagementId) === String(eid); }) || null;
+}
+// The MSA the client signs. Operator-set via the Config sheet ('msaText'); a clear
+// placeholder otherwise so we never present fabricated legal text as final.
+function getMsaText_() {
+  const t = String(cfgGet('msaText') || '').trim();
+  return t || '[ Your Master Services Agreement has not been set yet. Paste it into the Config sheet under the key "msaText". ]';
+}
+
+function handleClose_(a, b) {
+  const eid = String(b.eid || b.engagementId || '').trim();
+  if (!eid) return err_('Missing engagement id.');
+  const e = engById_(eid);
+  if (!e) return err_('We could not find that agreement. Please check your link.');
+  const tier = stripeTier_(e.tier);
+
+  if (a === 'engagementPublic') {
+    return ok({ engagement: {
+      engagementId: e.engagementId, company: e.company || '', tier: String(e.tier || 'team').toLowerCase(),
+      monthly: tier.monthly, setup: tier.setup, waiveCode: tier.waiveCode, msaText: getMsaText_(),
+      status: e.status || '', msaSigned: String(e.msaSigned) === 'yes', paid: String(e.paid) === 'yes',
+      signerName: e.msaSignerName || '' } });
+  }
+
+  if (a === 'signMsa') {
+    const name = String(b.name || '').trim();
+    if (name.length < 2) return err_('Please type your full name to sign.');
+    if (!b.agree) return err_('Please confirm you have read and agree to the agreement.');
+    const now = new Date().toISOString();
+    const ip = String(b.ip || '').slice(0, 64);
+    const executed = 'AXIUS — MASTER SERVICES AGREEMENT (EXECUTED)\n\n' +
+      'Engagement ID: ' + eid + '\nClient: ' + (e.company || '') + '\nPlan: ' + tier.label +
+      ' ($' + tier.monthly + '/mo + $' + tier.setup + ' setup)\n' +
+      'Signed by: ' + name + '\nDate (UTC): ' + now + '\nIP: ' + (ip || 'n/a') +
+      '\n\n----------------------------------------\n\n' + getMsaText_();
+    const fname = String(e.company || 'Client').replace(/[\\/:*?"<>|]+/g, ' ').trim() + ' — Executed MSA ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd') + '.txt';
+    const url = saveTextToDrive_(EXECUTED_AGREEMENTS_FOLDER_ID, fname, executed);
+    const rec = upsertEngagement_({ engagementId: eid, msaSigned: 'yes', msaSignedAt: now, msaSignerName: name, msaSignerIp: ip, msaUrl: url || '' });
+    notifyTelegram('MSA signed — ' + (e.company || eid) + ' by ' + name + '.');
+    return ok({ signed: true, signedAt: now, gateAReady: !!rec.gateAReadyAt });
+  }
+
+  if (a === 'createCheckout') {
+    if (!STRIPE_SECRET_KEY) return err_('Payments are not configured yet.');
+    try {
+      const session = stripeCreateCheckoutSession_(eid, e.tier);
+      return ok({ url: session.url, sessionId: session.id });
+    } catch (err) { Logger.log('createCheckout: ' + err.message); return err_('Could not start checkout: ' + err.message); }
+  }
+
+  if (a === 'confirmCheckout') {
+    if (!STRIPE_SECRET_KEY) return err_('Payments are not configured yet.');
+    const sid = String(b.sessionId || '').trim();
+    if (!sid) return err_('Missing session id.');
+    try {
+      const s = stripeGetSession_(sid);
+      if (!s || !s.id) return err_('Could not verify the payment.');
+      const matches = !s.metadata || !s.metadata.engagementId || String(s.metadata.engagementId) === eid;
+      const paid = (s.payment_status === 'paid' || s.payment_status === 'no_payment_required' || s.status === 'complete');
+      if (!matches) return err_('This payment does not match the agreement.');
+      if (!paid) return ok({ paid: false, status: s.status || 'open' });
+      const now = new Date().toISOString();
+      const cust = typeof s.customer === 'string' ? s.customer : (s.customer && s.customer.id) || '';
+      const rec = upsertEngagement_({ engagementId: eid, paid: 'yes', paidAt: now, stripeCustomerId: cust });
+      notifyTelegram('Payment received — ' + (e.company || eid) + (rec.gateAReadyAt ? ' · Gate A is now ready to provision.' : '.'));
+      return ok({ paid: true, gateAReady: !!rec.gateAReadyAt });
+    } catch (err) { Logger.log('confirmCheckout: ' + err.message); return err_('Could not verify the payment.'); }
+  }
+  return err_('Unknown action.');
+}
+
+// Create a subscription Checkout Session: monthly + one-time setup, the setup
+// waivable at checkout via the tier's promotion code. Engagement id rides on the
+// session AND the subscription metadata so every payment matches by id.
+function stripeCreateCheckoutSession_(eid, tierKey) {
+  const t = stripeTier_(tierKey);
+  const base = CLOSE_PAGE_URL + '?eid=' + encodeURIComponent(eid);
+  const payload = {
+    'mode': 'subscription',
+    'line_items[0][price]': t.priceMonthly, 'line_items[0][quantity]': '1',
+    'line_items[1][price]': t.priceSetup,   'line_items[1][quantity]': '1',
+    'allow_promotion_codes': 'true',
+    'client_reference_id': eid,
+    'metadata[engagementId]': eid,
+    'subscription_data[metadata][engagementId]': eid,
+    'success_url': base + '&session_id={CHECKOUT_SESSION_ID}',
+    'cancel_url': base + '&canceled=1',
+  };
+  const res = UrlFetchApp.fetch('https://api.stripe.com/v1/checkout/sessions', {
+    method: 'post', headers: { Authorization: 'Bearer ' + STRIPE_SECRET_KEY }, payload: payload, muteHttpExceptions: true });
+  const d = JSON.parse(res.getContentText() || '{}');
+  if (res.getResponseCode() !== 200) throw new Error(d.error ? d.error.message : ('Stripe ' + res.getResponseCode()));
+  return d;
+}
+function stripeGetSession_(sessionId) {
+  const res = UrlFetchApp.fetch('https://api.stripe.com/v1/checkout/sessions/' + encodeURIComponent(sessionId), {
+    method: 'get', headers: { Authorization: 'Bearer ' + STRIPE_SECRET_KEY }, muteHttpExceptions: true });
+  return JSON.parse(res.getContentText() || '{}');
 }
 
 // Gather everything we know about an engagement's lead — the lead row, its call

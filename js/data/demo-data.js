@@ -114,13 +114,13 @@ const DEMO_DATA = (() => {
   // Engagements (Active Clients) — one mid-onboarding, one fully provisioned —
   // so the demo shows the post-Gate-A cockpit + the Registry links.
   const engagements = [
-    {engagementId:'dl-09', company:'Protect Insurance Agency', status:'approved', dealValue:8200,
-     paid:'', paidAt:'', msaSigned:'yes', msaSignedAt:ts(4), msaSignerName:'Lucy Hayes', msaSignerIp:'',
+    {engagementId:'dl-09', company:'Protect Insurance Agency', status:'approved', dealValue:8200, tier:'department',
+     paid:'', paidAt:'', msaSigned:'yes', msaSignedAt:ts(4), msaSignerName:'Lucy Hayes', msaSignerIp:'', msaUrl:'https://drive.google.com/file/d/MSADEMO/view',
      roadmap:'Q1: centralize lead follow-up + reporting; automate quote intake. Q2: client portal + visibility dashboards.',
      roadmapApprovedAt:ts(5), stripeCustomerId:'', mongoSlug:'', discordGuildId:'', discordCategoryId:'',
      discordRoleId:'', driveFolderId:'', gateAReadyAt:'', provisionedAt:'', createdAt:ts(8), updatedAt:ts(4)},
-    {engagementId:'dl-17', company:'Oxford English Academy', status:'active', dealValue:12000,
-     paid:'yes', paidAt:ts(18), msaSigned:'yes', msaSignedAt:ts(19), msaSignerName:'Oliver Quinn', msaSignerIp:'',
+    {engagementId:'dl-17', company:'Oxford English Academy', status:'active', dealValue:12000, tier:'team',
+     paid:'yes', paidAt:ts(18), msaSigned:'yes', msaSignedAt:ts(19), msaSignerName:'Oliver Quinn', msaSignerIp:'', msaUrl:'https://drive.google.com/file/d/MSADEMO2/view',
      roadmap:'Q1: enrollment automation + reporting. Q2: integrations + AI front-desk.',
      roadmapApprovedAt:ts(20), stripeCustomerId:'cus_DEMO123', mongoSlug:'oxford-english-academy',
      discordGuildId:'guild-demo', discordCategoryId:'cat-demo', discordRoleId:'role-demo', driveFolderId:'drive-demo',
