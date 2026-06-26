@@ -77,7 +77,7 @@ const SCORE_WEIGHTS = {
 // Pipeline-stage → map-dot color. Shared by the dashboard map and the scraper
 // map so a lead's color always reflects the stage it's in.
 const STATUS_COLOR = {
-  'New':          '#4B72FF',
+  'New':          '#3E66C4',
   'Contacted':    '#F59E0B',
   'Interested':   '#2DD4BF',
   'Closed Won':   '#84CC16',

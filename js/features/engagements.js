@@ -34,7 +34,7 @@ async function startEngagement(leadId) {
   (S.engagements = S.engagements || []).push(rec);
   saveLocal();
   if (S.config.scriptUrl && !S.demoMode) {
-    try { const r = await sheetsCall({ action:'saveEngagement', ...rec }); if (r && r.engagement) Object.assign(rec, r.engagement); } catch (e) {}
+    try { const r = await sheetsCall({ action:'saveEngagement', ...rec }); if (r && r.engagement) Object.assign(rec, r.engagement); else if (!r || !r.success) toast('Saved locally — could not reach the server. It will retry on next sync.', 'error', 5000); } catch (e) { toast('Saved locally — could not reach the server.', 'error', 5000); }
   }
   toast('Engagement started for ' + (l.name || 'lead') + '.', 'success');
   if (typeof closeModal === 'function') closeModal();
@@ -91,7 +91,7 @@ function closeLinkHtml_(e) {
 async function setEngTier_(eid, tier) {
   const e = (S.engagements || []).find(x => x.engagementId === eid); if (!e) return;
   e.tier = tier; saveLocal(); renderEngagements();
-  if (S.config.scriptUrl && !S.demoMode) { try { const r = await sheetsCall({ action:'saveEngagement', engagementId:eid, tier:tier }); if (r && r.engagement) Object.assign(e, r.engagement); } catch (err) {} }
+  if (S.config.scriptUrl && !S.demoMode) { try { const r = await sheetsCall({ action:'saveEngagement', engagementId:eid, tier:tier }); if (r && r.engagement) Object.assign(e, r.engagement); else if (!r || !r.success) toast('Tier saved locally — could not reach the server.', 'error', 5000); } catch (err) { toast('Tier saved locally — could not reach the server.', 'error', 5000); } }
 }
 function copyCloseLink_(eid) {
   const url = CLOSE_BASE + '?eid=' + encodeURIComponent(eid);
@@ -174,7 +174,7 @@ async function approveRoadmap_(eid) {
   e.roadmapApprovedAt = now; if (e.status === 'roadmap_draft' || e.status === 'won') e.status = 'approved';
   saveLocal(); renderEngagements();
   if (S.config.scriptUrl && !S.demoMode) {
-    try { const r = await sheetsCall({ action:'saveEngagement', engagementId:eid, roadmapApprovedAt:now, status:'approved' }); if (r && r.engagement) { Object.assign(e, r.engagement); renderEngagements(); } } catch (err) {}
+    try { const r = await sheetsCall({ action:'saveEngagement', engagementId:eid, roadmapApprovedAt:now, status:'approved' }); if (r && r.engagement) { Object.assign(e, r.engagement); renderEngagements(); } else if (!r || !r.success) toast('Approved locally — could not reach the server.', 'error', 5000); } catch (err) { toast('Approved locally — could not reach the server.', 'error', 5000); }
   }
   toast('Roadmap marked approved.', 'success');
 }

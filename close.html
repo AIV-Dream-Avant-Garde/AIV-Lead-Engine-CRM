@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Axius — Engagement Agreement</title>
+<title>Axius · Engagement Agreement</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Instrument+Sans:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -100,7 +100,7 @@
       '<div class="eyebrow">Engagement agreement</div>' +
       '<h1>Welcome' + (e.company ? ', ' + esc(e.company) : '') + '.</h1>' +
       '<p class="lede">Here’s everything in one place. Review the agreement, add your signature, and you’re set. We’ll build your roadmap from our conversation right after.</p>' +
-      (CANCELED ? '<div class="msg err" style="display:block">No problem — checkout was cancelled. You can sign and pay whenever you’re ready.</div>' : '') +
+      (CANCELED ? '<div class="msg err" style="display:block">No problem, checkout was cancelled. You can sign and pay whenever you’re ready.</div>' : '') +
       '<div id="formMsg" class="msg"></div>' +
       '<div class="plan">' +
         '<div class="item"><div class="k">Monthly</div><div class="v">' + usd(e.monthly) + '<small>/mo</small></div></div>' +
@@ -133,7 +133,7 @@
       var co = await api('createCheckout', { eid: EID });
       if (co && co.success && co.url) { location.href = co.url; return; }
       btn.disabled = false; btn.textContent = 'Sign & continue to payment';
-      formMsg((co && co.error) || 'Could not open checkout. Your signature was saved — please try again.');
+      formMsg((co && co.error) || 'Could not open checkout. Your signature was saved, please try again.');
     } catch (err) { btn.disabled = false; btn.textContent = 'Sign & continue to payment'; formMsg('Something went wrong. Please try again.'); }
   }
 
@@ -156,7 +156,8 @@
       var r = await api('engagementPublic', { eid: EID });
       if (!r || !r.success || !r.engagement) return showError((r && r.error) || 'We couldn’t find that agreement.');
       ENG = r.engagement;
-      if (ENG.paid) return showDone('You’re all set.', 'This agreement is already signed and paid. We’ll be in touch with next steps — thank you.');
+      if (ENG.paid) return showDone('You’re all set.', 'This agreement is already signed and paid. We’ll be in touch with next steps, thank you.');
+      if (ENG.msaReady === false) return showDone('Almost ready.', 'We’re putting the final touches on your agreement. We’ll send it your way shortly, thank you for your patience.');
       renderAgreement();
     } catch (e) { showError('We couldn’t load your agreement. Please refresh in a moment.'); }
   }
