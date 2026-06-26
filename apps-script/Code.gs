@@ -91,7 +91,7 @@ function seedProperties() {
     TWILIO_AUTH_TOKEN: '', TWILIO_TWIML_APP: '',
     TWILIO_FROM_NUMBER: '', TWILIO_FROM_SMS_US: '', TWILIO_FROM_WA: '',
     RECORDINGS_FOLDER_ID: '', AUDIT_FOLDER_ID: '', EXECUTED_AGREEMENTS_FOLDER_ID: '', RESEND_API_KEY: '',
-    STRIPE_SECRET_KEY: '', CLOSE_PAGE_URL: '', PROVISION_SECRET: '', PROVISION_URL: '',
+    STRIPE_SECRET_KEY: '', STRIPE_WEBHOOK_TOKEN: '', CLOSE_PAGE_URL: '', PROVISION_SECRET: '', PROVISION_URL: '',
     TELEGRAM_ALERT_BOT_TOKEN: '', TELEGRAM_ALERT_CHAT_ID: '',
     GEMINI_API_KEY: '', CRM_SECRET: '',
     // Optional overrides (defaults already fine):
@@ -396,6 +396,16 @@ function doPost(e) {
 
     const b = JSON.parse((e.postData && e.postData.contents) || '{}');
 
+    // Stripe webhook — authoritative payment + churn signal (handles pay-then-close-tab
+    // and dunning). Apps Script can't read request headers, so the endpoint is secured by
+    // a URL token AND every event is re-fetched from Stripe before it's trusted.
+    if (a === 'stripe_hook') {
+      const tok = PROP_('STRIPE_WEBHOOK_TOKEN');
+      if (!tok || String(e.parameter.token || '').trim() !== String(tok).trim()) return err_('Unauthorized');
+      try { handleStripeEvent_(b); } catch (ex) { Logger.log('stripe_hook: ' + ex.message); }
+      return ContentService.createTextOutput('ok');
+    }
+
     // Public close-page endpoints (prospect-facing, NO CRM secret): the engagement
     // id is the unguessable key and all amounts are server-determined, so these are
     // safe to expose. Handled before the secret gate (like the webhooks above).
@@ -490,7 +500,7 @@ function doPost(e) {
       (b.data||[]).forEach(l=>{
         const id=String(l.id||'').trim();
         if(id && !ex.has(id)){
-          s.appendRow(LEAD_HDR.map(h=>(h==='notes'||h==='workHistory')?JSON.stringify(l[h]||[]):(l[h]??'')));
+          appendRowByHeader_(s, l);
           ex.add(id); added++;
         }
       });
@@ -542,7 +552,7 @@ function doPost(e) {
       return ok({deleted:true});
     }
     if (a === 'saveCall') {
-      getSheet(SHEETS.calls,CALL_HDR).appendRow(CALL_HDR.map(h=>b[h]??''));
+      appendRowByHeader_(getSheet(SHEETS.calls,CALL_HDR), b);
       // If the recording callback already fired for this call (race), attach it now.
       if (b.callSid) {
         const pend = cfgGet('pendingRec_' + b.callSid);
@@ -633,23 +643,28 @@ function doPost(e) {
       if (!eid) return err_('Missing engagementId.');
       const e = engById_(eid);
       if (!e) return err_('Engagement not found.');
+      if (e.provisionedAt || e.status === 'active') return err_('Already provisioned.');
+      if (e.status === 'provisioning') return err_('Provisioning is already in progress for this client.');
       const gateA = String(e.paid) === 'yes' && e.roadmapApprovedAt && String(e.msaSigned) === 'yes';
       if (!gateA) return err_('Gate A not met yet (needs paid + roadmap approved + MSA signed).');
       if (!PROVISION_SECRET) return err_('PROVISION_SECRET is not set.');
+      upsertEngagement_({ engagementId: eid, status: 'provisioning' });   // in-progress guard against double-fire/reload
       try {
         const prov = botProvision_(e);                       // 1) Discord + Mongo (idempotent on the bot)
-        let folderId = String(e.driveFolderId || '');
-        if (!folderId) {                                     // 2) Drive folder from the ACWA template (skip if already made)
+        let folderId = String(e.driveFolderId || ''), folder;
+        if (!folderId) {                                     // 2) create the client folder + PERSIST its id before copying → resumable on timeout
           const tmpl = DriveApp.getFolderById(TEMPLATE_FOLDER_ID);
           const parent = tmpl.getParents().hasNext() ? tmpl.getParents().next() : DriveApp.getRootFolder();
-          const folder = copyFolder_(tmpl, parent, String(e.company || eid));
+          folder = parent.createFolder(String(e.company || eid));
           folderId = folder.getId();
-          const sec5 = acwaSection_(folder, '5');            // 3) founding docs → §5 Documentation Library
-          if (sec5) {
-            const lead = toObjs(getSheet(SHEETS.leads, LEAD_HDR)).find(function(l){ return String(l.id) === eid; }) || {};
-            copyFileByUrlInto_(lead.auditUrl, sec5, (e.company || 'Client') + ' — Audit');
-            copyFileByUrlInto_(e.msaUrl, sec5, (e.company || 'Client') + ' — Executed MSA');
-          }
+          upsertEngagement_({ engagementId: eid, driveFolderId: folderId });
+        } else { folder = DriveApp.getFolderById(folderId); }
+        copyFolderInto_(DriveApp.getFolderById(TEMPLATE_FOLDER_ID), folder);   // copy ACWA template, skipping anything already there
+        const sec5 = acwaSection_(folder, '5');              // 3) founding docs → §5 Documentation Library (skip-existing)
+        if (sec5) {
+          const lead = toObjs(getSheet(SHEETS.leads, LEAD_HDR)).find(function(l){ return String(l.id) === eid; }) || {};
+          copyFileByUrlInto_(lead.auditUrl, sec5, (e.company || 'Client') + ' — Audit');
+          copyFileByUrlInto_(e.msaUrl, sec5, (e.company || 'Client') + ' — Executed MSA');
         }
         writeRegistryRow_(e, prov, folderId);                // 4) Project Registry (native Sheet)
         const now = new Date().toISOString();                // 5) store runtime IDs + go active
@@ -658,7 +673,12 @@ function doPost(e) {
           discordCategoryId: (prov.cc && prov.cc.categoryId) || '', discordRoleId: prov.clientRoleId || '', driveFolderId: folderId });
         notifyTelegram('Provisioned — ' + (e.company || eid) + ' is live (Discord + Drive + Registry).');
         return ok({ provisioned: true, engagement: rec, runtime: { slug: prov.slug, guild: (prov.cc || {}).guildId, role: prov.clientRoleId, driveFolderId: folderId } });
-      } catch (err) { Logger.log('provisionEngagement: ' + err.message); return err_('Provisioning failed: ' + err.message); }
+      } catch (err) {
+        upsertEngagement_({ engagementId: eid, status: 'gate_a_ready' });    // release the in-progress guard so it can be retried (folder id is kept → resumable)
+        Logger.log('provisionEngagement: ' + err.message);
+        notifyTelegram('Provisioning FAILED — ' + (e.company || eid) + ': ' + err.message + ' (safe to retry)');
+        return err_('Provisioning failed: ' + err.message);
+      }
     }
     if (a === 'syncDeliveryNow') {
       const r = syncDelivery();
@@ -1013,7 +1033,7 @@ function doPost(e) {
         workHistory:JSON.stringify([]),
         importedAt:now,updatedAt:now,
       };
-      s.appendRow(LEAD_HDR.map(h=>lead[h]??''));
+      appendRowByHeader_(s, lead);
       notifyTelegram('New lead — ' + (lead.name||'No name') + ' · ' + (lead.source||'Inbound') + (lead.city?(' · '+lead.city):'') + (firstMsg?('\n"'+firstMsg.slice(0,200)+'"'):''));
       return ok({added:true,duplicate:false,id:lead.id});
     }
@@ -1257,7 +1277,7 @@ function runScheduledJobs_() {
           lockedBy:'', lockedUntil:'', assignedAt:'', workHistory:JSON.stringify([]),
           importedAt:now, updatedAt:now, lat:l.lat??'', lng:l.lng??''
         };
-        leadsSheet.appendRow(LEAD_HDR.map(h => lead[h] ?? ''));
+        appendRowByHeader_(leadsSheet, lead);
         existing.add(key);
         totalAdded++;
       }
@@ -1367,7 +1387,7 @@ function runStateCampaigns() {
             importedAt:now, updatedAt:now,
             lat:p.location?.latitude??'', lng:p.location?.longitude??'',
           };
-          leadsSheet.appendRow(LEAD_HDR.map(h => lead[h] ?? ''));
+          appendRowByHeader_(leadsSheet, lead);
           existing.add(key);
           addedHere++; grandAdded++;
           daily.counts[camp.id] = (daily.counts[camp.id] || 0) + 1;
@@ -1842,6 +1862,14 @@ function appendInteraction_(rec) {
   getSheet(SHEETS.interactions, INTERACTION_HDR).appendRow(INTERACTION_HDR.map(function(k){ return rec[k] != null ? rec[k] : ''; }));
 }
 
+// Append a record by the sheet's LIVE header order. getSheet reconciles new columns to
+// the END of the live header, so writing by a constant header can misalign every column
+// on a sheet that predates a field. Objects (notes/workHistory) are JSON-encoded.
+function appendRowByHeader_(sheet, rec) {
+  const h = sheet.getRange(1, 1, 1, Math.max(1, sheet.getLastColumn())).getValues()[0];
+  sheet.appendRow(h.map(function(k){ const v = rec[k]; return v == null ? '' : (typeof v === 'object' ? JSON.stringify(v) : v); }));
+}
+
 // Effective cadence config: operator overrides from the Config sheet
 // ('cadenceConfig' key, set in the CRM admin UI) layered over the Code.gs
 // constants as defaults. So the constants are the floor; the UI tunes the rest.
@@ -2017,24 +2045,31 @@ function patchCallTranscript_(callSid, transcript, summary) {
 function upsertEngagement_(b) {
   const eid = String(b.engagementId || '').trim();
   if (!eid) throw new Error('Missing engagementId.');
-  const s = getSheet(SHEETS.engagements, ENGAGEMENT_HDR);
-  const rows = s.getDataRange().getValues(), h = rows[0] || ENGAGEMENT_HDR, ec = h.indexOf('engagementId');
-  const now = new Date().toISOString();
-  let rowIdx = -1, existing = {};
-  for (let i = 1; i < rows.length; i++) { if (String(rows[i][ec]) === eid) { rowIdx = i; h.forEach(function(k,j){ existing[k] = rows[i][j]; }); break; } }
-  const rec = {};
-  h.forEach(function(k){ rec[k] = (b[k] != null && b[k] !== '') ? b[k] : (existing[k] != null ? existing[k] : ''); });
-  rec.engagementId = eid;
-  rec.createdAt = existing.createdAt || now;
-  rec.updatedAt = now;
-  // Gate A: paid + roadmap approved + MSA signed (won is implied by the record existing).
-  const gateA = String(rec.paid) === 'yes' && rec.roadmapApprovedAt && String(rec.msaSigned) === 'yes';
-  if (gateA && !rec.gateAReadyAt) rec.gateAReadyAt = now;
-  if (gateA && (rec.status === 'won' || rec.status === 'roadmap_draft' || rec.status === 'roadmap_sent' || rec.status === 'approved' || !rec.status)) rec.status = 'gate_a_ready';
-  const vals = h.map(function(k){ return rec[k] != null ? rec[k] : ''; });
-  if (rowIdx >= 0) s.getRange(rowIdx + 1, 1, 1, h.length).setValues([vals]);
-  else s.appendRow(vals);
-  return rec;
+  // Lock: signMsa, confirmCheckout, the webhook, saveEngagement and provision can all
+  // write this row near-simultaneously — without a lock a concurrent sign+pay can lose a
+  // Gate-A signal (read-modify-write race).
+  const lock = LockService.getScriptLock();
+  try { lock.waitLock(15000); } catch (e) { throw new Error('Busy, please retry.'); }
+  try {
+    const s = getSheet(SHEETS.engagements, ENGAGEMENT_HDR);
+    const rows = s.getDataRange().getValues(), h = rows[0] || ENGAGEMENT_HDR, ec = h.indexOf('engagementId');
+    const now = new Date().toISOString();
+    let rowIdx = -1, existing = {};
+    for (let i = 1; i < rows.length; i++) { if (String(rows[i][ec]) === eid) { rowIdx = i; h.forEach(function(k,j){ existing[k] = rows[i][j]; }); break; } }
+    const rec = {};
+    h.forEach(function(k){ rec[k] = (b[k] != null && b[k] !== '') ? b[k] : (existing[k] != null ? existing[k] : ''); });
+    rec.engagementId = eid;
+    rec.createdAt = existing.createdAt || now;
+    rec.updatedAt = now;
+    // Gate A: paid + roadmap approved + MSA signed (won is implied by the record existing).
+    const gateA = String(rec.paid) === 'yes' && rec.roadmapApprovedAt && String(rec.msaSigned) === 'yes';
+    if (gateA && !rec.gateAReadyAt) rec.gateAReadyAt = now;
+    if (gateA && (rec.status === 'won' || rec.status === 'roadmap_draft' || rec.status === 'roadmap_sent' || rec.status === 'approved' || !rec.status)) rec.status = 'gate_a_ready';
+    const vals = h.map(function(k){ return rec[k] != null ? rec[k] : ''; });
+    if (rowIdx >= 0) s.getRange(rowIdx + 1, 1, 1, h.length).setValues([vals]);
+    else s.appendRow(vals);
+    return rec;
+  } finally { lock.releaseLock(); }
 }
 
 /* ── Close page (task 6/7): public e-sign + Stripe pay, keyed by engagement id ── */
@@ -2044,10 +2079,13 @@ function engById_(eid) {
 }
 // The MSA the client signs. Operator-set via the Config sheet ('msaText'); a clear
 // placeholder otherwise so we never present fabricated legal text as final.
+const MSA_PLACEHOLDER = '[ Your Master Services Agreement has not been set yet. Paste it into the Config sheet under the key "msaText". ]';
 function getMsaText_() {
   const t = String(cfgGet('msaText') || '').trim();
-  return t || '[ Your Master Services Agreement has not been set yet. Paste it into the Config sheet under the key "msaText". ]';
+  return t || MSA_PLACEHOLDER;
 }
+// Is a real MSA configured? Guards signing/checkout so no one ever e-signs the placeholder.
+function msaIsSet_() { return String(cfgGet('msaText') || '').trim().length > 40; }
 
 function handleClose_(a, b) {
   const eid = String(b.eid || b.engagementId || '').trim();
@@ -2055,16 +2093,21 @@ function handleClose_(a, b) {
   const e = engById_(eid);
   if (!e) return err_('We could not find that agreement. Please check your link.');
   const tier = stripeTier_(e.tier);
+  const alreadySigned = String(e.msaSigned) === 'yes';
+  const alreadyPaid = String(e.paid) === 'yes';
 
   if (a === 'engagementPublic') {
+    // NB: never returns the waiver promo code — that's entered on Stripe's screen, not exposed here.
     return ok({ engagement: {
       engagementId: e.engagementId, company: e.company || '', tier: String(e.tier || 'team').toLowerCase(),
-      monthly: tier.monthly, setup: tier.setup, waiveCode: tier.waiveCode, msaText: getMsaText_(),
-      status: e.status || '', msaSigned: String(e.msaSigned) === 'yes', paid: String(e.paid) === 'yes',
+      monthly: tier.monthly, setup: tier.setup, msaText: getMsaText_(), msaReady: msaIsSet_(),
+      status: e.status || '', msaSigned: alreadySigned, paid: alreadyPaid,
       signerName: e.msaSignerName || '' } });
   }
 
   if (a === 'signMsa') {
+    if (!msaIsSet_()) return err_('This agreement is not ready to sign yet. Please reach out to us.');
+    if (alreadySigned) return ok({ signed: true, signedAt: e.msaSignedAt || '', already: true });   // idempotent — never overwrite or re-file
     const name = String(b.name || '').trim();
     if (name.length < 2) return err_('Please type your full name to sign.');
     if (!b.agree) return err_('Please confirm you have read and agree to the agreement.');
@@ -2084,31 +2127,55 @@ function handleClose_(a, b) {
 
   if (a === 'createCheckout') {
     if (!STRIPE_SECRET_KEY) return err_('Payments are not configured yet.');
+    if (!msaIsSet_()) return err_('This agreement is not ready yet. Please reach out to us.');
+    if (alreadyPaid) return ok({ alreadyPaid: true });
     try {
       const session = stripeCreateCheckoutSession_(eid, e.tier);
       return ok({ url: session.url, sessionId: session.id });
-    } catch (err) { Logger.log('createCheckout: ' + err.message); return err_('Could not start checkout: ' + err.message); }
+    } catch (err) { Logger.log('createCheckout: ' + err.message); notifyTelegram('Checkout could not start — ' + (e.company || eid) + ': ' + err.message); return err_('Could not start checkout: ' + err.message); }
   }
 
   if (a === 'confirmCheckout') {
     if (!STRIPE_SECRET_KEY) return err_('Payments are not configured yet.');
     const sid = String(b.sessionId || '').trim();
     if (!sid) return err_('Missing session id.');
+    if (alreadyPaid) return ok({ paid: true, already: true });
     try {
       const s = stripeGetSession_(sid);
       if (!s || !s.id) return err_('Could not verify the payment.');
-      const matches = !s.metadata || !s.metadata.engagementId || String(s.metadata.engagementId) === eid;
-      const paid = (s.payment_status === 'paid' || s.payment_status === 'no_payment_required' || s.status === 'complete');
-      if (!matches) return err_('This payment does not match the agreement.');
-      if (!paid) return ok({ paid: false, status: s.status || 'open' });
-      const now = new Date().toISOString();
-      const cust = typeof s.customer === 'string' ? s.customer : (s.customer && s.customer.id) || '';
-      const rec = upsertEngagement_({ engagementId: eid, paid: 'yes', paidAt: now, stripeCustomerId: cust });
-      notifyTelegram('Payment received — ' + (e.company || eid) + (rec.gateAReadyAt ? ' · Gate A is now ready to provision.' : '.'));
-      return ok({ paid: true, gateAReady: !!rec.gateAReadyAt });
+      const v = stripePaidForEid_(s, eid, tier);
+      if (!v.match) return err_('This payment does not match the agreement.');
+      if (!v.paid) return ok({ paid: false, status: s.status || 'open' });
+      const rec = markEngagementPaid_(eid, s);
+      return ok({ paid: true, gateAReady: !!(rec && rec.gateAReadyAt) });
     } catch (err) { Logger.log('confirmCheckout: ' + err.message); return err_('Could not verify the payment.'); }
   }
   return err_('Unknown action.');
+}
+
+// Strict check that a Stripe Checkout session genuinely paid for THIS engagement.
+// Binding must be explicit (metadata or client_reference_id == eid) — never "missing == match".
+function stripePaidForEid_(s, eid, tier) {
+  const meta = (s.metadata && s.metadata.engagementId) ? String(s.metadata.engagementId) : '';
+  const ref  = s.client_reference_id ? String(s.client_reference_id) : '';
+  const match = (meta === eid) || (ref === eid);
+  // Guard against a fully-discounted total, but never reject a real payment just because
+  // Stripe omitted amount_total — only enforce when it's present.
+  const enough = !tier || !s.amount_total || Number(s.amount_total) >= Number(tier.monthly) * 100;
+  const paid = (s.payment_status === 'paid' || s.status === 'complete') && s.mode === 'subscription' && enough;
+  return { match: match, paid: paid };
+}
+
+// Mark an engagement paid — shared by confirmCheckout (return) and the Stripe webhook. Idempotent.
+function markEngagementPaid_(eid, s) {
+  const e = engById_(eid);
+  if (!e) return null;
+  if (String(e.paid) === 'yes') return e;
+  const now = new Date().toISOString();
+  const cust = s ? (typeof s.customer === 'string' ? s.customer : (s.customer && s.customer.id) || '') : '';
+  const rec = upsertEngagement_({ engagementId: eid, paid: 'yes', paidAt: now, stripeCustomerId: cust });
+  notifyTelegram('Payment received — ' + (e.company || eid) + (rec.gateAReadyAt ? ' · Gate A is ready to provision.' : '.'));
+  return rec;
 }
 
 // Create a subscription Checkout Session: monthly + one-time setup, the setup
@@ -2128,16 +2195,41 @@ function stripeCreateCheckoutSession_(eid, tierKey) {
     'success_url': base + '&session_id={CHECKOUT_SESSION_ID}',
     'cancel_url': base + '&canceled=1',
   };
+  // Idempotency key bucketed to 10 min — rapid double-clicks reuse one session (no duplicate subscriptions).
+  const idem = 'co_' + eid + '_' + Math.floor(new Date().getTime() / 600000);
   const res = UrlFetchApp.fetch('https://api.stripe.com/v1/checkout/sessions', {
-    method: 'post', headers: { Authorization: 'Bearer ' + STRIPE_SECRET_KEY }, payload: payload, muteHttpExceptions: true });
+    method: 'post', headers: { Authorization: 'Bearer ' + STRIPE_SECRET_KEY, 'Idempotency-Key': idem }, payload: payload, muteHttpExceptions: true });
   const d = JSON.parse(res.getContentText() || '{}');
   if (res.getResponseCode() !== 200) throw new Error(d.error ? d.error.message : ('Stripe ' + res.getResponseCode()));
   return d;
 }
-function stripeGetSession_(sessionId) {
-  const res = UrlFetchApp.fetch('https://api.stripe.com/v1/checkout/sessions/' + encodeURIComponent(sessionId), {
+function stripeGet_(path) {
+  const res = UrlFetchApp.fetch('https://api.stripe.com/v1/' + path, {
     method: 'get', headers: { Authorization: 'Bearer ' + STRIPE_SECRET_KEY }, muteHttpExceptions: true });
   return JSON.parse(res.getContentText() || '{}');
+}
+function stripeGetSession_(sessionId) { return stripeGet_('checkout/sessions/' + encodeURIComponent(sessionId)); }
+
+// Stripe webhook events (authoritative payment + churn). Verified by re-fetching the
+// object from Stripe, so the posted body is never trusted on its own.
+function handleStripeEvent_(evt) {
+  const type = evt && evt.type, obj = (evt && evt.data && evt.data.object) || {};
+  if (type === 'checkout.session.completed') {
+    const s = stripeGetSession_(obj.id);                                   // re-fetch authoritative
+    const eid = (s.metadata && s.metadata.engagementId) || s.client_reference_id || '';
+    if (!eid) return;
+    const v = stripePaidForEid_(s, String(eid), stripeTier_((engById_(String(eid)) || {}).tier));
+    if (v.match && v.paid) markEngagementPaid_(String(eid), s);
+  } else if (type === 'customer.subscription.deleted') {
+    const eid = (obj.metadata && obj.metadata.engagementId) || '';
+    const e = eid && engById_(String(eid));
+    if (e && e.status !== 'churned') { upsertEngagement_({ engagementId: String(eid), status: 'churned' }); notifyTelegram('Subscription cancelled — ' + (e.company || eid) + '.'); }
+  } else if (type === 'invoice.payment_failed') {
+    let eid = '';
+    try { const sub = obj.subscription ? stripeGet_('subscriptions/' + obj.subscription) : null; eid = (sub && sub.metadata && sub.metadata.engagementId) || ''; } catch (e) {}
+    const e = eid && engById_(String(eid));
+    if (e) notifyTelegram('Payment failed (dunning) — ' + (e.company || eid) + '. Check Stripe.');
+  }
 }
 
 /* ── Spine provisioning helpers (task 8) ──────────────────────────────────── */
@@ -2153,13 +2245,22 @@ function botProvision_(e) {
   if (res.getResponseCode() !== 200 || !d.ok) throw new Error(d.error || ('bot /provision ' + res.getResponseCode()));
   return d;
 }
-// DriveApp can copy files but not folders — copy the template tree (ACWA §1–10) recursively.
-function copyFolder_(src, destParent, newName) {
-  const dest = destParent.createFolder(newName);
+// DriveApp can copy files but not folders — copy the template tree (ACWA §1–10) into an
+// EXISTING destination folder. Skip-existing (resumable on a 6-min timeout) + per-file
+// guarded so one un-copyable item (e.g. a shortcut) can't abort the whole provision.
+function copyFolderInto_(src, dest) {
   const files = src.getFiles();
-  while (files.hasNext()) { const f = files.next(); f.makeCopy(f.getName(), dest); }
+  while (files.hasNext()) {
+    const f = files.next();
+    try { if (!dest.getFilesByName(f.getName()).hasNext()) f.makeCopy(f.getName(), dest); }
+    catch (e) { Logger.log('copyFolderInto_ file "' + f.getName() + '": ' + e.message); }
+  }
   const subs = src.getFolders();
-  while (subs.hasNext()) { const sf = subs.next(); copyFolder_(sf, dest, sf.getName()); }
+  while (subs.hasNext()) {
+    const sf = subs.next();
+    const sub = dest.getFoldersByName(sf.getName()).hasNext() ? dest.getFoldersByName(sf.getName()).next() : dest.createFolder(sf.getName());
+    copyFolderInto_(sf, sub);
+  }
   return dest;
 }
 // Find an ACWA section subfolder by its number prefix ("5 · Documentation Library").
@@ -2175,7 +2276,9 @@ function copyFileByUrlInto_(url, destFolder, rename) {
     const id = (String(url).match(/[-\w]{25,}/) || [])[0];
     if (!id) return null;
     const f = DriveApp.getFileById(id);
-    return f.makeCopy(rename || f.getName(), destFolder);
+    const name = rename || f.getName();
+    if (destFolder.getFilesByName(name).hasNext()) return null;   // already copied → resumable, no duplicate
+    return f.makeCopy(name, destFolder);
   } catch (e) { Logger.log('copyFileByUrlInto_: ' + e.message); return null; }
 }
 // The Project Registry — ONE native Google Sheet, auto-created in CLIENTS and remembered.
