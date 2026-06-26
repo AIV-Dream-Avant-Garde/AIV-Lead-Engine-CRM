@@ -111,3 +111,48 @@ async function approveRoadmap_(eid) {
   }
   toast('Roadmap marked approved.', 'success');
 }
+
+/* ── Prospect audit (sales artifact, on the lead) ─────────────────────────── */
+
+// Render the audit affordance in the lead modal: generate / preview+send / sent.
+function renderLeadAudit_(l) {
+  const el = document.getElementById('m-audit'); if (!el) return;
+  if (!(S.session && S.session.role === 'admin') || !l) { el.innerHTML = ''; return; }
+  if (l._auditing)     { el.innerHTML = '<span class="call-rec-pending"><span class="call-rec-spin"></span>Generating audit…</span>'; return; }
+  if (l._sendingAudit) { el.innerHTML = '<span class="call-rec-pending"><span class="call-rec-spin"></span>Sending audit…</span>'; return; }
+  const hasCtx = (S.calls || []).some(c => c.leadId === l.id && (c.transcript || c.callSummary)) || (S.interactions || []).some(i => i.leadId === l.id);
+  const viewLink = l.auditUrl ? `<a class="call-rec-link" href="${esc(l.auditUrl)}" target="_blank" rel="noopener">View audit</a>` : '';
+  if (l.auditSentAt) { el.innerHTML = `<span class="lock-badge lock-mine">Audit sent · ${fmtD(l.auditSentAt)}</span> ${viewLink}`; return; }
+  if (l.auditUrl || l._auditText) {
+    const preview = l._auditText ? `<details class="call-transcript" style="margin-top:6px"><summary>Preview audit</summary><div class="call-transcript-body">${esc(l._auditText)}</div></details>` : '';
+    el.innerHTML = (S.demoMode ? viewLink : `${viewLink}
+      <button class="call-tx-btn" onclick="sendAudit_('${l.id}')">Send audit</button>
+      <button class="call-tx-btn" onclick="generateAudit_('${l.id}')">Regenerate</button>`) + preview;
+    return;
+  }
+  el.innerHTML = (hasCtx && !S.demoMode) ? `<button class="call-tx-btn" onclick="generateAudit_('${l.id}')">📄 Generate audit (AI)</button>` : '';
+}
+
+async function generateAudit_(leadId) {
+  const l = (S.leads || []).find(x => x.id === leadId); if (!l || l._auditing) return;
+  if (!S.config.scriptUrl || S.demoMode) { toast('Connect Apps Script to generate audits.', 'error'); return; }
+  l._auditing = true; renderLeadAudit_(l);
+  try {
+    const r = await sheetsCall({ action:'generateAudit', leadId:leadId });
+    if (r && r.audit) { l._auditText = r.audit; l.auditUrl = r.auditUrl || l.auditUrl; saveLocal(); toast('Audit generated. Review, then send.', 'success'); }
+    else toast((r && r.error) ? r.error : 'Could not generate the audit.', 'error', 6000);
+  } catch (e) { toast('Audit failed: ' + e.message, 'error'); }
+  l._auditing = false; renderLeadAudit_(l);
+}
+
+async function sendAudit_(leadId) {
+  const l = (S.leads || []).find(x => x.id === leadId); if (!l || l._sendingAudit) return;
+  if (!confirm('Send this audit to ' + (l.email || 'the lead') + '?')) return;
+  l._sendingAudit = true; renderLeadAudit_(l);
+  try {
+    const r = await sheetsCall({ action:'sendAudit', leadId:leadId, audit: l._auditText || '' });
+    if (r && r.sent) { l.auditSentAt = r.sentAt; saveLocal(); toast('Audit sent.', 'success'); }
+    else toast((r && r.error) ? r.error : 'Could not send the audit.', 'error', 6000);
+  } catch (e) { toast('Send failed: ' + e.message, 'error'); }
+  l._sendingAudit = false; renderLeadAudit_(l);
+}

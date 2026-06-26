@@ -490,6 +490,7 @@ function openLead(id) {
       engWrap.innerHTML = '';
     }
   }
+  if (typeof renderLeadAudit_ === 'function') renderLeadAudit_(l);
 
   // Work history
   const whWrap = document.getElementById('m-work-history');

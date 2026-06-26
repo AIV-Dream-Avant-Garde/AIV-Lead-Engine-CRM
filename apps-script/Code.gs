@@ -182,7 +182,7 @@ const ENGAGEMENT_HDR = ['engagementId','company','status','dealValue',
   'stripeCustomerId','mongoSlug','discordGuildId','discordCategoryId','discordRoleId','driveFolderId',
   'gateAReadyAt','provisionedAt','createdAt','updatedAt'];
 
-const LEAD_HDR = ['id','name','phone','address','website','rating','reviews','city','barrio','keyword','source','sourceDetail','status','providerId','providerRate','closerId','closerRate','dealValue','collectedAmount','providerCommission','closerCommission','commissionStatus','lockedBy','lockedUntil','assignedAt','workHistory','dncReason','followUpDate','notes','importedAt','updatedAt','calendarEventId','refundAmount','refundReason','refundedAt','country','email','externalId','lastTouchAt','lastReplyAt','consentSms','consentWhatsapp','consentEmail','lat','lng','residualActive','residualRate','residualMRR'];
+const LEAD_HDR = ['id','name','phone','address','website','rating','reviews','city','barrio','keyword','source','sourceDetail','status','providerId','providerRate','closerId','closerRate','dealValue','collectedAmount','providerCommission','closerCommission','commissionStatus','lockedBy','lockedUntil','assignedAt','workHistory','dncReason','followUpDate','notes','importedAt','updatedAt','calendarEventId','refundAmount','refundReason','refundedAt','country','email','externalId','lastTouchAt','lastReplyAt','consentSms','consentWhatsapp','consentEmail','lat','lng','residualActive','residualRate','residualMRR','auditUrl','auditSentAt'];
 const CALL_HDR = ['id','leadId','leadName','phone','callSid','outcome','duration','notes','recordingUrl','driveUrl','consentConfirmed','calledAt','calledBy','calledByName','transcript','callSummary'];
 const TEAM_HDR = ['id','name','role','pinHash','providerRate','closerRate','contact','active','createdAt','commissionType'];
 const COMM_HDR   = ['id','leadId','leadName','dealValue','collectedAmount','providerId','providerRate','providerAmount','closerId','closerRate','closerAmount','status','createdAt','paidAt','paidBy','paymentRef','refundReason','adjustedBy','adjustedAt','providerName','closerName','recurring','period'];
@@ -446,7 +446,7 @@ function doPost(e) {
     var ADMIN_ONLY = { saveTeamMember:1, cancelCommission:1, adjustCollected:1, markCommissionPaid:1,
       saveCadenceConfig:1, saveScheduledJobs:1, saveStateCampaigns:1, saveReportEmail:1,
       setTrigger:1, runCadenceNow:1, runScrapesNow:1, saveScript:1, deleteScript:1, previewOutreach:1,
-      saveEngagement:1, draftRoadmap:1 };
+      saveEngagement:1, draftRoadmap:1, generateAudit:1, sendAudit:1 };
     if (ADMIN_ONLY[a] && !verifyAdminToken_(b.adminToken)) {
       return err_('Admin sign-in required for this action.', 401);
     }
@@ -563,6 +563,40 @@ function doPost(e) {
       if (!roadmap) return err_('Could not draft a roadmap (need call transcripts/context, or AI is unavailable).');
       const rec = upsertEngagement_({ engagementId:eid, roadmap:roadmap, status:'roadmap_draft' });
       return ok({ roadmap:roadmap, engagement:rec });
+    }
+    // Generate a prospect audit from the lead's transcripts + thread + record,
+    // archive it to "05 · Audits & Proposals", stamp the lead's auditUrl. Returns it
+    // for review before it's sent.
+    if (a === 'generateAudit') {
+      const leadId = String(b.leadId || '').trim();
+      if (!leadId) return err_('Missing leadId.');
+      const ctx = gatherEngagementContext_(leadId);
+      if (!ctx.lead) return err_('Lead not found.');
+      if (!ctx.transcripts.length && !ctx.interactions.length) return err_('No call transcripts or thread yet to audit.');
+      const audit = geminiAudit_(ctx);
+      if (!audit) return err_('Could not generate the audit (need transcripts/context, or AI is unavailable).');
+      const name = String(ctx.lead.name || 'Audit').replace(/[\\/:*?"<>|]+/g, ' ').trim() + ' — Audit ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd') + '.txt';
+      const url = saveTextToDrive_(AUDIT_FOLDER_ID, name, audit);
+      if (url) patchLeadFields_(leadId, { auditUrl:url });
+      return ok({ audit:audit, auditUrl:url });
+    }
+    // Send the audit to the prospect via the existing outbound email + log it.
+    if (a === 'sendAudit') {
+      const leadId = String(b.leadId || '').trim();
+      if (!leadId) return err_('Missing leadId.');
+      const lead = toObjs(getSheet(SHEETS.leads, LEAD_HDR)).find(function(l){ return String(l.id) === leadId; });
+      if (!lead || !String(lead.email || '').trim()) return err_('No email on this lead.');
+      if (leadOptedOut(leadId)) return err_('Lead opted out.');
+      let audit = String(b.audit || '');
+      if (!audit && lead.auditUrl) { try { const fid = (String(lead.auditUrl).match(/[-\w]{25,}/) || [])[0]; if (fid) audit = DriveApp.getFileById(fid).getBlob().getDataAsString(); } catch (e) {} }
+      if (!audit) return err_('No audit to send. Generate it first.');
+      const subject = 'A quick technology audit for ' + (lead.name || 'your team');
+      const r = resendSend_(String(lead.email).trim(), subject, audit);
+      if (!r.sid) return err_(r.error || 'Email failed.');
+      const now = new Date().toISOString();
+      appendInteraction_({ id:Utilities.getUuid(), leadId:leadId, leadName:lead.name, phone:'', channel:'email', direction:'out', body:audit, stepTag:'audit', status:r.status || 'sent', sid:r.sid, error:'', createdAt:now, createdBy:'audit' });
+      patchLeadFields_(leadId, { auditSentAt:now });
+      return ok({ sent:true, sentAt:now, sid:r.sid });
     }
     if (a === 'saveTeamMember') {
       const s=getSheet(SHEETS.team,TEAM_HDR),rows=s.getDataRange().getValues(),h=rows[0]||TEAM_HDR,ic=h.indexOf('id');
@@ -1971,6 +2005,54 @@ function geminiRoadmap_(ctx) {
     const d = JSON.parse(res.getContentText() || '{}');
     return (d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts) ? d.candidates[0].content.parts.map(function(p){ return p.text || ''; }).join('').trim() : '';
   } catch (e) { Logger.log('geminiRoadmap_ error: ' + e.message); return ''; }
+}
+
+// Set a few fields on a lead row by id.
+function patchLeadFields_(leadId, fields) {
+  const s = getSheet(SHEETS.leads, LEAD_HDR), rows = s.getDataRange().getValues(), h = rows[0] || LEAD_HDR, ic = h.indexOf('id');
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][ic]) === String(leadId)) {
+      Object.keys(fields).forEach(function(k){ const c = h.indexOf(k); if (c >= 0) s.getRange(i + 1, c + 1).setValue(fields[k]); });
+      return true;
+    }
+  }
+  return false;
+}
+
+// Save plain text to a Drive folder (private), return a viewable link. '' on failure.
+function saveTextToDrive_(folderId, name, text) {
+  if (!folderId) return '';
+  try {
+    const f = DriveApp.getFolderById(folderId).createFile(name, String(text || ''), 'text/plain');
+    f.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.VIEW);
+    return 'https://drive.google.com/file/d/' + f.getId() + '/view';
+  } catch (e) { Logger.log('saveTextToDrive_: ' + e.message); return ''; }
+}
+
+// Generate a warm, grounded prospect audit (the email body) from the context.
+function geminiAudit_(ctx) {
+  if (!GEMINI_API_KEY || GEMINI_API_KEY.indexOf('TU_') === 0) return '';
+  const lead = ctx.lead || {};
+  const tx = (ctx.transcripts || []).map(function(t){ return (t.summary ? 'Summary: ' + t.summary + '\n' : '') + (t.transcript ? 'Transcript:\n' + t.transcript : ''); }).join('\n\n---\n\n').slice(0, 14000);
+  const convo = (ctx.interactions || []).join('\n').slice(0, 4000);
+  const agent = CADENCE_AGENT_NAME || 'Andrés';
+  const sys = 'You are ' + agent + ' at Axius, writing a short, warm, genuinely useful TECHNOLOGY AUDIT for a prospect, to be emailed to them directly. ' + AXIUS_BRIEF + ' ' +
+    'From what they shared (call summaries/transcripts + email thread) and their business, identify where time and money may be leaking and the highest-impact opportunities to improve efficiency, visibility, cost and growth through better technology ownership. ' +
+    'Be specific to THIS business and grounded in what they actually said. Do NOT invent facts, numbers, metrics, or guarantees, and do not quote pricing. ' +
+    'Structure: a warm one-line opener, then 3 to 5 concrete observations — for each: what you noticed, why it matters, and what you would do about it — then a low-key close offering to walk through it together. ' +
+    'Plain, warm, human, on-brand. No em dashes (use periods or commas). No consultant or startup buzzwords. No pressure. This IS the email body, ready to send. Sign off simply as ' + agent + '.';
+  const prompt = 'Business: ' + (lead.name || '') + (lead.city ? ' (' + lead.city + ')' : '') + (lead.keyword ? ' — ' + lead.keyword : '') +
+    '\n\nWhat they shared (calls):\n' + (tx || '(no call transcripts yet)') +
+    '\n\nEmail thread:\n' + (convo || '(none)') +
+    '\n\nWrite the audit now.';
+  try {
+    const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent?key=' + encodeURIComponent(GEMINI_API_KEY);
+    const payload = { systemInstruction:{parts:[{text:sys}]}, contents:[{role:'user',parts:[{text:prompt}]}], generationConfig:{temperature:0.4, maxOutputTokens:1500} };
+    const res = UrlFetchApp.fetch(url, { method:'post', contentType:'application/json', payload:JSON.stringify(payload), muteHttpExceptions:true });
+    if (res.getResponseCode() !== 200) { Logger.log('geminiAudit_ http ' + res.getResponseCode() + ': ' + res.getContentText().slice(0,160)); return ''; }
+    const d = JSON.parse(res.getContentText() || '{}');
+    return (d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts) ? d.candidates[0].content.parts.map(function(p){ return p.text || ''; }).join('').trim() : '';
+  } catch (e) { Logger.log('geminiAudit_ error: ' + e.message); return ''; }
 }
 
 // AI-personalized FIRST email: analyzes the lead (type, city, rating/reviews) and
