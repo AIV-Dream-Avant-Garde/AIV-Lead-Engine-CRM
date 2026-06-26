@@ -444,7 +444,7 @@ function doPost(e) {
     var ADMIN_ONLY = { saveTeamMember:1, cancelCommission:1, adjustCollected:1, markCommissionPaid:1,
       saveCadenceConfig:1, saveScheduledJobs:1, saveStateCampaigns:1, saveReportEmail:1,
       setTrigger:1, runCadenceNow:1, runScrapesNow:1, saveScript:1, deleteScript:1, previewOutreach:1,
-      saveEngagement:1 };
+      saveEngagement:1, draftRoadmap:1 };
     if (ADMIN_ONLY[a] && !verifyAdminToken_(b.adminToken)) {
       return err_('Admin sign-in required for this action.', 401);
     }
@@ -547,26 +547,20 @@ function doPost(e) {
     // Upsert an engagement (Active Client) record by engagementId (= lead id).
     // Recomputes gateAReadyAt = first moment paid + roadmap-approved + MSA-signed.
     if (a === 'saveEngagement') {
+      if (!String(b.engagementId || '').trim()) return err_('Missing engagementId.');
+      return ok({ saved:true, engagement: upsertEngagement_(b) });
+    }
+    // Draft a quarterly roadmap from the lead's call transcripts + email thread + the
+    // lead record, store it on the engagement (status -> roadmap_draft), return it.
+    if (a === 'draftRoadmap') {
       const eid = String(b.engagementId || '').trim();
       if (!eid) return err_('Missing engagementId.');
-      const s = getSheet(SHEETS.engagements, ENGAGEMENT_HDR);
-      const rows = s.getDataRange().getValues(), h = rows[0] || ENGAGEMENT_HDR, ec = h.indexOf('engagementId');
-      const now = new Date().toISOString();
-      let rowIdx = -1, existing = {};
-      for (let i = 1; i < rows.length; i++) { if (String(rows[i][ec]) === eid) { rowIdx = i; h.forEach(function(k,j){ existing[k] = rows[i][j]; }); break; } }
-      const rec = {};
-      h.forEach(function(k){ rec[k] = (b[k] != null && b[k] !== '') ? b[k] : (existing[k] != null ? existing[k] : ''); });
-      rec.engagementId = eid;
-      rec.createdAt = existing.createdAt || now;
-      rec.updatedAt = now;
-      // Gate A: paid + roadmap approved + MSA signed (won is implied by the record existing).
-      const gateA = String(rec.paid) === 'yes' && rec.roadmapApprovedAt && String(rec.msaSigned) === 'yes';
-      if (gateA && !rec.gateAReadyAt) rec.gateAReadyAt = now;
-      if (gateA && (rec.status === 'won' || rec.status === 'roadmap_draft' || rec.status === 'roadmap_sent' || rec.status === 'approved' || !rec.status)) rec.status = 'gate_a_ready';
-      const vals = h.map(function(k){ return rec[k] != null ? rec[k] : ''; });
-      if (rowIdx >= 0) s.getRange(rowIdx + 1, 1, 1, h.length).setValues([vals]);
-      else s.appendRow(vals);
-      return ok({ saved:true, engagement: rec });
+      const ctx = gatherEngagementContext_(eid);
+      if (!ctx.lead) return err_('Lead not found for this engagement.');
+      const roadmap = geminiRoadmap_(ctx);
+      if (!roadmap) return err_('Could not draft a roadmap (need call transcripts/context, or AI is unavailable).');
+      const rec = upsertEngagement_({ engagementId:eid, roadmap:roadmap, status:'roadmap_draft' });
+      return ok({ roadmap:roadmap, engagement:rec });
     }
     if (a === 'saveTeamMember') {
       const s=getSheet(SHEETS.team,TEAM_HDR),rows=s.getDataRange().getValues(),h=rows[0]||TEAM_HDR,ic=h.indexOf('id');
@@ -1911,6 +1905,70 @@ function patchCallTranscript_(callSid, transcript, summary) {
     }
   }
   return false;
+}
+
+// ── Engagement (Active Client) helpers ───────────────────────────────────────
+// Upsert an engagement row, merging non-empty fields over the existing row (keyed
+// by engagementId). Recomputes Gate-A readiness + status. Returns the merged rec.
+function upsertEngagement_(b) {
+  const eid = String(b.engagementId || '').trim();
+  if (!eid) throw new Error('Missing engagementId.');
+  const s = getSheet(SHEETS.engagements, ENGAGEMENT_HDR);
+  const rows = s.getDataRange().getValues(), h = rows[0] || ENGAGEMENT_HDR, ec = h.indexOf('engagementId');
+  const now = new Date().toISOString();
+  let rowIdx = -1, existing = {};
+  for (let i = 1; i < rows.length; i++) { if (String(rows[i][ec]) === eid) { rowIdx = i; h.forEach(function(k,j){ existing[k] = rows[i][j]; }); break; } }
+  const rec = {};
+  h.forEach(function(k){ rec[k] = (b[k] != null && b[k] !== '') ? b[k] : (existing[k] != null ? existing[k] : ''); });
+  rec.engagementId = eid;
+  rec.createdAt = existing.createdAt || now;
+  rec.updatedAt = now;
+  // Gate A: paid + roadmap approved + MSA signed (won is implied by the record existing).
+  const gateA = String(rec.paid) === 'yes' && rec.roadmapApprovedAt && String(rec.msaSigned) === 'yes';
+  if (gateA && !rec.gateAReadyAt) rec.gateAReadyAt = now;
+  if (gateA && (rec.status === 'won' || rec.status === 'roadmap_draft' || rec.status === 'roadmap_sent' || rec.status === 'approved' || !rec.status)) rec.status = 'gate_a_ready';
+  const vals = h.map(function(k){ return rec[k] != null ? rec[k] : ''; });
+  if (rowIdx >= 0) s.getRange(rowIdx + 1, 1, 1, h.length).setValues([vals]);
+  else s.appendRow(vals);
+  return rec;
+}
+
+// Gather everything we know about an engagement's lead — the lead row, its call
+// transcripts/summaries, and the email thread — to ground the roadmap/audit.
+function gatherEngagementContext_(eid) {
+  const lead = toObjs(getSheet(SHEETS.leads, LEAD_HDR)).find(function(l){ return String(l.id) === String(eid); }) || null;
+  const transcripts = toObjs(getSheet(SHEETS.calls, CALL_HDR))
+    .filter(function(c){ return String(c.leadId) === String(eid) && (c.transcript || c.callSummary); })
+    .map(function(c){ return { when:c.calledAt, summary:c.callSummary || '', transcript:c.transcript || '' }; });
+  const interactions = toObjs(getSheet(SHEETS.interactions, INTERACTION_HDR))
+    .filter(function(i){ return String(i.leadId) === String(eid) && i.body; })
+    .map(function(i){ return (String(i.direction) === 'in' ? 'THEM' : 'US') + ': ' + String(i.body).slice(0, 500); });
+  return { lead:lead, transcripts:transcripts, interactions:interactions };
+}
+
+// Draft a quarterly technology-ownership roadmap grounded in the gathered context.
+function geminiRoadmap_(ctx) {
+  if (!GEMINI_API_KEY || GEMINI_API_KEY.indexOf('TU_') === 0) return '';
+  const lead = ctx.lead || {};
+  const tx = (ctx.transcripts || []).map(function(t){ return (t.summary ? 'Summary: ' + t.summary + '\n' : '') + (t.transcript ? 'Transcript:\n' + t.transcript : ''); }).join('\n\n---\n\n').slice(0, 14000);
+  const convo = (ctx.interactions || []).join('\n').slice(0, 4000);
+  const sys = 'You are ' + (CADENCE_AGENT_NAME || 'Andrés') + ' at Axius, drafting a focused quarterly TECHNOLOGY-OWNERSHIP roadmap for a NEW client. ' + AXIUS_BRIEF + ' ' +
+    'Axius ASSUMES OWNERSHIP of the client technology + operational systems layer (follow-up, reporting, automations, software/integrations, websites, AI, technology projects) to improve efficiency, visibility, cost and growth. ' +
+    'Ground the roadmap in what THIS business actually said and needs (the call summaries/transcripts + email thread below). Do NOT invent facts, numbers, metrics, or commitments. ' +
+    'Structure: one short framing line, then Q1, Q2, Q3, each with 2 to 4 concrete initiatives written as OUTCOMES (what improves) tied to their specifics. ' +
+    'Plain and warm, on-brand. No em dashes, no consultant/startup buzzwords, no fluff, no pricing. This is an internal DRAFT for review before the client sees it.';
+  const prompt = 'Client: ' + (lead.name || '') + (lead.city ? ' (' + lead.city + ')' : '') + (lead.keyword ? ' — ' + lead.keyword : '') +
+    '\n\nWhat we learned (calls):\n' + (tx || '(no call transcripts yet)') +
+    '\n\nEmail thread:\n' + (convo || '(none)') +
+    '\n\nDraft the quarterly roadmap now.';
+  try {
+    const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent?key=' + encodeURIComponent(GEMINI_API_KEY);
+    const payload = { systemInstruction:{parts:[{text:sys}]}, contents:[{role:'user',parts:[{text:prompt}]}], generationConfig:{temperature:0.4, maxOutputTokens:2000} };
+    const res = UrlFetchApp.fetch(url, { method:'post', contentType:'application/json', payload:JSON.stringify(payload), muteHttpExceptions:true });
+    if (res.getResponseCode() !== 200) { Logger.log('geminiRoadmap_ http ' + res.getResponseCode() + ': ' + res.getContentText().slice(0,160)); return ''; }
+    const d = JSON.parse(res.getContentText() || '{}');
+    return (d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts) ? d.candidates[0].content.parts.map(function(p){ return p.text || ''; }).join('').trim() : '';
+  } catch (e) { Logger.log('geminiRoadmap_ error: ' + e.message); return ''; }
 }
 
 // AI-personalized FIRST email: analyzes the lead (type, city, rating/reviews) and
