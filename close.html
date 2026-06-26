@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Axius — Engagement Agreement</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Instrument+Sans:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#ECE6DB;--surface:#F7F3EB;--surface-hi:#FCFAF4;--border:rgba(22,20,15,.13);
+    --accent:#1C5A40;--acc-m:rgba(28,90,64,.09);--hl:#16140F;--sub:rgba(22,20,15,.50);
+    --body:rgba(22,20,15,.72);--pos:#1E7A52;--red:#B23B2E;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);font-family:'Instrument Sans',system-ui,sans-serif;color:var(--body);
+    line-height:1.55;letter-spacing:-.005em;-webkit-font-smoothing:antialiased;min-height:100vh;
+    display:flex;flex-direction:column;align-items:center;padding:28px 18px 60px}
+  .wordmark{font-family:'Fraunces',serif;font-size:22px;font-weight:600;letter-spacing:-.5px;color:var(--hl);
+    margin:6px 0 26px;display:flex;align-items:center;gap:8px}
+  .wordmark .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);display:inline-block}
+  .card{width:100%;max-width:620px;background:var(--surface);border:1px solid var(--border);border-radius:16px;
+    padding:30px 30px 28px;box-shadow:0 14px 50px rgba(22,20,15,.08)}
+  .eyebrow{font-size:9px;font-weight:600;letter-spacing:2.5px;text-transform:uppercase;color:var(--accent);
+    margin-bottom:12px;display:flex;align-items:center;gap:7px}
+  .eyebrow::before{content:'';width:16px;height:1px;background:var(--accent)}
+  h1{font-family:'Fraunces',serif;font-size:30px;font-weight:600;letter-spacing:-.8px;color:var(--hl);line-height:1.12;margin-bottom:8px}
+  p.lede{font-size:14.5px;margin-bottom:20px}
+  .plan{display:flex;gap:14px;flex-wrap:wrap;background:var(--surface-hi);border:1px solid var(--border);
+    border-radius:12px;padding:16px 18px;margin-bottom:18px}
+  .plan .item{flex:1;min-width:130px}
+  .plan .k{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--sub);margin-bottom:4px}
+  .plan .v{font-family:'Geist Mono',monospace;font-size:20px;font-weight:500;color:var(--hl)}
+  .plan .v small{font-size:12px;color:var(--sub)}
+  .note{font-size:12.5px;color:var(--sub);margin-bottom:20px}
+  .msa-label{font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--sub);margin-bottom:8px}
+  .msa{background:var(--surface-hi);border:1px solid var(--border);border-radius:10px;padding:16px;
+    max-height:260px;overflow-y:auto;font-size:13px;white-space:pre-wrap;color:var(--body);margin-bottom:22px;line-height:1.6}
+  label.fld{display:block;font-size:12px;font-weight:600;color:var(--hl);margin-bottom:6px}
+  input[type=text]{width:100%;background:var(--surface-hi);border:1px solid var(--border);border-radius:9px;
+    padding:11px 13px;font-family:'Instrument Sans',sans-serif;font-size:15px;color:var(--hl);outline:none}
+  input[type=text]:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--acc-m)}
+  .sign-name{font-family:'Fraunces',serif;font-style:italic;font-size:18px}
+  .agree{display:flex;gap:10px;align-items:flex-start;margin:16px 0 22px;font-size:13.5px;cursor:pointer}
+  .agree input{margin-top:3px;width:16px;height:16px;accent-color:var(--accent);flex-shrink:0}
+  button.cta{width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:14px;
+    font-family:'Instrument Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .15s,transform .05s}
+  button.cta:hover{opacity:.93}button.cta:active{transform:translateY(1px)}
+  button.cta:disabled{opacity:.5;cursor:not-allowed}
+  .fine{font-size:11.5px;color:var(--sub);text-align:center;margin-top:14px}
+  .msg{font-size:13.5px;padding:12px 14px;border-radius:9px;margin-bottom:16px;display:none}
+  .msg.err{display:block;background:rgba(178,59,46,.08);border:1px solid rgba(178,59,46,.25);color:var(--red)}
+  .center{text-align:center;padding:14px 0}
+  .check{width:54px;height:54px;border-radius:50%;background:var(--acc-m);color:var(--accent);display:flex;
+    align-items:center;justify-content:center;font-size:28px;margin:0 auto 16px}
+  .spin{width:22px;height:22px;border:2.5px solid var(--border);border-top-color:var(--accent);border-radius:50%;
+    animation:sp .7s linear infinite;margin:30px auto}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .footer{font-size:11px;color:var(--sub);margin-top:24px;text-align:center}
+  .footer a{color:var(--accent);text-decoration:none}
+</style>
+</head>
+<body>
+  <div class="wordmark"><span class="dot"></span>AXIUS</div>
+  <div class="card" id="card"><div class="spin"></div></div>
+  <div class="footer">A technology ownership practice · <a href="https://axius.tech">axius.tech</a></div>
+
+<script>
+  // Public CRM endpoint (Apps Script web app). Not secret. Override if the deploy URL changes.
+  var API = 'https://script.google.com/macros/s/AKfycbw7b0VdFRxQ30YqHIC9QbAWHYmt7gj-b_l-5P1HFIv71AnLi8X8AJIT-jEK7pI9Mvk5/exec';
+  var q = new URLSearchParams(location.search);
+  var EID = q.get('eid') || '';
+  var SESSION = q.get('session_id') || '';
+  var CANCELED = q.get('canceled') || '';
+  var card = document.getElementById('card');
+  var ENG = null;
+
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function usd(n){ return '$' + Number(n || 0).toLocaleString('en-US'); }
+  async function api(action, body){
+    var r = await fetch(API + '?action=' + action, { method:'POST', redirect:'follow', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(body || {}) });
+    return r.json();
+  }
+  async function clientIp(){ try { var r = await fetch('https://api.ipify.org?format=json'); var d = await r.json(); return d.ip || ''; } catch(e){ return ''; } }
+
+  function showError(msg){
+    card.innerHTML = '<div class="eyebrow">Engagement agreement</div><h1>Something’s off</h1>' +
+      '<p class="lede">' + esc(msg) + '</p><p class="note">If you reached this from a link we sent you, please reply to that email and we’ll sort it out right away.</p>';
+  }
+  function showDone(title, body){
+    card.innerHTML = '<div class="center"><div class="check">✓</div>' +
+      '<h1>' + esc(title) + '</h1><p class="lede" style="margin-top:8px">' + esc(body) + '</p></div>';
+  }
+
+  function renderAgreement(){
+    var e = ENG;
+    card.innerHTML =
+      '<div class="eyebrow">Engagement agreement</div>' +
+      '<h1>Welcome' + (e.company ? ', ' + esc(e.company) : '') + '.</h1>' +
+      '<p class="lede">Here’s everything in one place. Review the agreement, add your signature, and you’re set. We’ll build your roadmap from our conversation right after.</p>' +
+      (CANCELED ? '<div class="msg err" style="display:block">No problem — checkout was cancelled. You can sign and pay whenever you’re ready.</div>' : '') +
+      '<div id="formMsg" class="msg"></div>' +
+      '<div class="plan">' +
+        '<div class="item"><div class="k">Monthly</div><div class="v">' + usd(e.monthly) + '<small>/mo</small></div></div>' +
+        '<div class="item"><div class="k">One-time setup</div><div class="v">' + usd(e.setup) + '</div></div>' +
+      '</div>' +
+      '<p class="note">Billed monthly, cancel anytime. If you have a code that waives the setup fee, you can enter it on the next (payment) screen.</p>' +
+      '<div class="msa-label">Master Services Agreement</div>' +
+      '<div class="msa">' + esc(e.msaText) + '</div>' +
+      '<label class="fld" for="nm">Full legal name</label>' +
+      '<input id="nm" type="text" class="sign-name" placeholder="Type your name to sign" autocomplete="name">' +
+      '<label class="agree"><input type="checkbox" id="agree"><span>I have read and agree to the Master Services Agreement, and I’m authorized to sign on behalf of ' + (e.company ? esc(e.company) : 'my company') + '.</span></label>' +
+      '<button class="cta" id="go">Sign &amp; continue to payment</button>' +
+      '<p class="fine">Your signature is recorded with a timestamp. Payment is processed securely by Stripe.</p>';
+    document.getElementById('go').addEventListener('click', submit);
+  }
+
+  function formMsg(msg){ var m = document.getElementById('formMsg'); if (!m) return; m.className = 'msg err'; m.textContent = msg; m.scrollIntoView({behavior:'smooth', block:'center'}); }
+
+  async function submit(){
+    var name = (document.getElementById('nm').value || '').trim();
+    var agree = document.getElementById('agree').checked;
+    if (name.length < 2) return formMsg('Please type your full name to sign.');
+    if (!agree) return formMsg('Please confirm you’ve read and agree to the agreement.');
+    var btn = document.getElementById('go'); btn.disabled = true; btn.textContent = 'Recording signature…';
+    try {
+      var ip = await clientIp();
+      var sig = await api('signMsa', { eid: EID, name: name, agree: true, ip: ip });
+      if (!sig || !sig.success) { btn.disabled = false; btn.textContent = 'Sign & continue to payment'; return formMsg((sig && sig.error) || 'Could not record your signature.'); }
+      btn.textContent = 'Opening secure checkout…';
+      var co = await api('createCheckout', { eid: EID });
+      if (co && co.success && co.url) { location.href = co.url; return; }
+      btn.disabled = false; btn.textContent = 'Sign & continue to payment';
+      formMsg((co && co.error) || 'Could not open checkout. Your signature was saved — please try again.');
+    } catch (err) { btn.disabled = false; btn.textContent = 'Sign & continue to payment'; formMsg('Something went wrong. Please try again.'); }
+  }
+
+  async function confirmPaid(){
+    card.innerHTML = '<div class="spin"></div><p class="center" style="color:var(--sub)">Confirming your payment…</p>';
+    try {
+      var r = await api('confirmCheckout', { eid: EID, sessionId: SESSION });
+      if (r && r.success && r.paid) {
+        showDone('You’re all set.', 'Thank you. Your agreement is signed and your first payment is in. We’ll start building your roadmap from our conversation and reach out with next steps shortly.');
+      } else {
+        card.innerHTML = '<div class="eyebrow">Engagement agreement</div><h1>Almost there.</h1>' +
+          '<p class="lede">We haven’t confirmed the payment yet. If you just completed checkout, give it a moment and refresh. If you closed it early, you can ' +
+          '<a href="?eid=' + encodeURIComponent(EID) + '" style="color:var(--accent)">return to the agreement</a>.</p>';
+      }
+    } catch (e) { showError('We couldn’t verify the payment just now. Please refresh in a moment.'); }
+  }
+
+  async function load(){
+    try {
+      var r = await api('engagementPublic', { eid: EID });
+      if (!r || !r.success || !r.engagement) return showError((r && r.error) || 'We couldn’t find that agreement.');
+      ENG = r.engagement;
+      if (ENG.paid) return showDone('You’re all set.', 'This agreement is already signed and paid. We’ll be in touch with next steps — thank you.');
+      renderAgreement();
+    } catch (e) { showError('We couldn’t load your agreement. Please refresh in a moment.'); }
+  }
+
+  if (!EID) showError('This link is missing its agreement reference.');
+  else if (SESSION) confirmPaid();
+  else load();
+</script>
+</body>
+</html>

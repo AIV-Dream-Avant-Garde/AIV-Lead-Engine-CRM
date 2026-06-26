@@ -26,8 +26,8 @@ async function startEngagement(leadId) {
   if (!l) return;
   if (engFor(leadId)) { toast('Engagement already started for this lead.', 'warning'); navigate('admin'); adminTab('clients'); return; }
   const now = new Date().toISOString();
-  const rec = { engagementId:l.id, company:l.name || '', status:'won', dealValue:l.dealValue || '',
-    paid:'', paidAt:'', msaSigned:'', msaSignedAt:'', msaSignerName:'', msaSignerIp:'',
+  const rec = { engagementId:l.id, company:l.name || '', status:'won', dealValue:l.dealValue || '', tier:'team',
+    paid:'', paidAt:'', msaSigned:'', msaSignedAt:'', msaSignerName:'', msaSignerIp:'', msaUrl:'',
     roadmap:'', roadmapApprovedAt:'', stripeCustomerId:'', mongoSlug:'', discordGuildId:'',
     discordCategoryId:'', discordRoleId:'', driveFolderId:'', gateAReadyAt:'', provisionedAt:'',
     createdAt:now, updatedAt:now };
@@ -62,10 +62,41 @@ function renderEngagements() {
         <span style="font-size:11px;color:var(--sub)">${ready ? 'Gate A met' : checks.filter(c => c.done).length + '/4'}</span>
       </div>
       <div class="eng-checks">${chips}</div>
+      ${closeLinkHtml_(e)}
       ${roadmapHtml_(e)}
       ${reg.length ? `<div style="font-size:11px;color:var(--sub);margin-top:8px">Registry: ${reg.join(' · ')}</div>` : ''}
     </div>`;
   }).join('');
+}
+
+// The close-page controls on an engagement card: plan/tier picker, the shareable
+// "close link" the client signs+pays on, signed/paid status + executed-MSA link.
+const CLOSE_BASE = 'https://crm.axius.tech/close.html';
+function closeLinkHtml_(e) {
+  const tier = String(e.tier || 'team').toLowerCase();
+  const signed = String(e.msaSigned) === 'yes', paid = String(e.paid) === 'yes';
+  const status = signed ? (paid ? '<span style="color:var(--pos)">Signed + paid</span>' : 'Signed · awaiting payment') : 'Not signed yet';
+  const msaLink = e.msaUrl ? ` · <a class="call-rec-link" href="${esc(e.msaUrl)}" target="_blank" rel="noopener">Executed MSA</a>` : '';
+  const sel = `<select class="field-sel" style="font-size:11px;padding:4px 8px" ${paid ? 'disabled' : ''} onchange="setEngTier_('${esc(e.engagementId)}', this.value)">
+      <option value="team" ${tier === 'team' ? 'selected' : ''}>Team · $2,500/mo + $500</option>
+      <option value="department" ${tier === 'department' ? 'selected' : ''}>Department · $5,000/mo + $1,000</option>
+    </select>`;
+  return `<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      ${sel}
+      <button class="call-tx-btn" onclick="copyCloseLink_('${esc(e.engagementId)}')">🔗 Copy close link</button>
+      <span style="font-size:11px;color:var(--sub)">${status}${msaLink}</span>
+    </div>`;
+}
+async function setEngTier_(eid, tier) {
+  const e = (S.engagements || []).find(x => x.engagementId === eid); if (!e) return;
+  e.tier = tier; saveLocal(); renderEngagements();
+  if (S.config.scriptUrl && !S.demoMode) { try { const r = await sheetsCall({ action:'saveEngagement', engagementId:eid, tier:tier }); if (r && r.engagement) Object.assign(e, r.engagement); } catch (err) {} }
+}
+function copyCloseLink_(eid) {
+  const url = CLOSE_BASE + '?eid=' + encodeURIComponent(eid);
+  const done = () => toast('Close link copied — send it to the client.', 'success');
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done).catch(() => prompt('Copy the close link:', url));
+  else prompt('Copy the close link:', url);
 }
 
 // Roadmap area for an engagement card: the draft (with redraft/approve), a
