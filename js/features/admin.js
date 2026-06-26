@@ -246,11 +246,15 @@ function forceReleaseLead(leadId) {
 }
 
 async function markCommissionPaid(commId) {
+  const comm = S.commissions.find(c => c.id === commId);
+  if (!comm) return;
+  // Collectible-off-paid: don't quietly pay a rep for a deal the client hasn't paid.
+  const eng = (typeof engFor === 'function') ? engFor(comm.leadId) : null;
+  if (eng && String(eng.paid) !== 'yes' &&
+      !confirm((comm.leadName || 'This client') + ' hasn’t paid yet — their engagement is still unpaid. Pay the rep’s commission anyway?')) return;
   const ref = prompt('Payment reference (e.g., transfer #123, cash, bank):');
   if (ref === null) return;
   if (!String(ref).trim()) { toast('A payment reference is required to mark a commission paid.', 'error'); return; }
-  const comm = S.commissions.find(c => c.id === commId);
-  if (!comm) return;
   comm.status     = 'paid';
   comm.paidAt     = new Date().toISOString();
   comm.paidBy     = S.session?.userName || '';

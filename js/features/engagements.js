@@ -20,11 +20,14 @@ function engGateChecks_(e) {
 function engIsGateAReady_(e) { return engGateChecks_(e).every(c => c.done); }
 function engFor(leadId) { return (S.engagements || []).find(e => e.engagementId === leadId) || null; }
 
-// Create an engagement from a Closed Won lead, then sync it to the server.
-async function startEngagement(leadId) {
+// Create the engagement record for a won lead if it doesn't exist yet (silent, durable).
+// Returns the engagement. Called automatically when a deal is Closed Won, so the two
+// halves of the funnel (pipeline ↔ spine) are stitched without a second manual step.
+async function ensureEngagement(leadId) {
+  const existing = engFor(leadId);
+  if (existing) return existing;
   const l = (S.leads || []).find(x => x.id === leadId);
-  if (!l) return;
-  if (engFor(leadId)) { toast('Engagement already started for this lead.', 'warning'); navigate('admin'); adminTab('clients'); return; }
+  if (!l) return null;
   const now = new Date().toISOString();
   const rec = { engagementId:l.id, company:l.name || '', status:'won', dealValue:l.dealValue || '', tier:'team',
     paid:'', paidAt:'', msaSigned:'', msaSignedAt:'', msaSignerName:'', msaSignerIp:'', msaUrl:'',
@@ -33,10 +36,16 @@ async function startEngagement(leadId) {
     createdAt:now, updatedAt:now };
   (S.engagements = S.engagements || []).push(rec);
   saveLocal();
-  if (S.config.scriptUrl && !S.demoMode) {
-    await durableSave({ action:'saveEngagement', ...rec }, 'Engagement', 'engagements', r => { if (r.engagement) Object.assign(rec, r.engagement); });
-  }
-  toast('Engagement started for ' + (l.name || 'lead') + '.', 'success');
+  await durableSave({ action:'saveEngagement', ...rec }, 'Engagement', 'engagements', r => { if (r.engagement) Object.assign(rec, r.engagement); });
+  return rec;
+}
+
+// "Start engagement" button (Closed Won lead) — ensure the record, then jump to the cockpit.
+async function startEngagement(leadId) {
+  const existed = !!engFor(leadId);
+  await ensureEngagement(leadId);
+  const l = (S.leads || []).find(x => x.id === leadId);
+  toast(existed ? 'Engagement already started for this lead.' : ('Engagement started for ' + ((l && l.name) || 'lead') + '.'), existed ? 'warning' : 'success');
   if (typeof closeModal === 'function') closeModal();
   navigate('admin'); adminTab('clients');
 }
