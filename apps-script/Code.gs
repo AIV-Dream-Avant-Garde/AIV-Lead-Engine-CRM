@@ -22,7 +22,9 @@ const TWILIO_FROM_NUMBER = PROP_('TWILIO_FROM_NUMBER');
 const TWILIO_FROM_SMS_US = PROP_('TWILIO_FROM_SMS_US');
 const TWILIO_FROM_WA     = PROP_('TWILIO_FROM_WA', '+14155238886');
 // ── Drive destinations (System Map v0.4) — set each to the matching folder id ──
-const DRIVE_FOLDER_ID    = PROP_('DRIVE_FOLDER_ID');   // "Sales/Lead Engine & CRM/04 · Call Recordings & Transcripts/" — where each call's driveUrl points
+// "Sales/Lead Engine & CRM/04 · Call Recordings & Transcripts/" — where each call's driveUrl points.
+// Renamed from DRIVE_FOLDER_ID for naming consistency; falls back to the old prop so nothing breaks pre-migration.
+const RECORDINGS_FOLDER_ID = PROP_('RECORDINGS_FOLDER_ID') || PROP_('DRIVE_FOLDER_ID');
 const AUDIT_FOLDER_ID    = PROP_('AUDIT_FOLDER_ID');   // "Lead Engine & CRM/05 · Audits & Proposals/" — generated audits + sent proposals (task 3)
 const EXECUTED_AGREEMENTS_FOLDER_ID = PROP_('EXECUTED_AGREEMENTS_FOLDER_ID'); // "Corporate/Legal/Executed Agreements/" — executed MSAs on e-sign (task 6)
 const RESEND_API_KEY     = PROP_('RESEND_API_KEY');
@@ -70,7 +72,7 @@ function seedProperties() {
     TWILIO_ACCOUNT_SID: '', TWILIO_API_KEY_SID: '', TWILIO_API_SECRET: '',
     TWILIO_AUTH_TOKEN: '', TWILIO_TWIML_APP: '',
     TWILIO_FROM_NUMBER: '', TWILIO_FROM_SMS_US: '', TWILIO_FROM_WA: '',
-    DRIVE_FOLDER_ID: '', AUDIT_FOLDER_ID: '', EXECUTED_AGREEMENTS_FOLDER_ID: '', RESEND_API_KEY: '',
+    RECORDINGS_FOLDER_ID: '', AUDIT_FOLDER_ID: '', EXECUTED_AGREEMENTS_FOLDER_ID: '', RESEND_API_KEY: '',
     TELEGRAM_ALERT_BOT_TOKEN: '', TELEGRAM_ALERT_CHAT_ID: '',
     GEMINI_API_KEY: '', CRM_SECRET: '',
     // Optional overrides (defaults already fine):
@@ -936,10 +938,10 @@ function saveToDrive(recUrl,fileName){
   // (name, stringContent) overload, which coerces the blob to the literal string
   // "Blob" and writes a 4-byte text file instead of the audio. (That was the bug.)
   const blob=res.getBlob().setName(fileName).setContentType('audio/mpeg');
-  const f=DriveApp.getFolderById(DRIVE_FOLDER_ID).createFile(blob);
+  const f=DriveApp.getFolderById(RECORDINGS_FOLDER_ID).createFile(blob);
   // Call recordings are consent/PII audio — do NOT make them world-readable.
   // They stay private to the script owner; to let reps listen, share the Drive
-  // folder (DRIVE_FOLDER_ID) with their Google accounts instead.
+  // folder (RECORDINGS_FOLDER_ID) with their Google accounts instead.
   f.setSharing(DriveApp.Access.PRIVATE,DriveApp.Permission.VIEW);
   return 'https://drive.google.com/uc?export=preview&id='+f.getId();
 }
