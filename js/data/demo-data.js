@@ -114,6 +114,16 @@ const DEMO_DATA = (() => {
   // Engagements (Active Clients) — one mid-onboarding, one fully provisioned —
   // so the demo shows the post-Gate-A cockpit + the Registry links.
   const engagements = [
+    // A spread across the spine: just-closed → signed/awaiting-pay → ready-to-provision → live.
+    {engagementId:'dl-08', company:'Bay & Tide Seafood', status:'won', dealValue:3500, tier:'team',
+     paid:'', paidAt:'', msaSigned:'', msaSignedAt:'', msaSignerName:'', msaSignerIp:'', msaUrl:'',
+     roadmap:'', roadmapApprovedAt:'', stripeCustomerId:'', mongoSlug:'', discordGuildId:'', discordCategoryId:'',
+     discordRoleId:'', driveFolderId:'', gateAReadyAt:'', provisionedAt:'', createdAt:ts(1), updatedAt:ts(1)},
+    {engagementId:'dl-18', company:'Grand Reserve Hotel', status:'gate_a_ready', dealValue:8500, tier:'department',
+     paid:'yes', paidAt:ts(2), msaSigned:'yes', msaSignedAt:ts(3), msaSignerName:'Marcus Reed', msaSignerIp:'', msaUrl:'https://drive.google.com/file/d/MSADEMO3/view',
+     roadmap:'Q1: unify reservations + reporting; automate guest comms. Q2: revenue dashboards + integrations.',
+     roadmapApprovedAt:ts(2), stripeCustomerId:'cus_DEMO456', mongoSlug:'', discordGuildId:'', discordCategoryId:'',
+     discordRoleId:'', driveFolderId:'', gateAReadyAt:ts(1), provisionedAt:'', createdAt:ts(4), updatedAt:ts(1)},
     {engagementId:'dl-09', company:'Protect Insurance Agency', status:'approved', dealValue:8200, tier:'department',
      paid:'', paidAt:'', msaSigned:'yes', msaSignedAt:ts(4), msaSignerName:'Lucy Hayes', msaSignerIp:'', msaUrl:'https://drive.google.com/file/d/MSADEMO/view',
      roadmap:'Q1: centralize lead follow-up + reporting; automate quote intake. Q2: client portal + visibility dashboards.',
