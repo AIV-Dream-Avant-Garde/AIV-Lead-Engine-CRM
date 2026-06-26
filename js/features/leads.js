@@ -608,13 +608,28 @@ function renderLeadTimeline(l) {
 
   if (l.importedAt) events.push({date: l.importedAt, icon: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:13px;height:13px"><path d="M8 3v10M3 8h10"/></svg>', text: 'Lead imported'});
 
+  // Spine milestones — the rest of the client's journey (audit → close → paid →
+  // roadmap → provisioned) so this one view tells the whole story end to end.
+  const mIcon = '<svg viewBox="0 0 16 16" fill="currentColor" style="width:12px;height:12px"><path d="M8 1l2 4.5 5 .5-3.7 3.3L12.5 15 8 12.3 3.5 15l1.2-5.7L1 6l5-.5L8 1z"/></svg>';
+  if (l.auditSentAt) events.push({ date: l.auditSentAt, icon: mIcon, text: 'Audit sent to the prospect', spine: true });
+  const eng = (typeof engFor === 'function') ? engFor(l.id) : null;
+  if (eng) {
+    const M = (d, t) => { if (d) events.push({ date: d, icon: mIcon, text: t, spine: true }); };
+    M(eng.createdAt,         'Engagement opened');
+    M(eng.msaSignedAt,       'MSA signed' + (eng.msaSignerName ? ' by ' + eng.msaSignerName : ''));
+    M(eng.paidAt,            'Payment received' + (eng.tier ? ' · ' + (eng.tier === 'department' ? 'Department' : 'Team') : ''));
+    M(eng.roadmapApprovedAt, 'Quarterly roadmap approved');
+    M(eng.gateAReadyAt,      'Gate A met — ready to provision');
+    M(eng.provisionedAt,     'Provisioned — Discord, Drive & Registry live');
+  }
+
   events.sort((a, b) => new Date(b.date) - new Date(a.date));
 
   el.innerHTML = events.length
     ? events.map(e => `<div class="timeline-item">
-        <span class="tl-icon">${e.icon}</span>
+        <span class="tl-icon"${e.spine ? ' style="color:var(--accent)"' : ''}>${e.icon}</span>
         <div class="tl-body">
-          <div class="tl-text">${esc(e.text)}</div>
+          <div class="tl-text"${e.spine ? ' style="font-weight:600;color:var(--hl)"' : ''}>${esc(e.text)}</div>
           <div class="tl-date">${fmtD(e.date)} ${fmtT(e.date)}</div>
         </div>
       </div>`).join('')
