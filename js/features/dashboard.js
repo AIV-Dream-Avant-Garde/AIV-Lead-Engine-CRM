@@ -86,7 +86,7 @@ function renderDashboardFocus() {
   }).length;
 
   const cards = [
-    { val: waiting,    label: 'Waiting on a reply', sub: waiting ? 'Tap to respond now' : 'All caught up', nav: 'responder', color: waiting ? 'var(--red)' : 'var(--hl)' },
+    { val: waiting,    label: 'Waiting on a reply', sub: waiting ? 'Click to respond now' : 'All caught up', nav: 'responder', color: waiting ? 'var(--red)' : 'var(--hl)' },
     { val: sent7,      label: 'Emails sent (7d)',   sub: replied7 ? replied7 + ' replied' : 'Autopilot outreach', nav: 'analytics', color: 'var(--hl)' },
     { val: overdue,    label: 'Overdue follow-ups',  sub: overdue ? 'Past their date' : 'Nothing overdue', nav: 'leads',     color: overdue ? 'var(--amber)' : 'var(--hl)' },
     { val: callsToday, label: 'Calls today',         sub: 'Dialed since midnight',                          nav: 'llamadas',  color: 'var(--hl)' },

@@ -182,6 +182,7 @@ async function confirmImport() {
     else { setSyncUI('ok','Synced'); setLastSynced(); }
   }
 
+  if (!toAdd.length) { toast('Nothing imported — every row was a duplicate or missing a phone/email.', 'error', 6000); cancelImport(); renderAll(); return; }
   toast(toAdd.length + ' leads imported.', 'success');
   cancelImport();
   renderAll();

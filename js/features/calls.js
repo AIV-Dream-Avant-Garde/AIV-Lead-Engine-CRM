@@ -492,7 +492,7 @@ function cwTab(tab) {
   }
   const fallbacks = {
     opening:    getCallScript(),
-    pitch:      S.config.pitchScript      || 'No pitch configured. Add one in Settings → call scripts.',
+    pitch:      S.config.pitchScript      || 'No pitch configured. Add one in Admin → Call scripts.',
     objections: S.config.objectionsScript || 'No objections configured.',
     close:      S.config.closeScript      || 'No closing script configured.',
     rebuttals:  'No quick responses configured. Add one in Admin → Call scripts.',

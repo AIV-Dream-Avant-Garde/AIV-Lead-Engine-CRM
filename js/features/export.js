@@ -36,6 +36,7 @@ function previewExport() {
 
 function doExport() {
   const leads = getExportLeads();
+  if (!leads.length) { toast('Nothing to export — no leads match the current filter.', 'error'); return; }
   const hdrs  = ['name','phone','email','address','website','rating','reviews','country','city','barrio','keyword',
                   'source','sourceDetail','status','dncReason','followUpDate','importedAt','updatedAt',
                   'dealValue','collectedAmount','providerCommission','closerCommission','commissionStatus',
