@@ -94,7 +94,7 @@ function renderDashboardFocus() {
   ];
 
   host.innerHTML = cards.map(c =>
-    `<div class="dsh-focus-card" onclick="navigate('${c.nav}')">
+    `<div class="dsh-focus-card" role="button" tabindex="0" aria-label="${esc(c.label)}" onclick="navigate('${c.nav}')">
        <div class="dfc-val" style="color:${c.color}">${c.val}</div>
        <div class="dfc-label">${c.label}</div>
        <div class="dfc-sub">${c.sub}</div>

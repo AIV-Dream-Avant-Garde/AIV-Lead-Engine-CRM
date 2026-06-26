@@ -178,6 +178,19 @@ function navigate(id) {
   if (id === 'leads') auditLog('viewLeads', '', '');
 }
 
+// Keyboard activation for clickable rows/cards: any element marked role="button" with
+// an onclick (table rows, kanban cards, dashboard cards) fires on Enter/Space, so the
+// core surfaces are operable without a mouse — matching the sidebar nav that already is.
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+  const el = document.activeElement;
+  if (!el || el.getAttribute('role') !== 'button') return;
+  if (['INPUT','TEXTAREA','SELECT','BUTTON','A'].indexOf(el.tagName) !== -1) return; // native handles these
+  if (!el.getAttribute('onclick') && !el.onclick) return;
+  e.preventDefault();          // Space would otherwise scroll
+  el.click();
+});
+
 // ── Keyboard shortcuts ─────────────────────────────────────
 document.addEventListener('keydown', e => {
   if (!S.session) return;

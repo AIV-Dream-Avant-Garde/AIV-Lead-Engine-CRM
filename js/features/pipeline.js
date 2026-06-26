@@ -70,7 +70,7 @@ function renderPipeline() {
       const dealChip = col.k === 'Closed Won' && l.dealValue
         ? `<div style="font-size:10px;color:var(--green);font-weight:600;margin-top:3px">${fmtUSD(l.dealValue)}${payTag}</div>`
         : '';
-      return `<div class="kanban-card pipeline-card" draggable="true"
+      return `<div class="kanban-card pipeline-card" draggable="true" role="button" tabindex="0" aria-label="Open ${esc(l.name||'lead')}"
           ondragstart="pipelineDragStart(event,'${l.id}')"
           ondragend="pipelineDragEnd(event)"
           onclick="openLead('${l.id}')">
