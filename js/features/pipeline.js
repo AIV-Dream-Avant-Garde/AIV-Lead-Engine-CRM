@@ -61,8 +61,14 @@ function renderPipeline() {
       const ageBadge = ageDays > 0
         ? `<span style="font-size:10px;background:var(--surface-hi);border-radius:4px;padding:1px 5px;margin-left:4px;color:var(--sub)">${ageDays}d</span>`
         : '';
+      // On a won deal, surface whether the CLIENT has actually paid (engagement state),
+      // so "Closed Won" revenue is never mistaken for collected revenue.
+      const eng = col.k === 'Closed Won' && typeof engFor === 'function' ? engFor(l.id) : null;
+      const payTag = eng ? (String(eng.paid) === 'yes'
+        ? ' <span style="color:var(--pos)">· paid</span>'
+        : ' <span style="color:var(--amber)">· awaiting pay</span>') : '';
       const dealChip = col.k === 'Closed Won' && l.dealValue
-        ? `<div style="font-size:10px;color:var(--green);font-weight:600;margin-top:3px">${fmtUSD(l.dealValue)}</div>`
+        ? `<div style="font-size:10px;color:var(--green);font-weight:600;margin-top:3px">${fmtUSD(l.dealValue)}${payTag}</div>`
         : '';
       return `<div class="kanban-card pipeline-card" draggable="true"
           ondragstart="pipelineDragStart(event,'${l.id}')"

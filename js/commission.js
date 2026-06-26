@@ -173,6 +173,10 @@ function confirmCerradoWithValue(leadId, dealValue) {
   S.commissions.push(commRec);
   saveLocal();
   bgSave({action:'saveCommission', ...commRec}, 'Commission', 'commissions');
+  // Stitch the funnel: a Closed Won deal automatically opens its engagement (the spine
+  // record) so the deal flows straight into onboarding — no separate "Start engagement"
+  // step, and the client's paid/Gate-A state lives on one record from here on.
+  if (typeof ensureEngagement === 'function') ensureEngagement(lead.id);
   toast(isResidual ? 'Deal closed — first month’s residual recorded' : 'Deal closed — commission recorded', 'success');
   closeModal();
   renderAll();
