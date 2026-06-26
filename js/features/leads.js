@@ -791,3 +791,21 @@ function startCallFromModal(leadId) { closeModal(); makeCall(leadId); }
 document.getElementById('modal')?.addEventListener('click', e => {
   if (e.target === document.getElementById('modal')) closeModal();
 });
+
+// Focus trap + Esc for the lead modal: keyboard users stay inside the open dialog
+// (Tab wraps within it) and can dismiss it with Escape, rather than tabbing into the
+// page behind it.
+document.addEventListener('keydown', e => {
+  const modal = document.getElementById('modal');
+  if (!modal || !modal.classList.contains('open')) return;
+  if (e.key === 'Escape') { e.preventDefault(); closeModal(); return; }
+  if (e.key !== 'Tab') return;
+  const focusable = Array.prototype.filter.call(
+    modal.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'),
+    el => el.offsetParent !== null);
+  if (!focusable.length) return;
+  const first = focusable[0], last = focusable[focusable.length - 1];
+  if (!modal.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+  else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
