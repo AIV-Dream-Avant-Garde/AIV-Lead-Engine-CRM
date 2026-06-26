@@ -64,6 +64,7 @@ function renderEngagements() {
       <div class="eng-checks">${chips}</div>
       ${closeLinkHtml_(e)}
       ${roadmapHtml_(e)}
+      ${provisionHtml_(e)}
       ${reg.length ? `<div style="font-size:11px;color:var(--sub);margin-top:8px">Registry: ${reg.join(' · ')}</div>` : ''}
     </div>`;
   }).join('');
@@ -97,6 +98,28 @@ function copyCloseLink_(eid) {
   const done = () => toast('Close link copied — send it to the client.', 'success');
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done).catch(() => prompt('Copy the close link:', url));
   else prompt('Copy the close link:', url);
+}
+
+// Provisioning (Gate-A handoff): a button once all four signals are met and the
+// engagement isn't provisioned yet; a spinner while it runs. Hidden in demo.
+function provisionHtml_(e) {
+  if (e.provisionedAt || e.status === 'active' || e.status === 'provisioning') return '';
+  if (!engGateChecks_(e).every(c => c.done)) return '';
+  if (e._provisioning) return `<div style="margin-top:8px"><span class="call-rec-pending"><span class="call-rec-spin"></span>Provisioning Discord + Drive + Registry…</span></div>`;
+  if (S.demoMode) return '';
+  return `<div style="margin-top:8px"><button class="btn btn-primary" style="font-size:12px;padding:7px 14px" onclick="provisionEngagement_('${esc(e.engagementId)}')">🚀 Provision (Gate A)</button></div>`;
+}
+async function provisionEngagement_(eid) {
+  const e = (S.engagements || []).find(x => x.engagementId === eid); if (!e || e._provisioning) return;
+  if (!S.config.scriptUrl || S.demoMode) { toast('Connect Apps Script to provision.', 'error'); return; }
+  if (!confirm('Provision ' + (e.company || eid) + '?\n\nThis creates the Discord space, copies the Drive folder from the template, and writes the Project Registry row. It can’t be auto-undone.')) return;
+  e._provisioning = true; renderEngagements();
+  try {
+    const r = await sheetsCall({ action:'provisionEngagement', engagementId:eid });
+    if (r && r.provisioned) { if (r.engagement) Object.assign(e, r.engagement); toast((e.company || eid) + ' is live — Discord, Drive, and Registry are set.', 'success'); }
+    else toast((r && r.error) ? r.error : 'Provisioning failed.', 'error', 8000);
+  } catch (err) { toast('Provisioning failed: ' + err.message, 'error'); }
+  e._provisioning = false; saveLocal(); renderEngagements();
 }
 
 // Roadmap area for an engagement card: the draft (with redraft/approve), a

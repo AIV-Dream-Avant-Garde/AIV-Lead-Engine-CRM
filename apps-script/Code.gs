@@ -43,6 +43,14 @@ const STRIPE_TIERS = {
 };
 function stripeTier_(t) { return STRIPE_TIERS[String(t || 'team').toLowerCase()] || STRIPE_TIERS.team; }
 
+// Spine handoff (task 8). Bot provisions Discord+Mongo on the box; the CRM (script
+// owner) writes all Drive. Folder ids resolved from Drive's own metadata (overridable).
+const PROVISION_URL    = PROP_('PROVISION_URL') || 'http://167.233.85.223:8787';
+const PROVISION_SECRET = PROP_('PROVISION_SECRET');
+const TEMPLATE_FOLDER_ID     = PROP_('TEMPLATE_FOLDER_ID')     || '1A8BQCQPIMy3jpKoRwgrR5w4nFc4CfhiB';  // CLIENTS/"_TEMPLATE · [Company Name]" (ACWA §1–10); its parent = CLIENTS
+const TESTIMONIALS_FOLDER_ID = PROP_('TESTIMONIALS_FOLDER_ID') || '1J1d-zgoKB9pm7Tf_4MoBl45GOiYo5oaD';  // ASSETS/"Testimonials & Social Proof"
+const REGISTRY_HDR = ['engagementId','company','tier','stripeCustomerId','mongoSlug','discordGuildId','discordCategoryId','discordRoleId','driveFolderId','provisionedAt'];
+
 // Deployment config — overridable via Script properties, with safe defaults.
 const RESEND_FROM        = PROP_('RESEND_FROM', 'Andres Toro <hola@axius.tech>');   // a PERSON, not the brand — cold mail from a name gets opened more (override via Script property)
 const REPLY_TO_EMAIL     = PROP_('REPLY_TO_EMAIL', 'andres@axius.tech');      // inbox runInboundEmailScan polls
@@ -83,7 +91,7 @@ function seedProperties() {
     TWILIO_AUTH_TOKEN: '', TWILIO_TWIML_APP: '',
     TWILIO_FROM_NUMBER: '', TWILIO_FROM_SMS_US: '', TWILIO_FROM_WA: '',
     RECORDINGS_FOLDER_ID: '', AUDIT_FOLDER_ID: '', EXECUTED_AGREEMENTS_FOLDER_ID: '', RESEND_API_KEY: '',
-    STRIPE_SECRET_KEY: '', CLOSE_PAGE_URL: '',
+    STRIPE_SECRET_KEY: '', CLOSE_PAGE_URL: '', PROVISION_SECRET: '', PROVISION_URL: '',
     TELEGRAM_ALERT_BOT_TOKEN: '', TELEGRAM_ALERT_CHAT_ID: '',
     GEMINI_API_KEY: '', CRM_SECRET: '',
     // Optional overrides (defaults already fine):
@@ -465,7 +473,7 @@ function doPost(e) {
     var ADMIN_ONLY = { saveTeamMember:1, cancelCommission:1, adjustCollected:1, markCommissionPaid:1,
       saveCadenceConfig:1, saveScheduledJobs:1, saveStateCampaigns:1, saveReportEmail:1,
       setTrigger:1, runCadenceNow:1, runScrapesNow:1, saveScript:1, deleteScript:1, previewOutreach:1,
-      saveEngagement:1, draftRoadmap:1, generateAudit:1, sendAudit:1 };
+      saveEngagement:1, draftRoadmap:1, generateAudit:1, sendAudit:1, provisionEngagement:1 };
     if (ADMIN_ONLY[a] && !verifyAdminToken_(b.adminToken)) {
       return err_('Admin sign-in required for this action.', 401);
     }
@@ -616,6 +624,41 @@ function doPost(e) {
       appendInteraction_({ id:Utilities.getUuid(), leadId:leadId, leadName:lead.name, phone:'', channel:'email', direction:'out', body:audit, stepTag:'audit', status:r.status || 'sent', sid:r.sid, error:'', createdAt:now, createdBy:'audit' });
       patchLeadFields_(leadId, { auditSentAt:now });
       return ok({ sent:true, sentAt:now, sid:r.sid });
+    }
+    // Gate-A handoff (task 8): bot provisions Discord+Mongo, then CRM creates the
+    // client's Drive folder from the ACWA template, copies the founding docs into §5,
+    // writes the Project Registry row, and stores the runtime IDs. Idempotent.
+    if (a === 'provisionEngagement') {
+      const eid = String(b.engagementId || '').trim();
+      if (!eid) return err_('Missing engagementId.');
+      const e = engById_(eid);
+      if (!e) return err_('Engagement not found.');
+      const gateA = String(e.paid) === 'yes' && e.roadmapApprovedAt && String(e.msaSigned) === 'yes';
+      if (!gateA) return err_('Gate A not met yet (needs paid + roadmap approved + MSA signed).');
+      if (!PROVISION_SECRET) return err_('PROVISION_SECRET is not set.');
+      try {
+        const prov = botProvision_(e);                       // 1) Discord + Mongo (idempotent on the bot)
+        let folderId = String(e.driveFolderId || '');
+        if (!folderId) {                                     // 2) Drive folder from the ACWA template (skip if already made)
+          const tmpl = DriveApp.getFolderById(TEMPLATE_FOLDER_ID);
+          const parent = tmpl.getParents().hasNext() ? tmpl.getParents().next() : DriveApp.getRootFolder();
+          const folder = copyFolder_(tmpl, parent, String(e.company || eid));
+          folderId = folder.getId();
+          const sec5 = acwaSection_(folder, '5');            // 3) founding docs → §5 Documentation Library
+          if (sec5) {
+            const lead = toObjs(getSheet(SHEETS.leads, LEAD_HDR)).find(function(l){ return String(l.id) === eid; }) || {};
+            copyFileByUrlInto_(lead.auditUrl, sec5, (e.company || 'Client') + ' — Audit');
+            copyFileByUrlInto_(e.msaUrl, sec5, (e.company || 'Client') + ' — Executed MSA');
+          }
+        }
+        writeRegistryRow_(e, prov, folderId);                // 4) Project Registry (native Sheet)
+        const now = new Date().toISOString();                // 5) store runtime IDs + go active
+        const rec = upsertEngagement_({ engagementId: eid, status: 'active', provisionedAt: now,
+          mongoSlug: prov.slug || eid, discordGuildId: (prov.cc && prov.cc.guildId) || '',
+          discordCategoryId: (prov.cc && prov.cc.categoryId) || '', discordRoleId: prov.clientRoleId || '', driveFolderId: folderId });
+        notifyTelegram('Provisioned — ' + (e.company || eid) + ' is live (Discord + Drive + Registry).');
+        return ok({ provisioned: true, engagement: rec, runtime: { slug: prov.slug, guild: (prov.cc || {}).guildId, role: prov.clientRoleId, driveFolderId: folderId } });
+      } catch (err) { Logger.log('provisionEngagement: ' + err.message); return err_('Provisioning failed: ' + err.message); }
     }
     if (a === 'saveTeamMember') {
       const s=getSheet(SHEETS.team,TEAM_HDR),rows=s.getDataRange().getValues(),h=rows[0]||TEAM_HDR,ic=h.indexOf('id');
@@ -2089,6 +2132,67 @@ function stripeGetSession_(sessionId) {
   const res = UrlFetchApp.fetch('https://api.stripe.com/v1/checkout/sessions/' + encodeURIComponent(sessionId), {
     method: 'get', headers: { Authorization: 'Bearer ' + STRIPE_SECRET_KEY }, muteHttpExceptions: true });
   return JSON.parse(res.getContentText() || '{}');
+}
+
+/* ── Spine provisioning helpers (task 8) ──────────────────────────────────── */
+
+// Ask the bot to provision Discord + Mongo for this engagement. Idempotent server-side.
+function botProvision_(e) {
+  const res = UrlFetchApp.fetch(PROVISION_URL + '/provision', {
+    method: 'post', contentType: 'application/json',
+    headers: { Authorization: 'Bearer ' + PROVISION_SECRET },
+    payload: JSON.stringify({ engagementId: e.engagementId, company: e.company || '' }),
+    muteHttpExceptions: true });
+  const d = JSON.parse(res.getContentText() || '{}');
+  if (res.getResponseCode() !== 200 || !d.ok) throw new Error(d.error || ('bot /provision ' + res.getResponseCode()));
+  return d;
+}
+// DriveApp can copy files but not folders — copy the template tree (ACWA §1–10) recursively.
+function copyFolder_(src, destParent, newName) {
+  const dest = destParent.createFolder(newName);
+  const files = src.getFiles();
+  while (files.hasNext()) { const f = files.next(); f.makeCopy(f.getName(), dest); }
+  const subs = src.getFolders();
+  while (subs.hasNext()) { const sf = subs.next(); copyFolder_(sf, dest, sf.getName()); }
+  return dest;
+}
+// Find an ACWA section subfolder by its number prefix ("5 · Documentation Library").
+function acwaSection_(rootFolder, n) {
+  const subs = rootFolder.getFolders();
+  while (subs.hasNext()) { const f = subs.next(); if (f.getName().indexOf(String(n) + ' · ') === 0) return f; }
+  return null;
+}
+// Copy a Drive file (referenced by its /d/<id>/ URL) into a folder, optionally renamed.
+function copyFileByUrlInto_(url, destFolder, rename) {
+  if (!url || !destFolder) return null;
+  try {
+    const id = (String(url).match(/[-\w]{25,}/) || [])[0];
+    if (!id) return null;
+    const f = DriveApp.getFileById(id);
+    return f.makeCopy(rename || f.getName(), destFolder);
+  } catch (e) { Logger.log('copyFileByUrlInto_: ' + e.message); return null; }
+}
+// The Project Registry — ONE native Google Sheet, auto-created in CLIENTS and remembered.
+function registrySheet_() {
+  const id = PROP_('REGISTRY_SHEET_ID');
+  if (id) { try { return SpreadsheetApp.openById(id); } catch (e) {} }
+  const ss = SpreadsheetApp.create('AXIUS — Project Registry');
+  const sh = ss.getSheets()[0]; sh.setName('Registry'); sh.appendRow(REGISTRY_HDR);
+  try {
+    const file = DriveApp.getFileById(ss.getId()), tmpl = DriveApp.getFolderById(TEMPLATE_FOLDER_ID);
+    if (tmpl.getParents().hasNext()) { const parent = tmpl.getParents().next(); parent.addFile(file); DriveApp.getRootFolder().removeFile(file); }
+  } catch (e) { Logger.log('registrySheet_ move: ' + e.message); }
+  PropertiesService.getScriptProperties().setProperty('REGISTRY_SHEET_ID', ss.getId());
+  return ss;
+}
+// Upsert one engagement's row in the Registry (keyed by engagement id).
+function writeRegistryRow_(e, prov, folderId) {
+  const ss = registrySheet_(), sh = ss.getSheetByName('Registry') || ss.getSheets()[0];
+  const row = [e.engagementId, e.company || '', e.tier || '', e.stripeCustomerId || '', prov.slug || e.engagementId,
+    (prov.cc && prov.cc.guildId) || '', (prov.cc && prov.cc.categoryId) || '', prov.clientRoleId || '', folderId || '', new Date().toISOString()];
+  const rows = sh.getDataRange().getValues();
+  for (let i = 1; i < rows.length; i++) { if (String(rows[i][0]) === String(e.engagementId)) { sh.getRange(i + 1, 1, 1, row.length).setValues([row]); return; } }
+  sh.appendRow(row);
 }
 
 // Gather everything we know about an engagement's lead — the lead row, its call
