@@ -62,7 +62,52 @@ function renderEngagements() {
         <span style="font-size:11px;color:var(--sub)">${ready ? 'Gate A met' : checks.filter(c => c.done).length + '/4'}</span>
       </div>
       <div class="eng-checks">${chips}</div>
+      ${roadmapHtml_(e)}
       ${reg.length ? `<div style="font-size:11px;color:var(--sub);margin-top:8px">Registry: ${reg.join(' · ')}</div>` : ''}
     </div>`;
   }).join('');
+}
+
+// Roadmap area for an engagement card: the draft (with redraft/approve), a
+// spinner while drafting, or a "draft" button. Action buttons hide in demo.
+function roadmapHtml_(e) {
+  if (e._drafting) return `<div style="margin-top:8px"><span class="call-rec-pending"><span class="call-rec-spin"></span>Drafting roadmap…</span></div>`;
+  if (e.roadmap) {
+    const approved = !!e.roadmapApprovedAt;
+    const btns = S.demoMode ? '' : `<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+        <button class="call-tx-btn" onclick="draftRoadmap_('${esc(e.engagementId)}')">Redraft</button>
+        ${approved ? '' : `<button class="call-tx-btn" onclick="approveRoadmap_('${esc(e.engagementId)}')">Mark approved</button>`}
+      </div>`;
+    return `<div style="margin-top:8px">
+      <details class="call-transcript"><summary>Quarterly roadmap · ${approved ? '<span style="color:var(--pos)">approved</span>' : 'draft'}</summary><div class="call-transcript-body">${esc(e.roadmap)}</div></details>
+      ${btns}</div>`;
+  }
+  return S.demoMode ? '' : `<div style="margin-top:8px"><button class="call-tx-btn" onclick="draftRoadmap_('${esc(e.engagementId)}')">🗺 Draft roadmap (AI)</button></div>`;
+}
+
+// Ask the backend to draft the roadmap from the lead's transcripts + thread.
+async function draftRoadmap_(eid) {
+  const e = (S.engagements || []).find(x => x.engagementId === eid);
+  if (!e || e._drafting) return;
+  if (!S.config.scriptUrl || S.demoMode) { toast('Connect Apps Script to draft roadmaps.', 'error'); return; }
+  e._drafting = true; renderEngagements();
+  try {
+    const r = await sheetsCall({ action:'draftRoadmap', engagementId:eid });
+    if (r && r.roadmap) { e.roadmap = r.roadmap; if (r.engagement) Object.assign(e, r.engagement); toast('Roadmap drafted.', 'success'); }
+    else toast((r && r.error) ? r.error : 'Could not draft the roadmap.', 'error', 6000);
+  } catch (err) { toast('Draft failed: ' + err.message, 'error'); }
+  e._drafting = false; saveLocal(); renderEngagements();
+}
+
+// Operator approval of the roadmap (the client also approves via the e-sign page).
+async function approveRoadmap_(eid) {
+  const e = (S.engagements || []).find(x => x.engagementId === eid);
+  if (!e || !e.roadmap) return;
+  const now = new Date().toISOString();
+  e.roadmapApprovedAt = now; if (e.status === 'roadmap_draft' || e.status === 'won') e.status = 'approved';
+  saveLocal(); renderEngagements();
+  if (S.config.scriptUrl && !S.demoMode) {
+    try { const r = await sheetsCall({ action:'saveEngagement', engagementId:eid, roadmapApprovedAt:now, status:'approved' }); if (r && r.engagement) { Object.assign(e, r.engagement); renderEngagements(); } } catch (err) {}
+  }
+  toast('Roadmap marked approved.', 'success');
 }
