@@ -45,7 +45,7 @@ function stripeTier_(t) { return STRIPE_TIERS[String(t || 'team').toLowerCase()]
 
 // Spine handoff (task 8). Bot provisions Discord+Mongo on the box; the CRM (script
 // owner) writes all Drive. Folder ids resolved from Drive's own metadata (overridable).
-const PROVISION_URL    = PROP_('PROVISION_URL') || 'http://167.233.85.223:8787';
+const PROVISION_URL    = PROP_('PROVISION_URL') || 'https://bot.axius.tech';   // HTTPS via Caddy on the box (loopback-only :8787)
 const PROVISION_SECRET = PROP_('PROVISION_SECRET');
 const TEMPLATE_FOLDER_ID     = PROP_('TEMPLATE_FOLDER_ID')     || '1A8BQCQPIMy3jpKoRwgrR5w4nFc4CfhiB';  // CLIENTS/"_TEMPLATE · [Company Name]" (ACWA §1–10); its parent = CLIENTS
 const TESTIMONIALS_FOLDER_ID = PROP_('TESTIMONIALS_FOLDER_ID') || '1J1d-zgoKB9pm7Tf_4MoBl45GOiYo5oaD';  // ASSETS/"Testimonials & Social Proof"
