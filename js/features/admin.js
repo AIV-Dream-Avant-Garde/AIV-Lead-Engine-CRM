@@ -172,13 +172,31 @@ function fillCompPlan(m) {
   const df = document.getElementById('tm-double-first'); if (df) df.value = (p.doubleFirstClose === false ? 'no' : 'yes');
   const tiers = (Array.isArray(p.bonusTiers) && p.bonusTiers.length) ? p.bonusTiers
     : [{closes:3,bonus:20},{closes:5,bonus:40},{closes:8,bonus:80},{closes:10,bonus:150},{closes:12,bonus:250}];
-  set('tm-bonus-tiers', tiers.map(t => t.closes + ':' + t.bonus).join(', '));
+  renderBonusTiers(tiers);
 }
-// Read the comp-plan inputs into a compPlan JSON string (meaningful for setters).
+// One volume-bonus tier row: pick the actual quantities — "N closes → $X".
+function bonusTierRowHtml_(closes, bonus) {
+  return `<div class="bonus-tier-row" style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+    <input type="number" class="bt-closes" min="1" step="1" value="${closes ?? ''}" placeholder="3" style="width:80px">
+    <span style="color:var(--body);font-size:12px">closes →&nbsp; $</span>
+    <input type="number" class="bt-bonus" min="0" step="5" value="${bonus ?? ''}" placeholder="20" style="width:110px">
+    <button type="button" class="btn btn-ghost btn-sm" onclick="this.closest('.bonus-tier-row').remove()" title="Remove this tier">✕</button>
+  </div>`;
+}
+function renderBonusTiers(tiers) {
+  const wrap = document.getElementById('tm-bonus-rows'); if (!wrap) return;
+  wrap.innerHTML = (tiers && tiers.length ? tiers : [{}]).map(t => bonusTierRowHtml_(t.closes, t.bonus)).join('');
+}
+function addBonusTier() {
+  const wrap = document.getElementById('tm-bonus-rows'); if (!wrap) return;
+  wrap.insertAdjacentHTML('beforeend', bonusTierRowHtml_('', ''));
+}
+// Read the comp-plan inputs into a compPlan JSON string.
 function readCompPlan() {
   const num = (id) => { const x = parseFloat(document.getElementById(id)?.value); return (Number.isFinite(x) && x >= 0) ? x : null; };
-  const tiers = String(document.getElementById('tm-bonus-tiers')?.value || '').split(',').map(s => s.trim()).filter(Boolean)
-    .map(s => { const [c, b] = s.split(':'); return { closes: parseInt(c, 10) || 0, bonus: parseFloat(b) || 0 }; }).filter(t => t.closes > 0);
+  const tiers = Array.from(document.querySelectorAll('#tm-bonus-rows .bonus-tier-row'))
+    .map(row => ({ closes: parseInt(row.querySelector('.bt-closes')?.value, 10) || 0, bonus: parseFloat(row.querySelector('.bt-bonus')?.value) || 0 }))
+    .filter(t => t.closes > 0).sort((a, b) => a.closes - b.closes);
   const plan = {
     close:    { team: num('tm-close-team') || 0, department: num('tm-close-dept') || 0 },
     residual: { team: num('tm-res-team') ?? 40, department: num('tm-res-dept') ?? 80, enterprisePct: num('tm-res-ent') ?? 3 },
