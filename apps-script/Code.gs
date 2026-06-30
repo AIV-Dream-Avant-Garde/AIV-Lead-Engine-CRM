@@ -1186,6 +1186,8 @@ function runScheduledScrapes() {
   try { campAdded = (runStateCampaigns() || {}).added || 0; } catch (e) { Logger.log('runStateCampaigns error: ' + e.message); }
   // Drain the bot's Drive-sync queue into each client's ACWA folders (task 8b).
   try { syncDelivery(); } catch (e) { Logger.log('syncDelivery error: ' + e.message); }
+  // Keep setter comp current daily: residuals (idempotent per month) + volume bonus / first-close (upserted).
+  try { runSetterResiduals(); runSetterBonuses(); } catch (e) { Logger.log('setter comp error: ' + e.message); }
   let jobsRes = {};
   try { jobsRes = runScheduledJobs_() || {}; } catch (e) { Logger.log('runScheduledJobs_ error: ' + e.message); }
   return { added: (jobsRes.added || 0) + campAdded, campaignsAdded: campAdded,
@@ -1516,6 +1518,55 @@ function runSetterResiduals(period) {
   return { created: created, period: period };
 }
 
+// Cumulative volume bonus + first-close-double for each setter, for `period`. Counts the setter's
+// setterClose rows that month, upserts ONE setterBonus + ONE setterFirstClose row per setter, and
+// NEVER overwrites a row already marked paid/clawback (a re-run can't undo a payout). Idempotent.
+// Bonus math MIRRORS setterVolumeBonus() in js/commission.js (keep the two in sync).
+function runSetterBonuses(period) {
+  period = period || Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM');
+  const cfg = getCompCfg_();
+  const team = {}; toObjs(getSheet(SHEETS.team, TEAM_HDR)).forEach(function(m){ team[String(m.id)] = m; });
+  const cs = getSheet(SHEETS.commissions, COMM_HDR), rows = cs.getDataRange().getValues(), h = rows[0] || COMM_HDR;
+  const ki=h.indexOf('kind'), pi=h.indexOf('period'), pidi=h.indexOf('providerId'), pai=h.indexOf('providerAmount'), cai=h.indexOf('createdAt'), sti=h.indexOf('status');
+  const closes = {}, firstAmt = {}, firstWhen = {}, existing = {};
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][pi]) !== period) continue;
+    const k = String(rows[i][ki]);
+    if (k === 'setterClose') {
+      const sid = String(rows[i][pidi]); closes[sid] = (closes[sid] || 0) + 1;
+      const when = String(rows[i][cai] || '');
+      if (!firstWhen[sid] || when < firstWhen[sid]) { firstWhen[sid] = when; firstAmt[sid] = parseFloat(rows[i][pai] || 0); }
+    } else if (k === 'setterBonus' || k === 'setterFirstClose') {
+      existing[String(rows[i][pidi]) + '|' + k] = { row: i + 1, status: String(rows[i][sti] || '') };
+    }
+  }
+  const now = new Date().toISOString();
+  Object.keys(closes).forEach(function(sid){
+    const m = team[sid]; if (!m || String(m.role) !== 'setter') return;
+    const n = closes[sid];
+    let bonus = 0;
+    cfg.bonusTiers.forEach(function(t){ if (n >= Number(t.closes)) { if (cfg.bonusCumulative) bonus += (Number(t.bonus) || 0); else bonus = (Number(t.bonus) || 0); } });
+    upsertCompRow_(cs, h, existing[sid + '|setterBonus'], { id: Utilities.getUuid(), leadId: '', leadName: 'Volume bonus ' + period + ' (' + n + ' close' + (n === 1 ? '' : 's') + ')', providerId: sid, providerName: m.name, providerRate: 0, providerAmount: bonus, closerRate: 0, closerAmount: 0, status: 'pending', paidAt:'', paidBy:'', paymentRef:'', createdAt: now, recurring: '', period: period, kind: 'setterBonus' });
+    if (cfg.doubleFirstClose && firstAmt[sid]) {
+      upsertCompRow_(cs, h, existing[sid + '|setterFirstClose'], { id: Utilities.getUuid(), leadId: '', leadName: 'First-close double ' + period, providerId: sid, providerName: m.name, providerRate: 0, providerAmount: firstAmt[sid], closerRate: 0, closerAmount: 0, status: 'pending', paidAt:'', paidBy:'', paymentRef:'', createdAt: now, recurring: '', period: period, kind: 'setterFirstClose' });
+    }
+  });
+  cfgSet('lastSetterBonusRun', JSON.stringify({ ranAt: now, period: period }));
+  return { period: period };
+}
+// Upsert a comp row: update an existing row (preserving its id) or append a new one. Skips rows
+// already marked paid/clawback so a re-run can never reverse a payout you've already made.
+function upsertCompRow_(sheet, hdr, ex, rec) {
+  if (ex && (ex.status === 'paid' || ex.status === 'clawback')) return;
+  if (ex && ex.row) {
+    const idi = hdr.indexOf('id'), cur = sheet.getRange(ex.row, idi + 1).getValue();
+    if (cur) rec.id = cur;
+    sheet.getRange(ex.row, 1, 1, hdr.length).setValues([hdr.map(function(k){ return rec[k] != null ? rec[k] : ''; })]);
+  } else {
+    sheet.appendRow(hdr.map(function(k){ return rec[k] != null ? rec[k] : ''; }));
+  }
+}
+
 function runMonthlyResiduals() {
   const period = Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM');
   const ls = getSheet(SHEETS.leads, LEAD_HDR), lr = ls.getDataRange().getValues(), lh = lr[0] || LEAD_HDR;
@@ -1559,6 +1610,7 @@ function runMonthlyResiduals() {
   }
   let setter = { created: 0 };
   try { setter = runSetterResiduals(period) || setter; } catch (e) { Logger.log('runSetterResiduals: ' + e.message); }
+  try { runSetterBonuses(period); } catch (e) { Logger.log('runSetterBonuses: ' + e.message); }
   cfgSet('lastResidualRun', JSON.stringify({ ranAt: now, period, created, setterResiduals: setter.created }));
   Logger.log('Monthly residuals: +' + created + ' closer, +' + setter.created + ' setter, for ' + period);
   return { created, period, setterResiduals: setter.created };
