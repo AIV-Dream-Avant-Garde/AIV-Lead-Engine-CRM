@@ -630,7 +630,7 @@ function renderScripts() {
 // ── renderAdmin — consolidated (team + commissions + audit + locked + DNC + perf) ─
 function renderAdmin() {
   if (S.session?.role !== 'admin') return;
-  const roleLabels = {admin:'Admin', closer:'Closer', solo:'Solo'};
+  const roleLabels = {admin:'Admin', closer:'Closer', setter:'Setter', solo:'Solo'};
 
   // Team list
   const teamWrap = document.getElementById('admin-team-list');
