@@ -18,7 +18,7 @@ function restoreModalFocus() {
 // ── Manual add lead (single-lead entry) ───────────────────
 function openAddLead() {
   ['al-name','al-phone','al-email','al-website','al-city','al-notes'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
-  const src = document.getElementById('al-source'); if (src) src.value = 'Manual';
+  const src = document.getElementById('al-source'); if (src) src.value = 'Referral';
   document.getElementById('addlead-overlay')?.classList.add('open');
   setTimeout(() => document.getElementById('al-name')?.focus(), 50);
 }
