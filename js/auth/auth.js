@@ -386,6 +386,6 @@ function updateSidebarUser(user) {
   const nm = document.getElementById('sb-user-name');
   if (nm) nm.textContent = user.userName;
   const rl = document.getElementById('sb-user-role');
-  const labels = {admin:'Administrator', closer:'Closer', solo:'Solo Operator'};
+  const labels = {admin:'Administrator', closer:'Closer', setter:'Appointment Setter', solo:'Solo Operator'};
   if (rl) rl.textContent = labels[user.role] || user.role;
 }

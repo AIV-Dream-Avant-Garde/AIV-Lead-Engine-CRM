@@ -327,3 +327,19 @@ async function pushLead(lead) {
     if (r && r.success) { S.dirty.delete(lead.id); saveLocal(); }
   }
 }
+
+// Bulk variant: mark all dirty and persist ONCE, then sync each. Avoids the
+// O(K·N) re-serialization of calling pushLead (and saveLocal) per lead in a loop.
+async function pushLeads(leads) {
+  if (!leads || !leads.length) return;
+  leads.forEach(l => S.dirty.add(l.id));
+  saveLocal();
+  if (!S.config.scriptUrl) return;
+  let changed = false;
+  for (const lead of leads) {
+    if (!lead._synced) continue;
+    const r = await sheetsCall({action:'update', ...lead});
+    if (r && r.success) { S.dirty.delete(lead.id); changed = true; }
+  }
+  if (changed) saveLocal();
+}

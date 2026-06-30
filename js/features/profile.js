@@ -5,7 +5,7 @@ function renderPerfil() {
   if (!S.session) return;
   const user   = S.session;
   const uid_   = user.userId;
-  const role   = ({admin:'Admin', closer:'Closer', solo:'Solo Operator'})[user.role] || user.role;
+  const role   = ({admin:'Admin', closer:'Closer', setter:'Appointment Setter', solo:'Solo Operator'})[user.role] || user.role;
   const initials = user.userName.split(' ').map(w => w[0] || '').join('').toUpperCase().slice(0,2);
 
   // Header

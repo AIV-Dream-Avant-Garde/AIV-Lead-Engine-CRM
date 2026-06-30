@@ -192,7 +192,7 @@ function renderSourceROI() {
 function renderLeaderboard() {
   const tbody = document.querySelector('#analytics-leaderboard tbody');
   if (!tbody) return;
-  const ROLE_LABELS = {admin:'Admin', closer:'Closer', solo:'Solo'};
+  const ROLE_LABELS = {admin:'Admin', closer:'Closer', setter:'Setter', solo:'Solo'};
   const members = S.team.filter(m => String(m.active) !== 'false').map(m => {
     const closed  = S.leads.filter(l => l.status === 'Closed Won' && l.closerId === m.id);
     const revenue = closed.reduce((s, l) => s + parseFloat(l.dealValue || 0), 0);

@@ -262,6 +262,12 @@ function debouncedSearch() {
   clearTimeout(_searchTimer);
   _searchTimer = setTimeout(() => { S.page = 1; renderTable(); }, 200);
 }
+// Same 200ms debounce for the pipeline + calls searches (each re-filters all leads on
+// every keystroke, which is expensive at volume).
+let _pipeTimer = null;
+function debouncedPipeline() { clearTimeout(_pipeTimer); _pipeTimer = setTimeout(() => { if (typeof renderPipeline === 'function') renderPipeline(); }, 200); }
+let _callsTimer = null;
+function debouncedCalls() { clearTimeout(_callsTimer); _callsTimer = setTimeout(() => { if (typeof renderCallsSection === 'function') renderCallsSection(); }, 200); }
 
 // ── Table render ───────────────────────────────────────────
 function renderTable() {
@@ -402,7 +408,22 @@ function applyBulkStatus() {
   if (st === 'Closed Won') { toast('Open each lead to close it: "Closed Won" requires the deal value.', 'error', 6000); return; }
   const n = S.selected.size;
   if (!confirm(`Change status of ${n} lead${n !== 1 ? 's' : ''} to "${st}"? This cannot be undone.`)) return;
-  S.leads.forEach(l => { if (S.selected.has(l.id)) { l.status = st; l.updatedAt = new Date().toISOString(); pushLead(l); } });
+  const now = new Date().toISOString();
+  const touched = S.leads.filter(l => S.selected.has(l.id));
+  touched.forEach(l => {
+    // "Closed Lost" in bulk must run the SAME release + commission-cancel + residual-off
+    // logic as the single-lead and pipeline paths, or losing deals would leave pending
+    // commissions live and residuals still generating.
+    if (st === 'Closed Lost' && l.status !== 'Closed Lost') {
+      if (!Array.isArray(l.workHistory)) l.workHistory = [];
+      if (l.closerId) l.workHistory.push({ closerId: l.closerId, closerName: S.team.find(m => m.id === l.closerId)?.name || l.closerId, outcome: 'Closed Lost', releasedAt: now });
+      if (!cancelLeadCommission(l.id, 'Deal marked Closed Lost') && l.commissionStatus === 'pending') l.commissionStatus = 'cancelled';
+      l.residualActive = false;
+      l.closerId = ''; l.lockedBy = ''; l.lockedUntil = ''; l.assignedAt = '';
+    }
+    l.status = st; l.updatedAt = now;
+  });
+  pushLeads(touched);
   clearSelection(); renderAll();
 }
 
@@ -423,39 +444,31 @@ function applyBulkAction() {
   if (S.selected.size === 0) { toast('Select at least one lead.', 'error'); return; }
   const now  = new Date().toISOString();
   const sess = S.session;
+  const touched = S.leads.filter(l => S.selected.has(l.id));
 
   if (act === 'followup') {
     const d = document.getElementById('bulk-action-date')?.value;
     if (!d) { toast('Select a follow-up date.', 'error'); return; }
-    S.leads.forEach(l => { if (S.selected.has(l.id)) { l.followUpDate = d; l.updatedAt = now; pushLead(l); } });
+    touched.forEach(l => { l.followUpDate = d; l.updatedAt = now; });
   } else if (act === 'source') {
     const src = document.getElementById('bulk-action-text')?.value?.trim();
     if (!src) { toast('Enter the new source.', 'error'); return; }
-    S.leads.forEach(l => { if (S.selected.has(l.id)) { l.source = src; l.updatedAt = now; pushLead(l); } });
+    touched.forEach(l => { l.source = src; l.updatedAt = now; });
   } else if (act === 'closer') {
     if (!sess) { toast('You must be logged in.', 'error'); return; }
-    S.leads.forEach(l => {
-      if (S.selected.has(l.id)) {
-        l.closerId   = sess.userId;
-        l.closerRate = sess.closerRate || 0;
-        l.assignedAt = l.assignedAt || now;
-        l.updatedAt  = now;
-        pushLead(l);
-      }
+    touched.forEach(l => {
+      l.closerId   = sess.userId;
+      l.closerRate = sess.closerRate || 0;
+      l.assignedAt = l.assignedAt || now;
+      l.updatedAt  = now;
     });
   } else if (act === 'dnc') {
     const reason = document.getElementById('bulk-action-text')?.value?.trim();
     if (!reason) { toast('Enter the DNC reason — required as a legal record.', 'error'); return; }
     if (!confirm(`Mark ${S.selected.size} lead(s) as "Do Not Call"?`)) return;
-    S.leads.forEach(l => {
-      if (S.selected.has(l.id)) {
-        l.status    = 'Do Not Call';
-        l.dncReason = reason;
-        l.updatedAt = now;
-        pushLead(l);
-      }
-    });
+    touched.forEach(l => { l.status = 'Do Not Call'; l.dncReason = reason; l.updatedAt = now; });
   }
+  pushLeads(touched);
 
   document.getElementById('bulk-action').value = '';
   onBulkActionChange();

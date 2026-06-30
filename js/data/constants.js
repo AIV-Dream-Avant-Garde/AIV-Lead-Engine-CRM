@@ -43,7 +43,9 @@ const OUTCOME_LABELS = {
 // secret (it's a public endpoint). Set this to your CURRENT "Manage deployments" URL.
 const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzWel67OOrAxOOXLBIwd5yEIKTnDEQZWUaR07QDdmLWeiOUWuwLA88O2-3oy-Awo8yNdw/exec';
 
-// SHA-256 of admin PIN "2819"
+// Legacy in-browser admin gate hash. Only consulted when the server admin gate is NOT
+// seeded (S.config.adminGateEnabled === false); once seedAdminGate() has run in prod,
+// admin auth is fully server-side (ADMIN_GATE_HASH) and this path is dead.
 const ADMIN_HASH = 'c05562111bb2b94ae2eebdbb85e408884622fffd762a7e132198b960d2ad4d17';
 
 const LOCK_DURATION_MS   = 4 * 60 * 60 * 1000; // 4 hours
