@@ -2464,7 +2464,7 @@ function botProvision_(e) {
   const res = UrlFetchApp.fetch(PROVISION_URL + '/provision', {
     method: 'post', contentType: 'application/json',
     headers: { Authorization: 'Bearer ' + PROVISION_SECRET },
-    payload: JSON.stringify({ engagementId: e.engagementId, company: e.company || '' }),
+    payload: JSON.stringify({ engagementId: e.engagementId, company: e.company || '', tier: String(e.tier || 'team').toLowerCase(), roadmap: e.roadmap || '' }),
     muteHttpExceptions: true });
   const d = JSON.parse(res.getContentText() || '{}');
   if (res.getResponseCode() !== 200 || !d.ok) throw new Error(d.error || ('bot /provision ' + res.getResponseCode()));
