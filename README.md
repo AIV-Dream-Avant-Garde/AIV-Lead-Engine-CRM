@@ -18,7 +18,7 @@ scrape / import → outreach cadence + AI replies → booked call (recorded + tr
 ### Acquire
 | Module | Description |
 |---|---|
-| **Leads** | CRUD table with search, filters (country / city / barrio / status / source), lead scoring, keyboard‑operable rows, and an inline detail modal (with a full client **Timeline** tab) |
+| **Leads** | CRUD table with search, filters (country / city / barrio / status / source), lead scoring, keyboard‑operable rows, bulk actions, AI **owner‑name enrichment** (scrapes the decision‑maker from the company site), and an inline detail modal (with a full client **Timeline** tab) |
 | **Scraper** | Google Places by **country → city → neighborhood → category**, plus whole‑state grid‑tiling **campaigns** that run on a schedule via the Apps Script backend |
 | **Import / Export** | Drag‑and‑drop CSV import with auto field‑mapping; filtered CSV export enriched with call + commission data |
 
@@ -27,7 +27,7 @@ scrape / import → outreach cadence + AI replies → booked call (recorded + tr
 |---|---|
 | **Outreach** | Email **cadence engine** (first touch + 3 framework follow‑ups) over Resend, with **AI replies** (Gemini) that follow the brand playbook; dry‑run safe, opt‑out aware |
 | **Responder** | Unified inbox of inbound replies (SMS / WhatsApp / email) with speed‑to‑lead alerts |
-| **Calls** | In‑browser VoIP via Twilio — record‑from‑answer → Drive archive → on‑demand **Gemini transcription** + AI call summary; consent capture; auto‑dialer queue |
+| **Calls** | In‑browser VoIP via Twilio — record‑from‑answer → Drive archive → on‑demand **Gemini transcription** + AI call summary; consent capture; auto‑dialer queue. Also ingests a **Google Meet transcript** → AI discovery‑call summary |
 | **Pipeline** | Kanban across the status columns with drag‑and‑drop; Closed Won cards show the client's **payment state** (· paid / · awaiting pay) |
 
 ### Close & deliver — the engagement spine
@@ -44,7 +44,7 @@ scrape / import → outreach cadence + AI replies → booked call (recorded + tr
 | Module | Description |
 |---|---|
 | **Analytics** | Monthly KPIs, conversion funnel, source ROI, team leaderboard, call performance |
-| **Admin** | Team management, commission ledger (pending / paid / clawback), cadence config, Active Clients, audit log |
+| **Admin** | Team management with **per‑person comp plans** (per‑close, residuals, enterprise %, volume‑bonus tiers, first‑close double), commission ledger (pending / paid / clawback), cadence config, Active Clients, audit log, and a **sales kill switch** (Operations tab) that pauses all scraping, outreach sends, and AI replies in one click |
 | **Profile** | Per‑user stats: leads, closed deals, earnings, call rate, follow‑up queue |
 
 A PIN‑free **demo** (the "View the demo →" link on the login screen) loads the whole CRM with sample data.
@@ -59,7 +59,7 @@ A PIN‑free **demo** (the "View the demo →" link on the login screen) loads t
 - **VoIP** — Twilio Voice SDK (WebRTC) + recording; **transcription / AI** via Gemini
 - **Email** — Resend (verified domain); **payments** — Stripe (subscription Checkout + webhook)
 - **Delivery** — Discord bot (`https://bot.axius.tech`) + Google Drive + a Project Registry sheet
-- **Auth** — server‑validated two‑gate admin (HMAC token) + per‑rep PIN tokens
+- **Auth** — server‑validated two‑gate admin (HMAC token) + per‑rep PIN login, over a shared `CRM_SECRET`
 
 ---
 
@@ -91,13 +91,14 @@ js/
 
 ## Roles & permissions
 
-| Section | Admin | Closer | Solo |
-|---|:---:|:---:|:---:|
-| Leads · Pipeline · Calls · Profile · Outreach · Responder | ✓ | ✓ | ✓ |
-| Analytics | ✓ | — | ✓ |
-| Scraper · Import · Export · Admin (incl. Active Clients) | ✓ | — | — |
+| Section | Admin | Closer | Setter | Solo |
+|---|:---:|:---:|:---:|:---:|
+| Dashboard · Leads · Calls · Responder · Profile | ✓ | ✓ | ✓ | ✓ |
+| Pipeline | ✓ | ✓ | — | ✓ |
+| Analytics | ✓ | — | — | ✓ |
+| Outreach · Scraper · Import · Export · Admin (incl. Active Clients) | ✓ | — | — | — |
 
-Admin signs in through a two‑gate code (server‑validated against a hashed Script property, with lockout). Reps are created in **Admin → Team** with a PIN, role, and commission rate; PINs are server‑validated and stored as hashes.
+Admin signs in through a two‑gate code (server‑validated against a hashed Script property, with lockout). Reps are created in **Admin → Team** with a PIN, role, and an **individual comp plan**; PINs are server‑validated and stored as hashes. Roles: **Closer** (closes deals on a % rate), **Appointment Setter** (sources/books leads; earns per‑close fees + monthly residuals + volume bonuses), **Solo** (closer + analytics), **Admin**.
 
 ---
 
@@ -128,7 +129,9 @@ Admin signs in through a two‑gate code (server‑validated against a hashed Sc
 
 ### 2. Client
 
-Open the app, sign in as admin, go to **Settings**, paste the Apps Script `/exec` URL, and **Test connection**. The close page (`close.html`) ships on the same host; its API base is the `/exec` URL.
+Set `DEFAULT_SCRIPT_URL` in `js/data/constants.js` to your Apps Script `/exec` URL, then deploy (Vercel). The client **pins** this URL on every load — so any device connects with zero setup and a stale URL cached in a browser can never hijack the app. (The Settings → Script URL field still exists for ad‑hoc testing, but the pinned default always wins on reload.) The close page (`close.html`) ships on the same host; its API base is the same `/exec` URL.
+
+A fresh device signs in with just a PIN — a successful admin/rep login hands back the shared secret and provisions that browser.
 
 ### 3. Team & leads
 
@@ -152,13 +155,31 @@ localStorage (cache + durable write queue)  ←→  syncNow()  ←→  Apps Scri
 
 ## Security
 
-- **Admin** is server‑validated (two‑gate code → HMAC token, 5‑try / 15‑min lockout); **reps** get per‑rep tokens. Tokens — not just the shared secret — gate sensitive actions.
-- The **public close endpoints** are keyed by the unguessable Engagement ID, are idempotent (signing once, MSA‑placeholder‑blocked), and never expose the waiver code.
-- **Stripe confirmation** requires an explicit engagement‑id binding + subscription/amount checks, with the webhook as the authoritative paid signal — a `paid` flag can't be forged.
-- Sessions expire on inactivity; the provisioning bot is reached over HTTPS.
+- **Admin** is server‑validated (two‑gate code → HMAC token, 5‑try / 15‑min lockout) and admin‑only actions require that token. Authenticated data access is gated by a shared **`CRM_SECRET`** sent with each request (handed to a device on successful login); rotate it on rep offboarding.
+- The **public close endpoints** are keyed by an opaque per‑engagement ID, are idempotent (signing once, MSA‑placeholder‑blocked), and never expose the waiver code. Server‑side amounts only — the client can't set the price.
+- **Stripe confirmation** requires an explicit engagement‑id binding + subscription/amount checks, with the webhook (its own rotatable token) as the authoritative paid signal — a `paid` flag can't be forged.
+- Sessions expire on inactivity and are tamper‑evident; the provisioning bot is reached over HTTPS. No live API keys live in the repo — all secrets resolve from Script Properties.
+
+> **Hardening roadmap (pre‑scale):** enforce the per‑rep token on write actions (today writes are gated by `CRM_SECRET` alone), give the Twilio webhook its own token, generate engagement IDs with a CSPRNG, and migrate off a single Sheet before high lead volume.
 
 ---
 
 ## Commission system
 
-When a deal is **Closed Won**, `calcCommissions()` records both the closer and provider cuts (`pending`), the lead's **engagement is auto‑created**, and admin marks the commission `paid` once collected — with a guard that warns if the **client hasn't paid yet** (collectible‑off‑paid). Cancellations issue a clawback reversing both amounts. Residual reps earn their rate monthly off the recurring value.
+When a deal is **Closed Won**, `calcCommissions()` records both the closer and provider cuts (`pending`), the lead's **engagement is auto‑created**, and admin marks the commission `paid` once collected — with a guard that warns if the **client hasn't paid yet** (collectible‑off‑paid). Cancellations (incl. a bulk "Closed Lost") issue a clawback reversing both amounts and stop residuals. Residual reps earn their rate monthly off the recurring value.
+
+### Per‑person comp plans
+
+Every team member carries an **individual comp plan** (`compPlan` JSON), edited in **Admin → Team** and available for all roles:
+
+- **Per‑close** flat amount (by tier), prefilled at deal‑close from the person's plan
+- **Monthly residuals** per active client, by tier (team / department $, enterprise %)
+- **Volume bonuses** — set the actual quantities per tier ("N closes → $X"), cumulative
+- **First‑close‑of‑month double**
+
+For **Appointment Setters**, a backend engine runs monthly and is idempotent + append‑only:
+
+- `runSetterResiduals()` — a residual row per active client the setter sourced (skips churned), keyed `providerId | leadId | period`
+- `runSetterBonuses()` — counts the month's closes to upsert one volume‑bonus row + one first‑close‑double row, never overwriting a row already marked `paid`/`clawback`
+
+The **sales kill switch** (Admin → Operations) pauses all scraping, outreach sends, and AI replies — scheduled and manual — until resumed; it does **not** touch payouts or client delivery.
