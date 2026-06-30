@@ -284,7 +284,7 @@ async function testConn() {
   if (!url) { toast('Enter the URL first.', 'error'); return; }
   setSyncUI('syncing','Testing...');
   try {
-    const r = await fetch(url + '?action=ping', {redirect:'follow'});
+    const r = await fetch(url + '?action=ping', {method:'POST', redirect:'follow', headers:{'Content-Type':'text/plain'}, body:'{}'});
     const d = await r.json();
     if (d.ping || d.success) {
       setSyncUI('ok','Connection OK');

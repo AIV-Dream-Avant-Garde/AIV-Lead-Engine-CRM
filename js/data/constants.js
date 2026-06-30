@@ -52,7 +52,9 @@ const MAX_FAIL_ATTEMPTS  = 5;
 const LOCKOUT_MS         = 15 * 60 * 1000;      // 15 min lockout
 const LS_LIMIT           = 5 * 1024 * 1024;     // ~5 MB localStorage budget
 
-const GET_ACTIONS = new Set(['ping','pull','getToken','twiml','checkTriggers']);
+// Everything goes over POST (Apps Script GET 404s cross-origin on some deployments).
+// 'twiml' is only ever hit directly by Twilio's webhook (a real GET), never via sheetsCall.
+const GET_ACTIONS = new Set([]);
 
 // Fields from scraped/imported lead data used for CSV mapping
 const CRM_FIELDS      = ['name','phone','email','address','website','rating','reviews','calendarEventId'];
