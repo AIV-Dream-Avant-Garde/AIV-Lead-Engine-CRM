@@ -153,11 +153,11 @@ function updateCommTypeHint() {
   if (lbl) lbl.textContent = isResidual ? 'Residual rate (% per month)' : 'Closer rate (%)';
 }
 
-// Show the per-setter comp plan only for setters (the % rate fields stay for everyone —
-// some setters also call leads, not just social DMs).
+// The individual comp plan is available for EVERY role now (closer, setter, solo); the
+// % rate fields stay alongside it for all of them.
 function toggleCompPlan() {
   const el = document.getElementById('tm-comp-plan');
-  if (el) el.style.display = (document.getElementById('tm-role')?.value === 'setter') ? 'block' : 'none';
+  if (el) el.style.display = 'block';
 }
 // Populate the comp-plan inputs from a member's compPlan (or sensible defaults for a new one).
 function fillCompPlan(m) {
@@ -227,7 +227,7 @@ async function saveTeamMember() {
   const commissionType = document.getElementById('tm-comm-type')?.value || 'one-time';
   const id     = existingId || uid();
   const prior  = S.team.find(m => m.id === id);
-  const member = {id, name, role, contact, closerRate:crate, providerRate:prate, commissionType, active:true, createdAt: prior?.createdAt || new Date().toISOString(), compPlan: role === 'setter' ? readCompPlan() : (prior?.compPlan || '')};
+  const member = {id, name, role, contact, closerRate:crate, providerRate:prate, commissionType, active:true, createdAt: prior?.createdAt || new Date().toISOString(), compPlan: readCompPlan()};
   if (pin) {
     member.pinHash  = await sha256(pin);
     if (!S.config.hidePinPlain) member.pinPlain = pin;   // plaintext storage is opt-out
