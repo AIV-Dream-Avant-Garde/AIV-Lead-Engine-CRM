@@ -64,6 +64,7 @@ async function adminLoginSubmit(code) {
   try { res = await sheetsCall({ action:'adminLogin', code }); } catch(e) { res = null; }
   adminVerifying = false;
   if (res && res.ok && res.token) {
+    if (res.secret) { S.config.crmSecret = res.secret; saveLocal(); }   // device provisioned by the login itself
     sessionStorage.setItem('aiv-admin-token', res.token);
     loginMode = 'pin';
     startSession({ userId:'admin', userName:(res.name || S.config.adminName || 'Andres Toro'), role:'admin', closerRate:0, adminToken:res.token });
@@ -119,6 +120,7 @@ async function tryLogin() {
     try { res = await sheetsCall({ action: 'repLogin', pin: entered }); } catch (e) { res = null; }
     if (res && res.serverAuth) {
       if (res.ok) {
+        if (res.secret) { S.config.crmSecret = res.secret; saveLocal(); }   // device provisioned by the login itself
         startSession({
           userId:       res.userId,
           userName:     res.name,
