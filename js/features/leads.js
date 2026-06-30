@@ -97,6 +97,41 @@ async function enrichOwnersBatch_() {
   if (btn) { btn.disabled = false; btn.textContent = '🔎 Find owners'; }
 }
 
+/* ── Meet discovery-call transcript ──────────────────────────────────────── */
+function renderLeadMeet_(l) {
+  const el = document.getElementById('m-meet'); if (!el) return;
+  if (!(S.session && S.session.role === 'admin') || !l) { el.innerHTML = ''; return; }
+  const hasMeet = (S.calls || []).some(c => c.leadId === l.id && c.outcome === 'meet' && (c.transcript || c.callSummary));
+  el.innerHTML = (hasMeet ? `<span class="lock-badge lock-mine">🎥 Discovery transcript on file</span>` : '')
+    + (S.demoMode ? '' : ` <button class="call-tx-btn" onclick="openMeetTranscript('${l.id}')">${hasMeet ? 'Add another Meet transcript' : '🎥 Add Meet transcript'}</button>`);
+}
+function openMeetTranscript(leadId) {
+  S._meetLeadId = leadId;
+  const t = document.getElementById('mt-text'), u = document.getElementById('mt-url');
+  if (t) t.value = ''; if (u) u.value = '';
+  document.getElementById('meet-overlay')?.classList.add('open');
+  setTimeout(() => document.getElementById('mt-text')?.focus(), 50);
+}
+async function saveMeetTranscript() {
+  const leadId = S._meetLeadId; if (!leadId) return;
+  if (!S.config.scriptUrl || S.demoMode) { toast('Connect Apps Script to add transcripts.', 'error'); return; }
+  const text = (document.getElementById('mt-text')?.value || '').trim();
+  const url  = (document.getElementById('mt-url')?.value || '').trim();
+  if (text.length < 20 && !url) { toast('Paste the transcript text or a Google Doc link.', 'error'); return; }
+  const btn = document.getElementById('mt-save'); if (btn) { btn.disabled = true; btn.textContent = 'Adding…'; }
+  try {
+    const r = await sheetsCall({ action:'addMeetTranscript', leadId, transcript:text, url,
+      repId:(S.session && S.session.userId) || '', repName:(S.session && S.session.userName) || '' });
+    if (r && r.added) {
+      if (r.call) { (S.calls = S.calls || []).push({ ...r.call, _synced:true }); saveLocal(); }
+      document.getElementById('meet-overlay')?.classList.remove('open');
+      toast('Transcript added — it now feeds the audit + roadmap.', 'success');
+      const l = (S.leads || []).find(x => x.id === leadId); if (l) { renderLeadMeet_(l); if (typeof renderLeadTimeline === 'function') renderLeadTimeline(l); }
+    } else toast((r && r.error) ? r.error : 'Could not add the transcript.', 'error', 6000);
+  } catch (e) { toast('Failed: ' + e.message, 'error'); }
+  if (btn) { btn.disabled = false; btn.textContent = 'Add transcript'; }
+}
+
 // ── Follow-up / source badge helpers ──────────────────────
 function isOverdue(lead) {
   if (!lead.followUpDate) return false;
@@ -529,6 +564,7 @@ function openLead(id) {
   }
   if (typeof renderLeadAudit_ === 'function') renderLeadAudit_(l);
   if (typeof renderLeadOwner_ === 'function') renderLeadOwner_(l);
+  if (typeof renderLeadMeet_ === 'function') renderLeadMeet_(l);
 
   // Work history
   const whWrap = document.getElementById('m-work-history');
