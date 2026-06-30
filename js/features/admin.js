@@ -139,6 +139,8 @@ function openTeamModal(memberId) {
   } else {
     titleEl.textContent = 'Add team member';
   }
+  fillCompPlan(memberId ? S.team.find(x => x.id === memberId) : null);
+  toggleCompPlan();
   updateCommTypeHint();
   modal.classList.add('open');
 }
@@ -149,6 +151,41 @@ function updateCommTypeHint() {
   const isResidual = document.getElementById('tm-comm-type')?.value === 'residual';
   const lbl = document.getElementById('tm-crate-label');
   if (lbl) lbl.textContent = isResidual ? 'Residual rate (% per month)' : 'Closer rate (%)';
+}
+
+// Show the per-setter comp plan only for setters (the % rate fields stay for everyone —
+// some setters also call leads, not just social DMs).
+function toggleCompPlan() {
+  const el = document.getElementById('tm-comp-plan');
+  if (el) el.style.display = (document.getElementById('tm-role')?.value === 'setter') ? 'block' : 'none';
+}
+// Populate the comp-plan inputs from a member's compPlan (or sensible defaults for a new one).
+function fillCompPlan(m) {
+  let p = {}; try { p = m && m.compPlan ? (typeof m.compPlan === 'string' ? JSON.parse(m.compPlan) : m.compPlan) : {}; } catch (e) {}
+  const r = p.residual || {}, c = p.close || {};
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = (val == null ? '' : val); };
+  set('tm-close-team', c.team || '');
+  set('tm-close-dept', c.department || '');
+  set('tm-res-team', r.team != null ? r.team : 40);
+  set('tm-res-dept', r.department != null ? r.department : 80);
+  set('tm-res-ent',  r.enterprisePct != null ? r.enterprisePct : 3);
+  const df = document.getElementById('tm-double-first'); if (df) df.value = (p.doubleFirstClose === false ? 'no' : 'yes');
+  const tiers = (Array.isArray(p.bonusTiers) && p.bonusTiers.length) ? p.bonusTiers
+    : [{closes:3,bonus:20},{closes:5,bonus:40},{closes:8,bonus:80},{closes:10,bonus:150},{closes:12,bonus:250}];
+  set('tm-bonus-tiers', tiers.map(t => t.closes + ':' + t.bonus).join(', '));
+}
+// Read the comp-plan inputs into a compPlan JSON string (meaningful for setters).
+function readCompPlan() {
+  const num = (id) => { const x = parseFloat(document.getElementById(id)?.value); return (Number.isFinite(x) && x >= 0) ? x : null; };
+  const tiers = String(document.getElementById('tm-bonus-tiers')?.value || '').split(',').map(s => s.trim()).filter(Boolean)
+    .map(s => { const [c, b] = s.split(':'); return { closes: parseInt(c, 10) || 0, bonus: parseFloat(b) || 0 }; }).filter(t => t.closes > 0);
+  const plan = {
+    close:    { team: num('tm-close-team') || 0, department: num('tm-close-dept') || 0 },
+    residual: { team: num('tm-res-team') ?? 40, department: num('tm-res-dept') ?? 80, enterprisePct: num('tm-res-ent') ?? 3 },
+    doubleFirstClose: (document.getElementById('tm-double-first')?.value !== 'no'),
+    bonusTiers: tiers,
+  };
+  return JSON.stringify(plan);
 }
 
 function closeTeamModal() {
@@ -190,7 +227,7 @@ async function saveTeamMember() {
   const commissionType = document.getElementById('tm-comm-type')?.value || 'one-time';
   const id     = existingId || uid();
   const prior  = S.team.find(m => m.id === id);
-  const member = {id, name, role, contact, closerRate:crate, providerRate:prate, commissionType, active:true, createdAt: prior?.createdAt || new Date().toISOString()};
+  const member = {id, name, role, contact, closerRate:crate, providerRate:prate, commissionType, active:true, createdAt: prior?.createdAt || new Date().toISOString(), compPlan: role === 'setter' ? readCompPlan() : (prior?.compPlan || '')};
   if (pin) {
     member.pinHash  = await sha256(pin);
     if (!S.config.hidePinPlain) member.pinPlain = pin;   // plaintext storage is opt-out
@@ -362,6 +399,8 @@ async function checkTriggerStatus() {
       cadenceConfig: res.cadenceConfig || null,
       lastScrapeRun: res.lastScrapeRun || null, lastCadenceRun: res.lastCadenceRun || null,
     };
+    S.activityPaused = !!res.activityPaused;
+    renderKillSwitch();
     renderScheduledJobs();
     renderReportTrigger();
     renderResidualTrigger();
@@ -413,6 +452,26 @@ async function setTrigger(fn, enabled) {
   } else {
     toast('Error updating the trigger. Make sure the script is deployed with the correct permissions.', 'error', 5000);
   }
+}
+
+// Sales kill switch — global pause/resume of all activity (scraping, outreach, AI replies).
+function renderKillSwitch() {
+  const el = document.getElementById('kill-switch'); if (!el) return;
+  const paused = !!S.activityPaused;
+  el.innerHTML = `<div class="card ${paused ? 'warn' : ''}" style="margin-bottom:0;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <div>
+        <div class="card-title">${paused ? '⏸ Activity is PAUSED' : '▶ Activity is running'}</div>
+        <div class="card-sub">${paused ? 'Scraping, outreach sends and AI replies are held — nothing goes out until you resume.' : 'Kill switch: pause all scraping, outreach sends and AI replies in one click.'}</div>
+      </div>
+      <button class="btn ${paused ? 'btn-primary' : 'btn-danger'}" onclick="toggleActivityPause()">${paused ? 'Resume activity' : 'Pause everything'}</button>
+    </div>`;
+}
+async function toggleActivityPause() {
+  const next = !S.activityPaused;
+  if (next && !confirm('Pause ALL activity?\n\nThis halts scraping, outreach sends, and AI replies (scheduled and manual) until you resume.')) return;
+  S.activityPaused = next; renderKillSwitch();
+  bgSave({ action:'setActivityPaused', paused: next }, 'Activity state');
+  toast(next ? 'All activity PAUSED.' : 'Activity resumed.', next ? 'warning' : 'success');
 }
 
 function renderReportTrigger() {

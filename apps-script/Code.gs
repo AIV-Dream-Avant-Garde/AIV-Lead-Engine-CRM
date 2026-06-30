@@ -203,7 +203,7 @@ const ENGAGEMENT_HDR = ['engagementId','company','status','dealValue','tier',
 
 const LEAD_HDR = ['id','name','phone','address','website','rating','reviews','city','barrio','keyword','source','sourceDetail','status','providerId','providerRate','closerId','closerRate','dealValue','collectedAmount','providerCommission','closerCommission','commissionStatus','lockedBy','lockedUntil','assignedAt','workHistory','dncReason','followUpDate','notes','importedAt','updatedAt','calendarEventId','refundAmount','refundReason','refundedAt','country','email','externalId','lastTouchAt','lastReplyAt','consentSms','consentWhatsapp','consentEmail','lat','lng','residualActive','residualRate','residualMRR','auditUrl','auditSentAt','ownerName'];
 const CALL_HDR = ['id','leadId','leadName','phone','callSid','outcome','duration','notes','recordingUrl','driveUrl','consentConfirmed','calledAt','calledBy','calledByName','transcript','callSummary'];
-const TEAM_HDR = ['id','name','role','pinHash','providerRate','closerRate','contact','active','createdAt','commissionType'];
+const TEAM_HDR = ['id','name','role','pinHash','providerRate','closerRate','contact','active','createdAt','commissionType','compPlan'];
 const COMM_HDR   = ['id','leadId','leadName','dealValue','collectedAmount','providerId','providerRate','providerAmount','closerId','closerRate','closerAmount','status','createdAt','paidAt','paidBy','paymentRef','refundReason','adjustedBy','adjustedAt','providerName','closerName','recurring','period','kind'];
 const SCRIPT_HDR = ['id','name','stage','body','createdAt','updatedAt'];
 const INTERACTION_HDR = ['id','leadId','leadName','phone','channel','direction','body','stepTag','status','sid','error','createdAt','createdBy'];
@@ -310,7 +310,7 @@ function pullPayload_(since) {
   if(since){const sd=new Date(since);interactions=interactions.filter(i=>!i.createdAt||new Date(i.createdAt)>=sd);}
   const sequences = toObjs(getSheet(SHEETS.sequences,SEQUENCE_HDR));
   const engagements = toObjs(getSheet(SHEETS.engagements,ENGAGEMENT_HDR));
-  return {leads,calls,team,commissions:comms,scripts,scheduledJobs,stateCampaigns,interactions,sequences,engagements,adminGateEnabled:!!PROP_('ADMIN_GATE_HASH'),serverTime:new Date().toISOString()};
+  return {leads,calls,team,commissions:comms,scripts,scheduledJobs,stateCampaigns,interactions,sequences,engagements,adminGateEnabled:!!PROP_('ADMIN_GATE_HASH'),activityPaused:activityPaused_(),serverTime:new Date().toISOString()};
 }
 function triggerStatus_() {
   const triggers = ScriptApp.getProjectTriggers();
@@ -324,6 +324,7 @@ function triggerStatus_() {
     cadenceEnabled: getCadenceCfg_().enabled,
     cadenceConfig: getCadenceCfg_(),
     compConfig: getCompCfg_(),
+    activityPaused: activityPaused_(),
     lastScrapeRun, lastCadenceRun,
   };
 }
@@ -500,7 +501,7 @@ function doPost(e) {
       saveCadenceConfig:1, saveCompConfig:1, saveScheduledJobs:1, saveStateCampaigns:1, saveReportEmail:1,
       setTrigger:1, runCadenceNow:1, runScrapesNow:1, saveScript:1, deleteScript:1, previewOutreach:1,
       saveEngagement:1, draftRoadmap:1, generateAudit:1, sendAudit:1, provisionEngagement:1, syncDeliveryNow:1,
-      enrichOwner:1, enrichOwnersBatch:1 };
+      enrichOwner:1, enrichOwnersBatch:1, setActivityPaused:1 };
     if (ADMIN_ONLY[a] && !verifyAdminToken_(b.adminToken)) {
       return err_('Admin sign-in required for this action.', 401);
     }
@@ -738,6 +739,13 @@ function doPost(e) {
         notifyTelegram('Provisioning FAILED — ' + (e.company || eid) + ': ' + err.message + ' (safe to retry)');
         return err_('Provisioning failed: ' + err.message);
       }
+    }
+    // Sales kill switch: pause/resume ALL automatic + manual activity (scraping, cadence
+    // sends, AI replies). Held until an admin flips it back.
+    if (a === 'setActivityPaused') {
+      cfgSet('activityPaused', b.paused ? '1' : '');
+      notifyTelegram(b.paused ? '⏸ Activity PAUSED by admin (kill switch on).' : '▶ Activity RESUMED by admin.');
+      return ok({ activityPaused: !!b.paused });
     }
     if (a === 'syncDeliveryNow') {
       const r = syncDelivery();
@@ -1254,6 +1262,7 @@ function runScheduledScrapes() {
 
 // Scheduled keyword/city jobs (state campaigns are handled by the caller above).
 function runScheduledJobs_() {
+  if (activityPaused_()) return { paused:true, added:0, jobsRun:0, ofJobs:0 };
   const ss   = SpreadsheetApp.openById(SHEET_ID);
   const cfg  = ss.getSheetByName('Config');
   if (!cfg) return;
@@ -1380,6 +1389,7 @@ function campaignTileCenter_(b, rows, cols, idx) {
 }
 
 function runStateCampaigns() {
+  if (activityPaused_()) return { added:0, paused:true };
   let campaigns = [];
   try { campaigns = JSON.parse(cfgGet('stateCampaigns') || '[]'); } catch (e) { return; }
   if (!Array.isArray(campaigns) || !campaigns.length) return;
@@ -1541,6 +1551,24 @@ function getCompCfg_() {
     doubleFirstClose: typeof s.doubleFirstClose === 'boolean' ? s.doubleFirstClose : COMP_DEFAULTS.doubleFirstClose,
   };
 }
+// Each setter carries their OWN comp plan (member.compPlan JSON) — residual by tier,
+// per-tier close amount, enterprise %, volume bonus tiers, double-first-close. Missing
+// fields fall back to the COMP_DEFAULTS. Per-close amounts default to 0 (manual per setter).
+function setterPlan_(m) {
+  let p = {}; try { p = JSON.parse((m && m.compPlan) || '{}') || {}; } catch (e) {}
+  const r = p.residual || {}, c = p.close || {}, n = (v, d) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : d);
+  return {
+    residual: { team: n(r.team, COMP_DEFAULTS.residual.team), department: n(r.department, COMP_DEFAULTS.residual.department), enterprisePct: n(r.enterprisePct, COMP_DEFAULTS.residual.enterprisePct) },
+    close:    { team: n(c.team, 0), department: n(c.department, 0) },
+    bonusTiers: (Array.isArray(p.bonusTiers) && p.bonusTiers.length) ? p.bonusTiers : COMP_DEFAULTS.bonusTiers,
+    bonusCumulative: typeof p.bonusCumulative === 'boolean' ? p.bonusCumulative : COMP_DEFAULTS.bonusCumulative,
+    doubleFirstClose: typeof p.doubleFirstClose === 'boolean' ? p.doubleFirstClose : COMP_DEFAULTS.doubleFirstClose,
+  };
+}
+// Global "sales kill switch": when paused, all automatic + manual activity (scraping,
+// cadence sends, AI replies) is held until an admin resumes it.
+function activityPaused_() { return String(cfgGet('activityPaused')) === '1'; }
+
 // Monthly residual for each active client a SETTER sourced. Append-only + idempotent per setter+lead+period,
 // so re-runs never duplicate a row or touch one you've already marked paid.
 function runSetterResiduals(period) {
@@ -1561,12 +1589,13 @@ function runSetterResiduals(period) {
     if (seen[sid + '|' + String(l.id) + '|' + period]) return;
     const eng = engByLead[String(l.id)] || {};
     if (String(eng.status) === 'churned') return;
+    const plan = setterPlan_(m);                                              // THIS setter's individual plan
     const tier = String(eng.tier || l.tier || 'team').toLowerCase();
     const mrr = parseFloat(eng.dealValue || l.residualMRR || l.dealValue || 0);
     let amount = 0, rate = 0;
-    if (tier === 'enterprise') { rate = cfg.residual.enterprisePct; amount = +(mrr * rate / 100).toFixed(2); }
-    else if (tier === 'department') amount = cfg.residual.department;
-    else amount = cfg.residual.team;
+    if (tier === 'enterprise') { rate = plan.residual.enterprisePct; amount = +(mrr * rate / 100).toFixed(2); }
+    else if (tier === 'department') amount = plan.residual.department;
+    else amount = plan.residual.team;
     if (!amount) return;
     const rec = { id: Utilities.getUuid(), leadId: l.id, leadName: l.name, dealValue: mrr, collectedAmount: '', providerId: sid, providerName: m.name, providerRate: rate, providerAmount: amount, closerId: '', closerName: '', closerRate: 0, closerAmount: 0, status: 'pending', paidAt: '', paidBy: '', paymentRef: '', createdAt: now, recurring: true, period: period, kind: 'setterResidual' };
     cs.appendRow(COMM_HDR.map(function(k){ return rec[k] != null ? rec[k] : ''; }));
@@ -1601,11 +1630,12 @@ function runSetterBonuses(period) {
   const now = new Date().toISOString();
   Object.keys(closes).forEach(function(sid){
     const m = team[sid]; if (!m || String(m.role) !== 'setter') return;
+    const plan = setterPlan_(m);                                             // THIS setter's individual plan
     const n = closes[sid];
     let bonus = 0;
-    cfg.bonusTiers.forEach(function(t){ if (n >= Number(t.closes)) { if (cfg.bonusCumulative) bonus += (Number(t.bonus) || 0); else bonus = (Number(t.bonus) || 0); } });
+    plan.bonusTiers.forEach(function(t){ if (n >= Number(t.closes)) { if (plan.bonusCumulative) bonus += (Number(t.bonus) || 0); else bonus = (Number(t.bonus) || 0); } });
     upsertCompRow_(cs, h, existing[sid + '|setterBonus'], { id: Utilities.getUuid(), leadId: '', leadName: 'Volume bonus ' + period + ' (' + n + ' close' + (n === 1 ? '' : 's') + ')', providerId: sid, providerName: m.name, providerRate: 0, providerAmount: bonus, closerRate: 0, closerAmount: 0, status: 'pending', paidAt:'', paidBy:'', paymentRef:'', createdAt: now, recurring: '', period: period, kind: 'setterBonus' });
-    if (cfg.doubleFirstClose && firstAmt[sid]) {
+    if (plan.doubleFirstClose && firstAmt[sid]) {
       upsertCompRow_(cs, h, existing[sid + '|setterFirstClose'], { id: Utilities.getUuid(), leadId: '', leadName: 'First-close double ' + period, providerId: sid, providerName: m.name, providerRate: 0, providerAmount: firstAmt[sid], closerRate: 0, closerAmount: 0, status: 'pending', paidAt:'', paidBy:'', paymentRef:'', createdAt: now, recurring: '', period: period, kind: 'setterFirstClose' });
     }
   });
@@ -2751,6 +2781,7 @@ function geminiPersonalizeEmail_(lead, cfg) {
 // Inert unless cfg.aiReplies is on; previews (logs only) while the cadence is in
 // dry-run, sends for real when the cadence is live.
 function runAiReplies() {
+  if (activityPaused_()) return;
   const cfg = getCadenceCfg_();
   if (!cfg.aiReplies) return { sent: 0, skipped: 'disabled' };
   const live = cfg.enabled === true;
@@ -2861,6 +2892,7 @@ function runAiReplies() {
 // The engine. Hourly trigger. Pass 1 enroll, Pass 2 advance. Dry-runs (writes
 // nothing, sends nothing) until the cadence config is enabled (UI or constant).
 function runCadence() {
+  if (activityPaused_()) { Logger.log('runCadence: activity paused — skipping.'); return { paused: true }; }
   // Single-run lock: the hourly trigger and the on-demand runCadenceNow must never
   // overlap, or both would read the same pre-send snapshot and double-send a step.
   const lock = LockService.getScriptLock();
