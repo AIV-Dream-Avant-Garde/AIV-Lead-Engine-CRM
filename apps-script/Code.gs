@@ -52,7 +52,7 @@ const TESTIMONIALS_FOLDER_ID = PROP_('TESTIMONIALS_FOLDER_ID') || '1J1d-zgoKB9pm
 const REGISTRY_HDR = ['engagementId','company','tier','stripeCustomerId','mongoSlug','discordGuildId','discordCategoryId','discordRoleId','driveFolderId','provisionedAt'];
 
 // Deployment config — overridable via Script properties, with safe defaults.
-const RESEND_FROM        = PROP_('RESEND_FROM', 'Andres Toro <hola@axius.tech>');   // a PERSON, not the brand — cold mail from a name gets opened more (override via Script property)
+const RESEND_FROM        = PROP_('RESEND_FROM', 'Andres Toro <andres@axius.tech>');   // a PERSON, not the brand — cold mail from a name gets opened more. From == Reply-To (andres@) for a natural, deliverable thread. Override via Script property.
 const REPLY_TO_EMAIL     = PROP_('REPLY_TO_EMAIL', 'andres@axius.tech');      // inbox runInboundEmailScan polls
 const GEMINI_MODEL       = PROP_('GEMINI_MODEL', 'gemini-2.0-flash');
 const BOOKING_URL        = PROP_('BOOKING_URL', 'https://cal.com/andrestoro/discovery-call?overlayCalendar=true');
