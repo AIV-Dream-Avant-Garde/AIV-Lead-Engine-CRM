@@ -1617,13 +1617,18 @@ function runSetterBonuses(period) {
   const ki=h.indexOf('kind'), pi=h.indexOf('period'), pidi=h.indexOf('providerId'), pai=h.indexOf('providerAmount'), cai=h.indexOf('createdAt'), sti=h.indexOf('status');
   const closes = {}, firstAmt = {}, firstWhen = {}, existing = {};
   for (let i = 1; i < rows.length; i++) {
-    if (String(rows[i][pi]) !== period) continue;
     const k = String(rows[i][ki]);
     if (k === 'setterClose') {
-      const sid = String(rows[i][pidi]); closes[sid] = (closes[sid] || 0) + 1;
+      // setterClose rows are one-time closes written with an EMPTY period column, so bucket
+      // them by the month of createdAt — matching on the period column would skip them all
+      // and the volume bonus / first-close-double would never generate.
       const when = String(rows[i][cai] || '');
+      const m = when ? Utilities.formatDate(new Date(when), 'America/New_York', 'yyyy-MM') : String(rows[i][pi]);
+      if (m !== period) continue;
+      const sid = String(rows[i][pidi]); closes[sid] = (closes[sid] || 0) + 1;
       if (!firstWhen[sid] || when < firstWhen[sid]) { firstWhen[sid] = when; firstAmt[sid] = parseFloat(rows[i][pai] || 0); }
     } else if (k === 'setterBonus' || k === 'setterFirstClose') {
+      if (String(rows[i][pi]) !== period) continue;     // backend-stamped rows match on the period column
       existing[String(rows[i][pidi]) + '|' + k] = { row: i + 1, status: String(rows[i][sti] || '') };
     }
   }

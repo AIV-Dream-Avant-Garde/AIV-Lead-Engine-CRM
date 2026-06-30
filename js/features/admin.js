@@ -180,7 +180,7 @@ function bonusTierRowHtml_(closes, bonus) {
     <input type="number" class="bt-closes" min="1" step="1" value="${closes ?? ''}" placeholder="3" style="width:80px">
     <span style="color:var(--body);font-size:12px">closes →&nbsp; $</span>
     <input type="number" class="bt-bonus" min="0" step="5" value="${bonus ?? ''}" placeholder="20" style="width:110px">
-    <button type="button" class="btn btn-ghost btn-sm" onclick="this.closest('.bonus-tier-row').remove()" title="Remove this tier">✕</button>
+    <button type="button" class="btn btn-ghost btn-sm" onclick="this.closest('.bonus-tier-row').remove()" title="Remove this tier" aria-label="Remove this tier">✕</button>
   </div>`;
 }
 function renderBonusTiers(tiers) {
