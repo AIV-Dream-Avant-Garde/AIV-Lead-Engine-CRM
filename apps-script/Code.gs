@@ -32,11 +32,6 @@ const TELEGRAM_ALERT_BOT_TOKEN = PROP_('TELEGRAM_ALERT_BOT_TOKEN');
 const TELEGRAM_ALERT_CHAT_ID   = PROP_('TELEGRAM_ALERT_CHAT_ID');
 const GEMINI_API_KEY     = PROP_('GEMINI_API_KEY');
 const CRM_SECRET         = PROP_('CRM_SECRET');
-// Admin two-gate hash. The Script property wins if set; otherwise this baked fallback is
-// used so the admin sign-in survives a fresh deploy with NO manual setup. Safe to commit:
-// it's sha256(adminCode + '|' + CRM_SECRET) — one-way AND salted by the SECRET (not in this
-// repo), so it's useless to anyone without CRM_SECRET. Rotate CRM_SECRET → re-run seedAdminGate().
-const ADMIN_GATE_HASH    = PROP_('ADMIN_GATE_HASH') || 'b429719693285077e54114f195c6bcbf9ff4e6d90168a6d8e62f63219ad52244';
 
 // Stripe — task 6/7 close page. SECRET key server-side only (never sent to the client).
 // Reuses the live Axius Products/Prices + setup-waiver promotion codes (see Stripe infra).
@@ -302,7 +297,7 @@ function doGet(e) {
       if(since){const sd=new Date(since);interactions=interactions.filter(i=>!i.createdAt||new Date(i.createdAt)>=sd);}
       const sequences = toObjs(getSheet(SHEETS.sequences,SEQUENCE_HDR));
       const engagements = toObjs(getSheet(SHEETS.engagements,ENGAGEMENT_HDR));
-      return ok({leads,calls,team,commissions:comms,scripts,scheduledJobs,stateCampaigns,interactions,sequences,engagements,adminGateEnabled:!!ADMIN_GATE_HASH,serverTime:new Date().toISOString()});
+      return ok({leads,calls,team,commissions:comms,scripts,scheduledJobs,stateCampaigns,interactions,sequences,engagements,adminGateEnabled:!!PROP_('ADMIN_GATE_HASH'),serverTime:new Date().toISOString()});
     }
     if (a === 'getToken') return ok({token:createToken(e.parameter.identity||'agent')});
     if (a === 'checkTriggers') {
@@ -428,7 +423,7 @@ function doPost(e) {
     // token on success. State is held in the 'adminAuthState' Script property,
     // guarded by a script lock to keep the attempt counter race-free.
     if (a === 'adminLogin') {
-      const gateHash = ADMIN_GATE_HASH;
+      const gateHash = PROP_('ADMIN_GATE_HASH');
       if (!gateHash) return ok({ ok:false, needsSetup:true });
       const lock = LockService.getScriptLock();
       try { lock.waitLock(5000); } catch (e) { return ok({ ok:false, error:'busy' }); }
