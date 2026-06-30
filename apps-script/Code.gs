@@ -624,6 +624,29 @@ function doPost(e) {
       todo.forEach(function(l){ try { const n = fetchOwnerName_(l.website); if (n) { patchLeadFields_(l.id, { ownerName: n, updatedAt: new Date().toISOString() }); found++; } } catch (e) {} });
       return ok({ checked: todo.length, found: found });
     }
+    // Ingest a Google Meet discovery-call transcript onto the lead (paste text, or a
+    // shared Doc link). Stored as a 'meet' call so the audit + roadmap use it automatically.
+    if (a === 'addMeetTranscript') {
+      const leadId = String(b.leadId || '').trim();
+      if (!leadId) return err_('Missing leadId.');
+      const lead = toObjs(getSheet(SHEETS.leads, LEAD_HDR)).find(function(l){ return String(l.id) === leadId; });
+      if (!lead) return err_('Lead not found.');
+      let text = String(b.transcript || '').trim();
+      const url = String(b.url || '').trim();
+      if (!text && url) text = fetchDocText_(url);
+      if (!text || text.length < 20) return err_('Paste the transcript text, or a Google Doc link shared so we can read it.');
+      text = text.slice(0, 40000);
+      const summary = geminiCallSummary_(text);
+      const now = new Date().toISOString();
+      const rec = { id: Utilities.getUuid(), leadId: leadId, leadName: lead.name || '', phone: lead.phone || '', callSid: '',
+        outcome: 'meet', duration: '', notes: 'Discovery call (Google Meet)', recordingUrl: '', driveUrl: url || '',
+        consentConfirmed: '', calledAt: now, calledBy: String(b.repId || ''), calledByName: String(b.repName || ''),
+        transcript: text, callSummary: summary || '' };
+      appendRowByHeader_(getSheet(SHEETS.calls, CALL_HDR), rec);
+      patchLeadFields_(leadId, { lastTouchAt: now, updatedAt: now });
+      notifyTelegram('Meet transcript added — ' + (lead.name || leadId) + ' (discovery call).');
+      return ok({ added: true, call: rec, summary: summary || '' });
+    }
     // for review before it's sent.
     if (a === 'generateAudit') {
       const leadId = String(b.leadId || '').trim();
@@ -2644,6 +2667,34 @@ function geminiOwner_(text) {
     if (!name || /none/i.test(name) || name.length > 60 || !/^[A-Za-zÀ-ÿ.'-]+(\s+[A-Za-zÀ-ÿ.'-]+){1,3}$/.test(name)) return '';
     return name;
   } catch (e) { Logger.log('geminiOwner_ error: ' + e.message); return ''; }
+}
+
+/* ── Meet discovery-call transcript ingestion ─────────────────────────────── */
+
+// Export a Google Doc (the Meet transcript) as plain text using the script owner's
+// OAuth token. Works when the doc is shared with the script owner (dreamjunk00).
+function fetchDocText_(url) {
+  try {
+    const id = (String(url).match(/[-\w]{25,}/) || [])[0];
+    if (!id) return '';
+    const res = UrlFetchApp.fetch('https://docs.google.com/feeds/download/documents/export/Export?id=' + encodeURIComponent(id) + '&exportFormat=txt',
+      { headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }, muteHttpExceptions: true, followRedirects: true });
+    if (res.getResponseCode() === 200) return res.getContentText();
+  } catch (e) { Logger.log('fetchDocText_: ' + e.message); }
+  return '';
+}
+// Tight CRM summary of a discovery-call transcript (text in → bullets out).
+function geminiCallSummary_(text) {
+  if (!GEMINI_API_KEY || GEMINI_API_KEY.indexOf('TU_') === 0) return '';
+  const sys = 'Summarize this discovery-call transcript for a sales CRM in 3 to 5 tight bullet points: who they are, their main pains, what they use today, and any next steps or commitments. Plain text bullets, no preamble.';
+  try {
+    const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent?key=' + encodeURIComponent(GEMINI_API_KEY);
+    const payload = { systemInstruction: { parts: [{ text: sys }] }, contents: [{ role: 'user', parts: [{ text: String(text).slice(0, 15000) }] }], generationConfig: { temperature: 0.3, maxOutputTokens: 320 } };
+    const res = UrlFetchApp.fetch(url, { method: 'post', contentType: 'application/json', payload: JSON.stringify(payload), muteHttpExceptions: true });
+    if (res.getResponseCode() !== 200) return '';
+    const d = JSON.parse(res.getContentText() || '{}');
+    return (d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts) ? d.candidates[0].content.parts.map(function(p){ return p.text || ''; }).join('').trim() : '';
+  } catch (e) { Logger.log('geminiCallSummary_ error: ' + e.message); return ''; }
 }
 
 // AI-personalized FIRST email: analyzes the lead (type, city, rating/reviews) and

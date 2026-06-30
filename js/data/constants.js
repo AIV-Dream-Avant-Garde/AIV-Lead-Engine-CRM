@@ -35,6 +35,7 @@ const STATUS_CLS = {
 const OUTCOME_LABELS = {
   answered:'Answered',noanswer:'No answer',voicemail:'Voicemail',
   busy:'Busy',callback:'Call back',wrong:'Wrong number',other:'Other',
+  meet:'Discovery call (Meet)',
 };
 
 // SHA-256 of admin PIN "2819"
