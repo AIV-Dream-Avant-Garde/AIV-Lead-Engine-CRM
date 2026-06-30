@@ -31,9 +31,16 @@ function saveLocal() {
 
 function loadLocal() {
   try { S.config = {...S.config, ...JSON.parse(localStorage.getItem('aiv-cfg')  || '{}')}; } catch(e) {}
-  // Fall back to the baked production URL so a fresh device connects with no setup —
-  // it can then be signed into with just a PIN (the login returns the secret).
-  if (!S.config.scriptUrl && typeof DEFAULT_SCRIPT_URL === 'string' && DEFAULT_SCRIPT_URL.indexOf('http') === 0) S.config.scriptUrl = DEFAULT_SCRIPT_URL;
+  // Pin the production endpoint. ALWAYS use the baked URL — so a stale or wrong scriptUrl
+  // left in a browser's localStorage (e.g. an old deployment from a previous setup) can
+  // never silently hijack the app and cause "Unauthorized" against a dead backend. A fresh
+  // device also connects with zero setup. The /exec URL is stable across redeploys, so the
+  // only place the production URL is ever changed is DEFAULT_SCRIPT_URL in constants.js.
+  if (typeof DEFAULT_SCRIPT_URL === 'string' && DEFAULT_SCRIPT_URL.indexOf('http') === 0
+      && S.config.scriptUrl !== DEFAULT_SCRIPT_URL) {
+    S.config.scriptUrl = DEFAULT_SCRIPT_URL;
+    try { localStorage.setItem('aiv-cfg', JSON.stringify(S.config)); } catch (e) {}  // heal the stored copy immediately
+  }
   // Whether the server admin gate is live (set on last sync) — read at login time
   // to decide if the old in-browser admin PIN path is still allowed.
   S.config.adminGateEnabled = localStorage.getItem('aiv-admin-gate') === '1';
