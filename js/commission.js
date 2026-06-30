@@ -145,6 +145,21 @@ function populateSetterPicker_() {
   field.style.display = ''; amtField.style.display = '';
 }
 
+// When a setter is picked, prefill their configured per-close amount (editable) so you're
+// not retyping it every time. Uses the team baseline; adjust for department/enterprise deals.
+function onSetterPicked() {
+  const sid = document.getElementById('deal-setter')?.value || '';
+  const amtEl = document.getElementById('deal-setter-amt');
+  if (sid && amtEl && !parseFloat(amtEl.value || '0')) {
+    const m = (S.team || []).find(x => x.id === sid);
+    let plan = {}; try { plan = m && m.compPlan ? (typeof m.compPlan === 'string' ? JSON.parse(m.compPlan) : m.compPlan) : {}; } catch (e) {}
+    const c = plan.close || {};
+    const amt = Number(c.team) || Number(c.department) || 0;
+    if (amt) amtEl.value = amt;
+  }
+  updateDealPreview();
+}
+
 function confirmDealValue() {
   const val = parseFloat(document.getElementById('deal-value-inp')?.value || '0');
   if (!val || val <= 0) { toast('Enter a valid value greater than 0.', 'error'); return; }
