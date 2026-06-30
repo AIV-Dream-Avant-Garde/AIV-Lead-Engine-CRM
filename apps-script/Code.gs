@@ -280,41 +280,9 @@ function doGet(e) {
       if (String(s).trim() !== String(CRM_SECRET).trim()) return err_('Unauthorized');
     }
     if (a === 'ping') return ok({ping:true,serverTime:new Date().toISOString()});
-    if (a === 'pull') {
-      const since = e.parameter.since;
-      let leads = toObjs(getSheet(SHEETS.leads,LEAD_HDR)).map(l=>({...l,notes:tryParse(l.notes,[])}));
-      if(since){const sd=new Date(since);leads=leads.filter(l=>!l.updatedAt||new Date(l.updatedAt)>=sd);}
-      const calls   = toObjs(getSheet(SHEETS.calls,CALL_HDR));
-      // Strip pinHash — reps now sign in via the server (repLogin), so the client
-      // never needs the hashes, and broadcasting SHA-256(4-digit PIN) is trivially
-      // reversible. (Pre-redeploy clients still get hashes from the OLD backend.)
-      const team    = toObjs(getSheet(SHEETS.team,TEAM_HDR)).map(function(m){ const c=Object.assign({},m); delete c.pinHash; return c; });
-      const comms   = toObjs(getSheet(SHEETS.commissions,COMM_HDR));
-      const scripts = toObjs(getSheet(SHEETS.scripts,SCRIPT_HDR));
-      let scheduledJobs=[]; try { const raw=cfgGet('scheduledJobs'); if(raw) scheduledJobs=JSON.parse(raw); } catch(e){}
-      let stateCampaigns=[]; try { const raw=cfgGet('stateCampaigns'); if(raw) stateCampaigns=JSON.parse(raw); } catch(e){}
-      let interactions = toObjs(getSheet(SHEETS.interactions,INTERACTION_HDR));
-      if(since){const sd=new Date(since);interactions=interactions.filter(i=>!i.createdAt||new Date(i.createdAt)>=sd);}
-      const sequences = toObjs(getSheet(SHEETS.sequences,SEQUENCE_HDR));
-      const engagements = toObjs(getSheet(SHEETS.engagements,ENGAGEMENT_HDR));
-      return ok({leads,calls,team,commissions:comms,scripts,scheduledJobs,stateCampaigns,interactions,sequences,engagements,adminGateEnabled:!!PROP_('ADMIN_GATE_HASH'),serverTime:new Date().toISOString()});
-    }
+    if (a === 'pull') return ok(pullPayload_(e.parameter.since));
     if (a === 'getToken') return ok({token:createToken(e.parameter.identity||'agent')});
-    if (a === 'checkTriggers') {
-      const triggers = ScriptApp.getProjectTriggers();
-      let lastScrapeRun = null; try { const raw = cfgGet('lastScrapeRun'); if (raw) lastScrapeRun = JSON.parse(raw); } catch(e) {}
-      let lastCadenceRun = null; try { const raw = cfgGet('lastCadenceRun'); if (raw) lastCadenceRun = JSON.parse(raw); } catch(e) {}
-      return ok({
-        scrapeTrigger: triggers.some(t => t.getHandlerFunction() === 'runScheduledScrapes'),
-        reportTrigger: triggers.some(t => t.getHandlerFunction() === 'sendWeeklyReport'),
-        cadenceTrigger: triggers.some(t => t.getHandlerFunction() === 'runCadence'),
-        residualTrigger: triggers.some(t => t.getHandlerFunction() === 'runMonthlyResiduals'),
-        cadenceEnabled: getCadenceCfg_().enabled,
-        cadenceConfig: getCadenceCfg_(),
-        compConfig: getCompCfg_(),
-        lastScrapeRun, lastCadenceRun,
-      });
-    }
+    if (a === 'checkTriggers') return ok(triggerStatus_());
     if (a === 'twiml') {
       const xml = ContentService.createTextOutput(
         '<?xml version="1.0"?><Response><Dial callerId="'+TWILIO_FROM_NUMBER+'" record="record-from-answer" recordingStatusCallback="'+ScriptApp.getService().getUrl()+'?action=rec_hook&amp;token='+encodeURIComponent(CRM_SECRET)+'&amp;cid='+encodeURIComponent(e.parameter.cid||'')+'"><Number>'+(e.parameter.To||'')+'</Number></Dial></Response>'
@@ -323,6 +291,41 @@ function doGet(e) {
     }
     return ok({pong:true});
   } catch(err) { return err_(err.message) }
+}
+
+// Shared read payloads — served over GET (doGet) AND POST (doPost), because some Apps
+// Script deployments 404 on cross-origin GET while POST works. `since` is the delta cursor.
+function pullPayload_(since) {
+  let leads = toObjs(getSheet(SHEETS.leads,LEAD_HDR)).map(l=>({...l,notes:tryParse(l.notes,[])}));
+  if(since){const sd=new Date(since);leads=leads.filter(l=>!l.updatedAt||new Date(l.updatedAt)>=sd);}
+  const calls   = toObjs(getSheet(SHEETS.calls,CALL_HDR));
+  // Strip pinHash — reps sign in via the server (repLogin), so the client never needs the
+  // hashes, and broadcasting SHA-256(4-digit PIN) is trivially reversible.
+  const team    = toObjs(getSheet(SHEETS.team,TEAM_HDR)).map(function(m){ const c=Object.assign({},m); delete c.pinHash; return c; });
+  const comms   = toObjs(getSheet(SHEETS.commissions,COMM_HDR));
+  const scripts = toObjs(getSheet(SHEETS.scripts,SCRIPT_HDR));
+  let scheduledJobs=[]; try { const raw=cfgGet('scheduledJobs'); if(raw) scheduledJobs=JSON.parse(raw); } catch(e){}
+  let stateCampaigns=[]; try { const raw=cfgGet('stateCampaigns'); if(raw) stateCampaigns=JSON.parse(raw); } catch(e){}
+  let interactions = toObjs(getSheet(SHEETS.interactions,INTERACTION_HDR));
+  if(since){const sd=new Date(since);interactions=interactions.filter(i=>!i.createdAt||new Date(i.createdAt)>=sd);}
+  const sequences = toObjs(getSheet(SHEETS.sequences,SEQUENCE_HDR));
+  const engagements = toObjs(getSheet(SHEETS.engagements,ENGAGEMENT_HDR));
+  return {leads,calls,team,commissions:comms,scripts,scheduledJobs,stateCampaigns,interactions,sequences,engagements,adminGateEnabled:!!ADMIN_GATE_HASH,serverTime:new Date().toISOString()};
+}
+function triggerStatus_() {
+  const triggers = ScriptApp.getProjectTriggers();
+  let lastScrapeRun = null; try { const raw = cfgGet('lastScrapeRun'); if (raw) lastScrapeRun = JSON.parse(raw); } catch(e) {}
+  let lastCadenceRun = null; try { const raw = cfgGet('lastCadenceRun'); if (raw) lastCadenceRun = JSON.parse(raw); } catch(e) {}
+  return {
+    scrapeTrigger: triggers.some(t => t.getHandlerFunction() === 'runScheduledScrapes'),
+    reportTrigger: triggers.some(t => t.getHandlerFunction() === 'sendWeeklyReport'),
+    cadenceTrigger: triggers.some(t => t.getHandlerFunction() === 'runCadence'),
+    residualTrigger: triggers.some(t => t.getHandlerFunction() === 'runMonthlyResiduals'),
+    cadenceEnabled: getCadenceCfg_().enabled,
+    cadenceConfig: getCadenceCfg_(),
+    compConfig: getCompCfg_(),
+    lastScrapeRun, lastCadenceRun,
+  };
 }
 
 function doPost(e) {
@@ -414,6 +417,9 @@ function doPost(e) {
       return handleClose_(a, b);
     }
 
+    // ping is unauthenticated (connection test) — answer over POST too (some deploys 404 on GET).
+    if (a === 'ping') return ok({ping:true,serverTime:new Date().toISOString()});
+
     // adminLogin / repLogin authenticate by code/PIN server-side (with a 5-try lockout) and
     // do NOT require the pre-shared CRM secret — so any device can sign in cold. On success
     // they hand back the secret, so the device is fully provisioned just by logging in.
@@ -421,6 +427,11 @@ function doPost(e) {
         String(b._secret).trim() !== String(CRM_SECRET).trim()) {
       return err_('Unauthorized — set the CRM_SECRET Script property to the value shown in Settings.');
     }
+
+    // Read actions, served over POST as well as GET (GET 404s on some deployments).
+    if (a === 'pull')          return ok(pullPayload_(b.since));
+    if (a === 'getToken')      return ok({token:createToken(b.identity||'agent')});
+    if (a === 'checkTriggers') return ok(triggerStatus_());
 
     // Server-validated admin login (two-gate). Validates the combined code against
     // ADMIN_GATE_HASH with a 5-try / 15-min lockout, and returns a short-lived
