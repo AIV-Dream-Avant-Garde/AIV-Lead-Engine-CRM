@@ -60,6 +60,43 @@ function saveNewLead() {
   if (S.config.scriptUrl) syncNow();   // push the new lead to Sheets now
 }
 
+/* ── Owner-name enrichment (powers the {owner} email token) ───────────────── */
+function renderLeadOwner_(l) {
+  const el = document.getElementById('m-owner'); if (!el) return;
+  if (!(S.session && S.session.role === 'admin') || !l) { el.innerHTML = ''; return; }
+  if (l._enriching) { el.innerHTML = '<span class="call-rec-pending"><span class="call-rec-spin"></span>Looking up the owner…</span>'; return; }
+  if (l.ownerName) {
+    el.innerHTML = `<span class="lock-badge lock-mine">👤 Owner: ${esc(l.ownerName)}</span>` + (S.demoMode ? '' : ` <button class="call-tx-btn" onclick="enrichOwner_('${l.id}')">Re-check</button>`);
+    return;
+  }
+  el.innerHTML = (String(l.website || '').trim() && !S.demoMode)
+    ? `<button class="call-tx-btn" onclick="enrichOwner_('${l.id}')">🔎 Find owner (from website)</button>` : '';
+}
+async function enrichOwner_(leadId) {
+  const l = (S.leads || []).find(x => x.id === leadId); if (!l || l._enriching) return;
+  if (!S.config.scriptUrl || S.demoMode) { toast('Connect Apps Script to look up owners.', 'error'); return; }
+  l._enriching = true; renderLeadOwner_(l);
+  try {
+    const r = await sheetsCall({ action:'enrichOwner', leadId });
+    if (r && r.found) { l.ownerName = r.ownerName; saveLocal(); toast('Owner found: ' + r.ownerName, 'success'); }
+    else if (r && r.success) toast('No owner name found on that website.', 'warning');
+    else toast((r && r.error) ? r.error : 'Lookup failed.', 'error');
+  } catch (e) { toast('Lookup failed: ' + e.message, 'error'); }
+  l._enriching = false; renderLeadOwner_(l);
+}
+async function enrichOwnersBatch_() {
+  if (!S.config.scriptUrl || S.demoMode) { toast('Connect Apps Script to look up owners.', 'error'); return; }
+  const btn = document.getElementById('find-owners-btn'); if (btn) { btn.disabled = true; btn.textContent = '🔎 Finding…'; }
+  try {
+    const r = await sheetsCall({ action:'enrichOwnersBatch' });
+    if (r && r.success) {
+      toast(r.checked ? ('Checked ' + r.checked + ', found ' + r.found + ' owner' + (r.found === 1 ? '' : 's') + '. Syncing…') : 'No leads needed an owner lookup.', r.found ? 'success' : 'warning', 6000);
+      if (r.found && typeof syncNow === 'function') syncNow();
+    } else toast((r && r.error) ? r.error : 'Batch lookup failed.', 'error');
+  } catch (e) { toast('Batch lookup failed: ' + e.message, 'error'); }
+  if (btn) { btn.disabled = false; btn.textContent = '🔎 Find owners'; }
+}
+
 // ── Follow-up / source badge helpers ──────────────────────
 function isOverdue(lead) {
   if (!lead.followUpDate) return false;
@@ -491,6 +528,7 @@ function openLead(id) {
     }
   }
   if (typeof renderLeadAudit_ === 'function') renderLeadAudit_(l);
+  if (typeof renderLeadOwner_ === 'function') renderLeadOwner_(l);
 
   // Work history
   const whWrap = document.getElementById('m-work-history');
