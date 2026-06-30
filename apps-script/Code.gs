@@ -310,7 +310,7 @@ function pullPayload_(since) {
   if(since){const sd=new Date(since);interactions=interactions.filter(i=>!i.createdAt||new Date(i.createdAt)>=sd);}
   const sequences = toObjs(getSheet(SHEETS.sequences,SEQUENCE_HDR));
   const engagements = toObjs(getSheet(SHEETS.engagements,ENGAGEMENT_HDR));
-  return {leads,calls,team,commissions:comms,scripts,scheduledJobs,stateCampaigns,interactions,sequences,engagements,adminGateEnabled:!!ADMIN_GATE_HASH,serverTime:new Date().toISOString()};
+  return {leads,calls,team,commissions:comms,scripts,scheduledJobs,stateCampaigns,interactions,sequences,engagements,adminGateEnabled:!!PROP_('ADMIN_GATE_HASH'),serverTime:new Date().toISOString()};
 }
 function triggerStatus_() {
   const triggers = ScriptApp.getProjectTriggers();
