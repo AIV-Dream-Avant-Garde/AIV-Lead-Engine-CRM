@@ -455,3 +455,23 @@ test('campaignTile: tile centers stay inside the bounding box', () => {
   const a = campaignTile(fl, g.rows, g.cols, 0), b = campaignTile(fl, g.rows, g.cols, 1);
   assert(a.lat !== b.lat || a.lng !== b.lng, 'adjacent tiles differ');
 });
+
+// ── Setter compensation: cumulative volume bonus (money — highest risk) ──────
+test('setterVolumeBonus: cumulative sums every reached tier', () => {
+  const T = [{closes:3,bonus:20},{closes:5,bonus:40},{closes:8,bonus:80},{closes:10,bonus:150},{closes:12,bonus:250}];
+  eq(setterVolumeBonus(2, T, true), 0,   'below first tier');
+  eq(setterVolumeBonus(3, T, true), 20,  'first tier');
+  eq(setterVolumeBonus(5, T, true), 60,  '20+40');
+  eq(setterVolumeBonus(8, T, true), 140, '20+40+80');
+  eq(setterVolumeBonus(11, T, true), 290,'20+40+80+150');
+  eq(setterVolumeBonus(12, T, true), 540,'all five');
+  eq(setterVolumeBonus(99, T, true), 540,'caps at the top tier');
+});
+
+test('setterVolumeBonus: highest-only mode pays a single tier', () => {
+  const T = [{closes:3,bonus:20},{closes:5,bonus:40},{closes:8,bonus:80}];
+  eq(setterVolumeBonus(2, T, false), 0);
+  eq(setterVolumeBonus(4, T, false), 20);
+  eq(setterVolumeBonus(7, T, false), 40);
+  eq(setterVolumeBonus(8, T, false), 80);
+});

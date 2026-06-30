@@ -63,6 +63,18 @@ function calcCommissions(lead, dealValue) {
   };
 }
 
+// Cumulative (or highest-tier) monthly volume bonus for a setter's close count.
+// tiers: [{closes, bonus}]. cumulative=true sums every reached tier, else pays the top reached.
+// Pure (unit-tested); MIRRORS runSetterBonuses() in apps-script/Code.gs — keep the two in sync.
+function setterVolumeBonus(closeCount, tiers, cumulative) {
+  const n = Number(closeCount) || 0;
+  let bonus = 0;
+  (tiers || []).forEach(function(t) {
+    if (n >= Number(t.closes)) { if (cumulative) bonus += (Number(t.bonus) || 0); else bonus = (Number(t.bonus) || 0); }
+  });
+  return bonus;
+}
+
 function updateDealPreview() {
   const val     = parseFloat(document.getElementById('deal-value-inp')?.value || '0');
   const preview = document.getElementById('deal-preview');
@@ -76,9 +88,18 @@ function updateDealPreview() {
     (closerMember ? closerMember.name.split(' ')[0] : 'Closer') + ' (' + closRate + '%):';
   document.getElementById('dp-closer-amt').textContent = fmtUSD(closerAmount);
 
+  const setterId  = document.getElementById('deal-setter')?.value || '';
+  const setterAmt = parseFloat(document.getElementById('deal-setter-amt')?.value || '0');
   const provRow = document.getElementById('dp-provider-row');
+  let providerShown = providerAmount;
   if (provRow) {
-    if (provRate > 0) {
+    if (setterId && setterAmt > 0) {
+      const sm = S.team.find(m => m.id === setterId);
+      document.getElementById('dp-provider-label').textContent = (sm ? sm.name.split(' ')[0] : 'Setter') + ' (flat):';
+      document.getElementById('dp-provider-amt').textContent = fmtUSD(setterAmt);
+      providerShown = setterAmt;
+      provRow.style.display = '';
+    } else if (provRate > 0) {
       const providerMember = S.team.find(m => m.id === lead.providerId);
       document.getElementById('dp-provider-label').textContent =
         (providerMember ? providerMember.name.split(' ')[0] : 'Provider') + ' (' + provRate + '%):';
@@ -88,7 +109,7 @@ function updateDealPreview() {
       provRow.style.display = 'none';
     }
   }
-  document.getElementById('dp-total').textContent = fmtUSD(closerAmount + providerAmount);
+  document.getElementById('dp-total').textContent = fmtUSD(closerAmount + providerShown);
   preview.style.display = 'block';
 }
 
@@ -106,7 +127,22 @@ function interceptCerrado(leadId) {
   }
   document.getElementById('deal-value-inp').value    = '';
   document.getElementById('deal-preview').style.display = 'none';
+  populateSetterPicker_();
   document.getElementById('deal-overlay').classList.add('open');
+}
+
+// Populate the deal modal's setter picker from active role:'setter' members. Hidden when there are none.
+function populateSetterPicker_() {
+  const sel = document.getElementById('deal-setter');
+  const field = document.getElementById('deal-setter-field'), amtField = document.getElementById('deal-setter-amt-field');
+  if (!sel || !field || !amtField) return;
+  const setters = (S.team || []).filter(m => m.role === 'setter' && String(m.active) !== 'false');
+  if (!setters.length) { field.style.display = 'none'; amtField.style.display = 'none'; return; }
+  const lead = S.leads.find(l => l.id === S.pendingCerrado);
+  sel.innerHTML = '<option value="">— none —</option>' + setters.map(m => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');
+  sel.value = (lead && lead.providerId) || '';
+  const amt = document.getElementById('deal-setter-amt'); if (amt) amt.value = '';
+  field.style.display = ''; amtField.style.display = '';
 }
 
 function confirmDealValue() {
@@ -170,6 +206,22 @@ function confirmCerradoWithValue(leadId, dealValue) {
     recurring:      isResidual ? true : '',
     period:         isResidual ? currentPeriod() : '',
   };
+  // Appointment setter: a MANUAL flat commission for this close. The setter becomes the lead's
+  // provider so the server-side monthly residual + cumulative-bonus engine credits them; tagging
+  // kind 'setterClose' is what the bonus + first-close-double passes count.
+  const setterId  = document.getElementById('deal-setter')?.value || '';
+  const setterAmt = parseFloat(document.getElementById('deal-setter-amt')?.value || '0');
+  if (setterId && setterAmt > 0) {
+    const setter = S.team.find(m => m.id === setterId);
+    lead.providerId         = setterId;
+    lead.providerCommission = setterAmt.toFixed(0);
+    commRec.providerId     = setterId;
+    commRec.providerName   = setter ? setter.name : '';
+    commRec.providerRate   = 0;
+    commRec.providerAmount = setterAmt.toFixed(2);
+    commRec.kind           = 'setterClose';
+    pushLead(lead);   // persist the setter as the lead's provider (residual engine reads this)
+  }
   S.commissions.push(commRec);
   saveLocal();
   bgSave({action:'saveCommission', ...commRec}, 'Commission', 'commissions');

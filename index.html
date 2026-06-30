@@ -1050,6 +1050,14 @@ Content-Type: application/json
       <label>Deal value (USD)</label>
       <input type="number" id="deal-value-inp" placeholder="E.g.: 5000000" min="0" step="1000" oninput="updateDealPreview()">
     </div>
+    <div class="field" id="deal-setter-field" style="display:none">
+      <label>Appointment setter (optional)</label>
+      <select id="deal-setter" onchange="updateDealPreview()"><option value="">— none —</option></select>
+    </div>
+    <div class="field" id="deal-setter-amt-field" style="display:none">
+      <label>Setter commission for this close (USD)</label>
+      <input type="number" id="deal-setter-amt" placeholder="E.g.: 150" min="0" step="10" oninput="updateDealPreview()">
+    </div>
     <div id="deal-preview" class="deal-preview">
       <div class="deal-preview-row"><span id="dp-closer-label">Closer (--%):</span><span id="dp-closer-amt">$0</span></div>
       <div class="deal-preview-row" id="dp-provider-row" style="display:none"><span id="dp-provider-label">Provider (--%):</span><span id="dp-provider-amt">$0</span></div>

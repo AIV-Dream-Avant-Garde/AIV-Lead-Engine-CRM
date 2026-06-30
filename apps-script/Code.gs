@@ -204,7 +204,7 @@ const ENGAGEMENT_HDR = ['engagementId','company','status','dealValue','tier',
 const LEAD_HDR = ['id','name','phone','address','website','rating','reviews','city','barrio','keyword','source','sourceDetail','status','providerId','providerRate','closerId','closerRate','dealValue','collectedAmount','providerCommission','closerCommission','commissionStatus','lockedBy','lockedUntil','assignedAt','workHistory','dncReason','followUpDate','notes','importedAt','updatedAt','calendarEventId','refundAmount','refundReason','refundedAt','country','email','externalId','lastTouchAt','lastReplyAt','consentSms','consentWhatsapp','consentEmail','lat','lng','residualActive','residualRate','residualMRR','auditUrl','auditSentAt'];
 const CALL_HDR = ['id','leadId','leadName','phone','callSid','outcome','duration','notes','recordingUrl','driveUrl','consentConfirmed','calledAt','calledBy','calledByName','transcript','callSummary'];
 const TEAM_HDR = ['id','name','role','pinHash','providerRate','closerRate','contact','active','createdAt','commissionType'];
-const COMM_HDR   = ['id','leadId','leadName','dealValue','collectedAmount','providerId','providerRate','providerAmount','closerId','closerRate','closerAmount','status','createdAt','paidAt','paidBy','paymentRef','refundReason','adjustedBy','adjustedAt','providerName','closerName','recurring','period'];
+const COMM_HDR   = ['id','leadId','leadName','dealValue','collectedAmount','providerId','providerRate','providerAmount','closerId','closerRate','closerAmount','status','createdAt','paidAt','paidBy','paymentRef','refundReason','adjustedBy','adjustedAt','providerName','closerName','recurring','period','kind'];
 const SCRIPT_HDR = ['id','name','stage','body','createdAt','updatedAt'];
 const INTERACTION_HDR = ['id','leadId','leadName','phone','channel','direction','body','stepTag','status','sid','error','createdAt','createdBy'];
 const SEQUENCE_HDR = ['leadId','state','stepIndex','nextRunAt','pausedReason','enrolledAt','updatedAt']; // cadence enrollment (Project B; written by the Vercel engine + manual CRM controls)
@@ -311,6 +311,7 @@ function doGet(e) {
         residualTrigger: triggers.some(t => t.getHandlerFunction() === 'runMonthlyResiduals'),
         cadenceEnabled: getCadenceCfg_().enabled,
         cadenceConfig: getCadenceCfg_(),
+        compConfig: getCompCfg_(),
         lastScrapeRun, lastCadenceRun,
       });
     }
@@ -481,7 +482,7 @@ function doPost(e) {
     // directly. Reps' day-to-day actions (leads, calls, outreach, their own
     // commissions) are intentionally NOT in this set. code 401 → client re-login.
     var ADMIN_ONLY = { saveTeamMember:1, cancelCommission:1, adjustCollected:1, markCommissionPaid:1,
-      saveCadenceConfig:1, saveScheduledJobs:1, saveStateCampaigns:1, saveReportEmail:1,
+      saveCadenceConfig:1, saveCompConfig:1, saveScheduledJobs:1, saveStateCampaigns:1, saveReportEmail:1,
       setTrigger:1, runCadenceNow:1, runScrapesNow:1, saveScript:1, deleteScript:1, previewOutreach:1,
       saveEngagement:1, draftRoadmap:1, generateAudit:1, sendAudit:1, provisionEngagement:1, syncDeliveryNow:1 };
     if (ADMIN_ONLY[a] && !verifyAdminToken_(b.adminToken)) {
@@ -893,6 +894,22 @@ function doPost(e) {
       cfgSet('cadenceConfig', JSON.stringify(clean));
       return ok({ saved:true, config: getCadenceCfg_() });
     }
+    // Setter-compensation config (admin UI): residual amounts by tier + volume-bonus tiers + flags.
+    if (a === 'saveCompConfig') {
+      const c = b.config || {}, r = c.residual || {};
+      const num = (v, d, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d; };
+      const tiers = (Array.isArray(c.bonusTiers) ? c.bonusTiers : [])
+        .map(t => ({ closes: num(t.closes, 0, 1, 1000), bonus: num(t.bonus, 0, 0, 1000000) }))
+        .filter(t => t.closes > 0).sort((a, b) => a.closes - b.closes);
+      const clean = {
+        residual: { team: num(r.team, COMP_DEFAULTS.residual.team, 0, 1000000), department: num(r.department, COMP_DEFAULTS.residual.department, 0, 1000000), enterprisePct: num(r.enterprisePct, COMP_DEFAULTS.residual.enterprisePct, 0, 100) },
+        bonusTiers: tiers.length ? tiers : COMP_DEFAULTS.bonusTiers,
+        bonusCumulative: c.bonusCumulative !== false,
+        doubleFirstClose: c.doubleFirstClose !== false,
+      };
+      cfgSet('compConfig', JSON.stringify(clean));
+      return ok({ saved:true, config: getCompCfg_() });
+    }
     if (a === 'saveReportEmail') {
       const ss=SpreadsheetApp.openById(SHEET_ID);
       let cfg=ss.getSheetByName('Config');
@@ -1169,6 +1186,8 @@ function runScheduledScrapes() {
   try { campAdded = (runStateCampaigns() || {}).added || 0; } catch (e) { Logger.log('runStateCampaigns error: ' + e.message); }
   // Drain the bot's Drive-sync queue into each client's ACWA folders (task 8b).
   try { syncDelivery(); } catch (e) { Logger.log('syncDelivery error: ' + e.message); }
+  // Keep setter comp current daily: residuals (idempotent per month) + volume bonus / first-close (upserted).
+  try { runSetterResiduals(); runSetterBonuses(); } catch (e) { Logger.log('setter comp error: ' + e.message); }
   let jobsRes = {};
   try { jobsRes = runScheduledJobs_() || {}; } catch (e) { Logger.log('runScheduledJobs_ error: ' + e.message); }
   return { added: (jobsRes.added || 0) + campAdded, campaignsAdded: campAdded,
@@ -1442,6 +1461,112 @@ function crawlEmail_(website) {
 // generate this month's commission row (one per lead per period). Dedups against
 // existing rows, so it's safe to run repeatedly. Set on a monthly trigger via
 // setTrigger('runMonthlyResiduals'). Mirrors the client generateResiduals().
+/* ── SETTER COMPENSATION ENGINE (setter = a lead's providerId whose team role is 'setter') ──
+   Confirmed rules (admin-tunable via compConfig; all keyed by 'YYYY-MM' so they roll over month-to-month
+   and year-to-year automatically and stay idempotent for 10+ years):
+     • Monthly residual per ACTIVE client, by tier: team $40 / department $80 / enterprise 3% of MRR  (kind 'setterResidual')
+     • [PR #2] manual flat per close + first-close-double + CUMULATIVE volume bonus (3/5/8/10/12 -> 20/40/80/150/250)
+   Setter rows are kind-tagged so they never collide with the closer residual dedup. */
+const COMP_DEFAULTS = {
+  residual:   { team: 40, department: 80, enterprisePct: 3 },
+  bonusTiers: [ {closes:3,bonus:20}, {closes:5,bonus:40}, {closes:8,bonus:80}, {closes:10,bonus:150}, {closes:12,bonus:250} ],
+  bonusCumulative: true,
+  doubleFirstClose: true,
+};
+function getCompCfg_() {
+  let s = {}; try { s = JSON.parse(cfgGet('compConfig') || '{}'); } catch (e) {}
+  const r = s.residual || {}, n0 = (v, d) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : d);
+  return {
+    residual: { team: n0(r.team, COMP_DEFAULTS.residual.team), department: n0(r.department, COMP_DEFAULTS.residual.department), enterprisePct: n0(r.enterprisePct, COMP_DEFAULTS.residual.enterprisePct) },
+    bonusTiers: (Array.isArray(s.bonusTiers) && s.bonusTiers.length) ? s.bonusTiers : COMP_DEFAULTS.bonusTiers,
+    bonusCumulative: typeof s.bonusCumulative === 'boolean' ? s.bonusCumulative : COMP_DEFAULTS.bonusCumulative,
+    doubleFirstClose: typeof s.doubleFirstClose === 'boolean' ? s.doubleFirstClose : COMP_DEFAULTS.doubleFirstClose,
+  };
+}
+// Monthly residual for each active client a SETTER sourced. Append-only + idempotent per setter+lead+period,
+// so re-runs never duplicate a row or touch one you've already marked paid.
+function runSetterResiduals(period) {
+  period = period || Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM');
+  const cfg = getCompCfg_();
+  const team = {}; toObjs(getSheet(SHEETS.team, TEAM_HDR)).forEach(function(m){ team[String(m.id)] = m; });
+  const engByLead = {}; toObjs(getSheet(SHEETS.engagements, ENGAGEMENT_HDR)).forEach(function(e){ engByLead[String(e.engagementId)] = e; });
+  const cs = getSheet(SHEETS.commissions, COMM_HDR), rows = cs.getDataRange().getValues(), h = rows[0] || COMM_HDR;
+  const ki = h.indexOf('kind'), pidi = h.indexOf('providerId'), idi = h.indexOf('leadId'), pi = h.indexOf('period');
+  const seen = {};
+  for (let i = 1; i < rows.length; i++) if (String(rows[i][ki]) === 'setterResidual') seen[String(rows[i][pidi]) + '|' + String(rows[i][idi]) + '|' + String(rows[i][pi])] = 1;
+  const now = new Date().toISOString(); let created = 0;
+  toObjs(getSheet(SHEETS.leads, LEAD_HDR)).forEach(function(l){
+    if (String(l.status) !== 'Closed Won') return;
+    const sid = String(l.providerId || ''); if (!sid) return;
+    const m = team[sid]; if (!m || String(m.role) !== 'setter') return;       // only role:setter sources earn this
+    if (String(l.residualActive).toLowerCase() === 'false') return;
+    if (seen[sid + '|' + String(l.id) + '|' + period]) return;
+    const eng = engByLead[String(l.id)] || {};
+    if (String(eng.status) === 'churned') return;
+    const tier = String(eng.tier || l.tier || 'team').toLowerCase();
+    const mrr = parseFloat(eng.dealValue || l.residualMRR || l.dealValue || 0);
+    let amount = 0, rate = 0;
+    if (tier === 'enterprise') { rate = cfg.residual.enterprisePct; amount = +(mrr * rate / 100).toFixed(2); }
+    else if (tier === 'department') amount = cfg.residual.department;
+    else amount = cfg.residual.team;
+    if (!amount) return;
+    const rec = { id: Utilities.getUuid(), leadId: l.id, leadName: l.name, dealValue: mrr, collectedAmount: '', providerId: sid, providerName: m.name, providerRate: rate, providerAmount: amount, closerId: '', closerName: '', closerRate: 0, closerAmount: 0, status: 'pending', paidAt: '', paidBy: '', paymentRef: '', createdAt: now, recurring: true, period: period, kind: 'setterResidual' };
+    cs.appendRow(COMM_HDR.map(function(k){ return rec[k] != null ? rec[k] : ''; }));
+    seen[sid + '|' + String(l.id) + '|' + period] = 1; created++;
+  });
+  cfgSet('lastSetterResidualRun', JSON.stringify({ ranAt: now, period: period, created: created }));
+  return { created: created, period: period };
+}
+
+// Cumulative volume bonus + first-close-double for each setter, for `period`. Counts the setter's
+// setterClose rows that month, upserts ONE setterBonus + ONE setterFirstClose row per setter, and
+// NEVER overwrites a row already marked paid/clawback (a re-run can't undo a payout). Idempotent.
+// Bonus math MIRRORS setterVolumeBonus() in js/commission.js (keep the two in sync).
+function runSetterBonuses(period) {
+  period = period || Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM');
+  const cfg = getCompCfg_();
+  const team = {}; toObjs(getSheet(SHEETS.team, TEAM_HDR)).forEach(function(m){ team[String(m.id)] = m; });
+  const cs = getSheet(SHEETS.commissions, COMM_HDR), rows = cs.getDataRange().getValues(), h = rows[0] || COMM_HDR;
+  const ki=h.indexOf('kind'), pi=h.indexOf('period'), pidi=h.indexOf('providerId'), pai=h.indexOf('providerAmount'), cai=h.indexOf('createdAt'), sti=h.indexOf('status');
+  const closes = {}, firstAmt = {}, firstWhen = {}, existing = {};
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][pi]) !== period) continue;
+    const k = String(rows[i][ki]);
+    if (k === 'setterClose') {
+      const sid = String(rows[i][pidi]); closes[sid] = (closes[sid] || 0) + 1;
+      const when = String(rows[i][cai] || '');
+      if (!firstWhen[sid] || when < firstWhen[sid]) { firstWhen[sid] = when; firstAmt[sid] = parseFloat(rows[i][pai] || 0); }
+    } else if (k === 'setterBonus' || k === 'setterFirstClose') {
+      existing[String(rows[i][pidi]) + '|' + k] = { row: i + 1, status: String(rows[i][sti] || '') };
+    }
+  }
+  const now = new Date().toISOString();
+  Object.keys(closes).forEach(function(sid){
+    const m = team[sid]; if (!m || String(m.role) !== 'setter') return;
+    const n = closes[sid];
+    let bonus = 0;
+    cfg.bonusTiers.forEach(function(t){ if (n >= Number(t.closes)) { if (cfg.bonusCumulative) bonus += (Number(t.bonus) || 0); else bonus = (Number(t.bonus) || 0); } });
+    upsertCompRow_(cs, h, existing[sid + '|setterBonus'], { id: Utilities.getUuid(), leadId: '', leadName: 'Volume bonus ' + period + ' (' + n + ' close' + (n === 1 ? '' : 's') + ')', providerId: sid, providerName: m.name, providerRate: 0, providerAmount: bonus, closerRate: 0, closerAmount: 0, status: 'pending', paidAt:'', paidBy:'', paymentRef:'', createdAt: now, recurring: '', period: period, kind: 'setterBonus' });
+    if (cfg.doubleFirstClose && firstAmt[sid]) {
+      upsertCompRow_(cs, h, existing[sid + '|setterFirstClose'], { id: Utilities.getUuid(), leadId: '', leadName: 'First-close double ' + period, providerId: sid, providerName: m.name, providerRate: 0, providerAmount: firstAmt[sid], closerRate: 0, closerAmount: 0, status: 'pending', paidAt:'', paidBy:'', paymentRef:'', createdAt: now, recurring: '', period: period, kind: 'setterFirstClose' });
+    }
+  });
+  cfgSet('lastSetterBonusRun', JSON.stringify({ ranAt: now, period: period }));
+  return { period: period };
+}
+// Upsert a comp row: update an existing row (preserving its id) or append a new one. Skips rows
+// already marked paid/clawback so a re-run can never reverse a payout you've already made.
+function upsertCompRow_(sheet, hdr, ex, rec) {
+  if (ex && (ex.status === 'paid' || ex.status === 'clawback')) return;
+  if (ex && ex.row) {
+    const idi = hdr.indexOf('id'), cur = sheet.getRange(ex.row, idi + 1).getValue();
+    if (cur) rec.id = cur;
+    sheet.getRange(ex.row, 1, 1, hdr.length).setValues([hdr.map(function(k){ return rec[k] != null ? rec[k] : ''; })]);
+  } else {
+    sheet.appendRow(hdr.map(function(k){ return rec[k] != null ? rec[k] : ''; }));
+  }
+}
+
 function runMonthlyResiduals() {
   const period = Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM');
   const ls = getSheet(SHEETS.leads, LEAD_HDR), lr = ls.getDataRange().getValues(), lh = lr[0] || LEAD_HDR;
@@ -1455,9 +1580,11 @@ function runMonthlyResiduals() {
   for (let i = 1; i < tr.length; i++) team[String(tr[i][tIdc])] = { name: tr[i][tNc], type: String(tr[i][tCtc] || '') };
 
   const cs = getSheet(SHEETS.commissions, COMM_HDR), cr = cs.getDataRange().getValues(), ch = cr[0] || COMM_HDR;
-  const clic=ch.indexOf('leadId'), cpc=ch.indexOf('period');
+  const clic=ch.indexOf('leadId'), cpc=ch.indexOf('period'), cki=ch.indexOf('kind');
   const seen = new Set();
-  for (let i = 1; i < cr.length; i++) seen.add(String(cr[i][clic]) + '|' + String(cpc >= 0 ? (cr[i][cpc] || '') : ''));
+  // Skip setter-comp rows: they share leadId|period with closer residuals but pay a different person,
+  // so counting them here would wrongly block the closer's residual for that lead+period.
+  for (let i = 1; i < cr.length; i++) { if (cki >= 0 && String(cr[i][cki]).indexOf('setter') === 0) continue; seen.add(String(cr[i][clic]) + '|' + String(cpc >= 0 ? (cr[i][cpc] || '') : '')); }
 
   const now = new Date().toISOString();
   let created = 0;
@@ -1481,9 +1608,12 @@ function runMonthlyResiduals() {
     seen.add(leadId + '|' + period);
     created++;
   }
-  cfgSet('lastResidualRun', JSON.stringify({ ranAt: now, period, created }));
-  Logger.log('Monthly residuals: +' + created + ' for ' + period);
-  return { created, period };
+  let setter = { created: 0 };
+  try { setter = runSetterResiduals(period) || setter; } catch (e) { Logger.log('runSetterResiduals: ' + e.message); }
+  try { runSetterBonuses(period); } catch (e) { Logger.log('runSetterBonuses: ' + e.message); }
+  cfgSet('lastResidualRun', JSON.stringify({ ranAt: now, period, created, setterResiduals: setter.created }));
+  Logger.log('Monthly residuals: +' + created + ' closer, +' + setter.created + ' setter, for ' + period);
+  return { created, period, setterResiduals: setter.created };
 }
 
 // ── Low-level send helpers (shared by the message handlers + the cadence engine) ──
