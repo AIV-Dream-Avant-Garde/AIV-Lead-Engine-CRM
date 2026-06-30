@@ -38,6 +38,11 @@ const OUTCOME_LABELS = {
   meet:'Discovery call (Meet)',
 };
 
+// Baked production Apps Script /exec URL — so any fresh device/browser connects
+// automatically and you can sign in with just your PIN (no per-device setup). Not a
+// secret (it's a public endpoint). Set this to your CURRENT "Manage deployments" URL.
+const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzWel67OOrAxOOXLBIwd5yEIKTnDEQZWUaR07QDdmLWeiOUWuwLA88O2-3oy-Awo8yNdw/exec';
+
 // SHA-256 of admin PIN "2819"
 const ADMIN_HASH = 'c05562111bb2b94ae2eebdbb85e408884622fffd762a7e132198b960d2ad4d17';
 

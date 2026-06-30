@@ -414,7 +414,11 @@ function doPost(e) {
       return handleClose_(a, b);
     }
 
-    if (String(b._secret).trim() !== String(CRM_SECRET).trim()) {
+    // adminLogin / repLogin authenticate by code/PIN server-side (with a 5-try lockout) and
+    // do NOT require the pre-shared CRM secret — so any device can sign in cold. On success
+    // they hand back the secret, so the device is fully provisioned just by logging in.
+    if (a !== 'adminLogin' && a !== 'repLogin' &&
+        String(b._secret).trim() !== String(CRM_SECRET).trim()) {
       return err_('Unauthorized — set the CRM_SECRET Script property to the value shown in Settings.');
     }
 
@@ -436,7 +440,7 @@ function doPost(e) {
         const ok_ = sha256Hex_(String(b.code || '') + '|' + CRM_SECRET) === gateHash;
         if (ok_) {
           PROPS.deleteProperty('adminAuthState');
-          return ok({ ok:true, token:issueAdminToken_(8), name:PROP_('ADMIN_NAME','Andres Toro') });
+          return ok({ ok:true, token:issueAdminToken_(8), name:PROP_('ADMIN_NAME','Andres Toro'), secret:CRM_SECRET });
         }
         const fails = (st.fails || 0) + 1;
         const next = { fails:fails };
@@ -467,7 +471,7 @@ function doPost(e) {
           PROPS.deleteProperty('repAuthState');
           return ok({ serverAuth:true, ok:true, userId:m.id, name:m.name, role:m.role || 'closer',
             closerRate:parseFloat(m.closerRate || 0), providerRate:parseFloat(m.providerRate || 0),
-            token:issueRepToken_(m.id, m.role || 'closer', 12) });
+            token:issueRepToken_(m.id, m.role || 'closer', 12), secret:CRM_SECRET });
         }
         const fails = (st.fails || 0) + 1;
         const next = { fails:fails };

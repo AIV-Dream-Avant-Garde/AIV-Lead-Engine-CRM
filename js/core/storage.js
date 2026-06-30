@@ -31,6 +31,9 @@ function saveLocal() {
 
 function loadLocal() {
   try { S.config = {...S.config, ...JSON.parse(localStorage.getItem('aiv-cfg')  || '{}')}; } catch(e) {}
+  // Fall back to the baked production URL so a fresh device connects with no setup —
+  // it can then be signed into with just a PIN (the login returns the secret).
+  if (!S.config.scriptUrl && typeof DEFAULT_SCRIPT_URL === 'string' && DEFAULT_SCRIPT_URL.indexOf('http') === 0) S.config.scriptUrl = DEFAULT_SCRIPT_URL;
   // Whether the server admin gate is live (set on last sync) — read at login time
   // to decide if the old in-browser admin PIN path is still allowed.
   S.config.adminGateEnabled = localStorage.getItem('aiv-admin-gate') === '1';
